@@ -8,71 +8,71 @@
 
 /* ====== 顶部 ====== */
 .lottery-header {
-  padding: 48rpx 32rpx 32rpx;
+  padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-lg);
   text-align: center;
   color: #fff;
 }
 .header-title {
   display: block;
-  font-size: 44rpx;
+  font-size: var(--font-xl);
   font-weight: 900;
   letter-spacing: 2rpx;
-  margin-bottom: 12rpx;
+  margin-bottom: var(--spacing-xs);
   text-shadow: 0 4rpx 12rpx rgba(0,0,0,0.15);
 }
 .header-sub {
   display: block;
-  font-size: 26rpx;
+  font-size: var(--font-sm);
   opacity: 0.9;
-  margin-bottom: 20rpx;
+  margin-bottom: var(--spacing-md);
 }
 .chances-badge {
   display: inline-block;
   background: rgba(255,255,255,0.25);
   backdrop-filter: blur(10px);
-  padding: 10rpx 32rpx;
+  padding: var(--spacing-xs) var(--spacing-lg);
   border-radius: 999rpx;
-  font-size: 24rpx;
+  font-size: var(--font-sm);
   font-weight: 600;
   border: 1rpx solid rgba(255,255,255,0.4);
 }
 .chances-num {
-  font-size: 32rpx;
+  font-size: var(--font-md);
   font-weight: 900;
   color: #F5D998;
 }
 
 /* ====== 九宫格 ====== */
 .grid-wrap {
-  padding: 0 32rpx;
-  margin-bottom: 32rpx;
+  padding: 0 var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
 }
 .grid-box {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: 12rpx;
+  gap: var(--spacing-xs);
   background: #fff;
-  border-radius: 28rpx;
-  padding: 20rpx;
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-md);
   box-shadow: 0 16rpx 48rpx rgba(0,0,0,0.1);
 }
 
 .grid-cell {
   aspect-ratio: 1;
-  border-radius: 20rpx;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8rpx;
+  gap: var(--spacing-xs);
   transition: all 0.15s ease;
   position: relative;
   overflow: hidden;
 }
 .cell-icon { font-size: 48rpx; }
 .cell-name {
-  font-size: 22rpx;
+  font-size: var(--font-xs);
   font-weight: 700;
   color: var(--color-text-title);
   text-align: center;
@@ -88,7 +88,7 @@
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(192, 139, 92, 0.08);
-  border-radius: 20rpx;
+  border-radius: var(--radius-md);
 }
 
 /* 中间按钮 */
@@ -113,24 +113,24 @@
 
 /* ====== 活动说明 ====== */
 .lottery-info {
-  margin: 0 32rpx;
+  margin: 0 var(--spacing-lg);
   background: #fff;
-  border-radius: 20rpx;
-  padding: 28rpx;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03);
 }
 .info-title {
-  font-size: 28rpx;
+  font-size: var(--font-base);
   font-weight: 800;
   color: var(--color-text-title);
-  margin-bottom: 16rpx;
+  margin-bottom: var(--spacing-sm);
 }
 .info-item {
   display: block;
-  font-size: 24rpx;
+  font-size: var(--font-sm);
   color: var(--color-text-sub);
   line-height: 2;
-  padding-left: 16rpx;
+  padding-left: var(--spacing-sm);
   position: relative;
 }
 .info-item::before {
@@ -159,12 +159,12 @@
 .result-popup {
   width: 560rpx;
   background: #fff;
-  border-radius: 32rpx;
-  padding: 56rpx 40rpx 40rpx;
+  border-radius: var(--radius-xl);
+  padding: 56rpx var(--spacing-xl) var(--spacing-xl);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16rpx;
+  gap: var(--spacing-sm);
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 @keyframes popIn {
@@ -173,24 +173,24 @@
 }
 
 .result-emoji { font-size: 80rpx; }
-.result-title { font-size: 36rpx; font-weight: 900; color: var(--color-text-title); }
+.result-title { font-size: var(--font-lg); font-weight: 900; color: var(--color-text-title); }
 .result-name {
-  font-size: 32rpx; font-weight: 800;
+  font-size: var(--font-md); font-weight: 800;
   color: var(--color-primary);
   background: var(--color-primary-bg);
-  padding: 12rpx 32rpx;
-  border-radius: 12rpx;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border-radius: var(--radius-sm);
 }
-.result-hint { font-size: 24rpx; color: var(--color-text-sub); text-align: center; }
+.result-hint { font-size: var(--font-sm); color: var(--color-text-sub); text-align: center; }
 .result-btn {
   width: 100%;
-  margin-top: 12rpx;
+  margin-top: var(--spacing-xs);
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
   color: #fff;
   text-align: center;
-  padding: 24rpx;
-  border-radius: 16rpx;
-  font-size: 30rpx;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-md);
   font-weight: 700;
 }
 .result-btn:active { opacity: 0.8; }
