@@ -5,10 +5,10 @@
 
 page {
   /* ─── 焦糖暖棕 · 主色 ─── */
-  --color-primary: #C08B5C;
-  --color-primary-light: #D4A574;
-  --color-primary-dark: #A67443;
-  --color-primary-bg: #FFF5EB;
+  --color-primary: #5E7CE2;
+  --color-primary-light: #7C8FF0;
+  --color-primary-dark: #4358B0;
+  --color-primary-bg: #EDF1FF;
 
   /* ─── 温润靛蓝 · AI辅色 ─── */
   --color-ai: #6B8A99;
@@ -35,8 +35,8 @@ page {
   --color-text-secondary: var(--color-text-sub);
 
   /* ─── 背景 & 边框 ─── */
-  --bg-page: #FAF6F1;
-  --bg-card: #FFFCF8;
+  --bg-page: #F3F7FF;
+  --bg-card: #FFFFFF;
   --color-bg-white: var(--bg-card);
   --color-border: rgba(44,36,32,0.06);
 
