@@ -31,6 +31,11 @@ exports.main = async (event) => {
     switch (action) {
         case 'ensureUser':
             return ensureUser(OPENID, event)
+        case 'login':
+        case 'initUser':
+            return ensureUser(OPENID, event)
+        case '':
+            return ensureUser(OPENID, event)
         case 'getStoreInfo':
             return getStoreInfo()
         case 'getWorkbenchAccess':

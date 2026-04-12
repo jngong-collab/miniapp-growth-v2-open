@@ -2,7 +2,7 @@
 
 .page-lottery {
   min-height: 100vh;
-  background: linear-gradient(180deg, #C08B5C 0%, #D4A574 35%, var(--bg-page) 65%);
+  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-light) 35%, var(--bg-page) 65%);
   padding-bottom: 60rpx;
 }
 
@@ -39,7 +39,7 @@
 .chances-num {
   font-size: var(--font-md);
   font-weight: 900;
-  color: #F5D998;
+  color: #fff;
 }
 
 /* ====== 九宫格 ====== */
@@ -52,10 +52,11 @@
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: var(--spacing-xs);
-  background: #fff;
+  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 78%, var(--color-bg-white) 100%);
   border-radius: var(--radius-xl);
   padding: var(--spacing-md);
-  box-shadow: 0 16rpx 48rpx rgba(0,0,0,0.1);
+  box-shadow: 0 12rpx 32rpx rgba(0,0,0,0.1);
+  border: 1rpx solid var(--color-border);
 }
 
 .grid-cell {
@@ -69,6 +70,8 @@
   transition: all 0.15s ease;
   position: relative;
   overflow: hidden;
+  border: 1rpx solid var(--color-border);
+  background: linear-gradient(165deg, #FFFFFF 0%, var(--bg-card) 100%);
 }
 .cell-icon { font-size: 48rpx; }
 .cell-name {
@@ -80,22 +83,22 @@
 
 /* 高亮动画 */
 .cell-active {
-  box-shadow: 0 0 0 4rpx var(--color-primary), 0 8rpx 24rpx rgba(192, 139, 92, 0.3);
+  box-shadow: 0 0 0 4rpx var(--color-primary), 0 8rpx 24rpx var(--color-primary-bg);
   transform: scale(1.05);
 }
 .cell-active::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(192, 139, 92, 0.08);
+  background: rgba(94, 124, 226, 0.08);
   border-radius: var(--radius-md);
 }
 
 /* 中间按钮 */
 .grid-btn {
-  background: linear-gradient(135deg, #D4A574, #C08B5C) !important;
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary)) !important;
   color: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(192, 139, 92, 0.4);
+  box-shadow: 0 8rpx 24rpx var(--color-primary-bg);
 }
 .grid-btn:active {
   transform: scale(0.95);
@@ -114,10 +117,11 @@
 /* ====== 活动说明 ====== */
 .lottery-info {
   margin: 0 var(--spacing-lg);
-  background: #fff;
+  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 78%, var(--color-bg-white) 100%);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.03);
+  box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 .info-title {
   font-size: var(--font-base);
@@ -158,13 +162,15 @@
 
 .result-popup {
   width: 560rpx;
-  background: #fff;
+  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 78%, var(--color-bg-white) 100%);
   border-radius: var(--radius-xl);
   padding: 56rpx var(--spacing-xl) var(--spacing-xl);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-sm);
+  border: 1rpx solid var(--color-border);
+  box-shadow: var(--shadow-float);
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 @keyframes popIn {

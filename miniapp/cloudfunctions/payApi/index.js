@@ -14,6 +14,10 @@ exports.main = async (event, context) => {
     switch (action) {
         case 'createOrder':    return await createOrder(event, openid)
         case 'requestPay':     return await requestPay(event, openid)
+        case 'ensureUser':
+        case 'login':
+        case 'initUser':
+            return await ensureUser(openid, event)
         case 'payCallback': {
             // 内部鉴权：未配置环境变量时直接拒绝执行，避免默认密钥失效。
             if (!isAuthorizedInternalCall(event)) {
@@ -33,6 +37,54 @@ exports.main = async (event, context) => {
         case 'refund':         return await handleRefund(event, openid)
         default:               return { code: -1, msg: '未知操作' }
     }
+}
+
+async function ensureUser(openid, event) {
+    if (!openid) return { code: -1, msg: '缺少用户身份' }
+
+    const invitedBy = (event || {}).invitedBy || ''
+    const storeRes = await db.collection('stores').limit(1).get().catch(() => ({ data: [] }))
+    const store = (storeRes.data || [])[0]
+    const storeId = store ? store._id : ''
+
+    let user = await db.collection('users').where({ _openid: openid }).limit(1).get()
+        .then(res => (res.data || [])[0])
+        .catch(() => null)
+
+    if (!user) {
+        const payload = {
+            _openid: openid,
+            nickName: '',
+            avatarUrl: '',
+            phone: '',
+            role: 'customer',
+            permissions: [],
+            storeId,
+            inviterOpenid: invitedBy && invitedBy !== openid ? invitedBy : '',
+            leadSources: [],
+            balance: 0,
+            totalEarned: 0,
+            totalInvited: 0,
+            memberLevel: 'normal',
+            createdAt: db.serverDate(),
+            updatedAt: db.serverDate()
+        }
+        const addRes = await db.collection('users').add({ data: payload })
+        if (!addRes._id) return { code: -1, msg: '用户初始化失败' }
+        user = await db.collection('users').doc(addRes._id).get().then(res => res.data || payload).catch(() => payload)
+    }
+
+    if (invitedBy && invitedBy !== openid && !user.inviterOpenid) {
+        await db.collection('users').where({ _openid: openid }).update({
+            data: {
+                inviterOpenid: invitedBy,
+                updatedAt: db.serverDate()
+            }
+        })
+        user.inviterOpenid = invitedBy
+    }
+
+    return { code: 0, openid, data: user }
 }
 
 // ─────────────────────────────────────────────

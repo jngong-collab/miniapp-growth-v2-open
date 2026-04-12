@@ -12,6 +12,10 @@ exports.main = async (event) => {
     switch (action) {
         case 'getProductDetail':
             return getProductDetail(event)
+        case 'ensureUser':
+        case 'login':
+        case 'initUser':
+            return proxyPayApi({ ...event, action: 'ensureUser' })
         case 'createOrder':
             return proxyPayApi({ ...event, action: 'createOrder' })
         case 'requestPay':

@@ -12,6 +12,10 @@ exports.main = async (event) => {
     const { action } = event
 
     switch (action) {
+        case 'ensureUser':
+        case 'login':
+        case 'initUser':
+            return { code: 0, data: { openid: OPENID, userInfo: {} } }
         case 'getMyEarnings':
             return getMyEarnings(OPENID)
         case 'getMyFissionRecords':

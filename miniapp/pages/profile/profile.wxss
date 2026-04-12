@@ -13,7 +13,7 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 520rpx;
-  background: linear-gradient(180deg, #FFF5EB 0%, #FFF8F2 40%, var(--bg-page) 100%);
+  background: linear-gradient(180deg, var(--color-primary-bg) 0%, var(--color-bg-white) 40%, var(--bg-page) 100%);
   z-index: 0;
 }
 
@@ -29,9 +29,9 @@
   width: 100%;
   border-radius: var(--radius-xl);
   overflow: hidden;
-  background: linear-gradient(135deg, #D4A574, #C08B5C, #A67443);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark), var(--color-text-main));
   color: #fff;
-  box-shadow: 0 24rpx 56rpx -12rpx rgba(192, 139, 92, 0.35);
+  box-shadow: 0 24rpx 56rpx -12rpx var(--color-primary-bg);
   transform: rotateX(2deg) scale(0.99);
   transition: transform 0.3s ease;
 }
@@ -147,7 +147,7 @@
 
 /* 通用内容块 */
 .section-block {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   box-shadow: 0 8rpx 28rpx rgba(0,0,0,0.03);
   margin-bottom: var(--spacing-md);
@@ -191,11 +191,11 @@
   font-size: var(--font-base); margin-right: var(--spacing-md);
 }
 /* 图标背景色 */
-.icon-earn { background: linear-gradient(135deg, #FFF5EB, #FFF8F0); }
-.icon-ai { background: linear-gradient(135deg, #E8F0F4, #F0F4F6); }
+.icon-earn { background: linear-gradient(135deg, var(--color-primary-bg), var(--color-bg-white)); }
+.icon-ai { background: linear-gradient(135deg, var(--color-ai-bg), var(--color-bg-white)); }
 .icon-default { background: var(--bg-page); }
-.icon-green { background: linear-gradient(135deg, #D4FC79, #E8FFD0); }
-.icon-blue { background: linear-gradient(135deg, #D0E8FF, #E6F1FF); }
+.icon-green { background: linear-gradient(135deg, var(--color-eco-bg), var(--color-bg-white)); }
+.icon-blue { background: linear-gradient(135deg, var(--color-ai-bg), var(--color-bg-white)); }
 
 .menu-label { font-size: var(--font-md); font-weight: 600; color: var(--color-text-title); }
 .menu-row-right { display: flex; align-items: center; }

@@ -5,7 +5,10 @@ const { callCloud } = require('./utils/cloud-api')
 App({
   _getCloudActionFallbacks() {
     return [
-      { name: 'opsApi', action: 'ensureUser' }
+      { name: 'opsApi', action: 'ensureUser' },
+      { name: 'payApi', action: 'ensureUser' },
+      { name: 'growthApi', action: 'ensureUser' },
+      { name: 'commerceApi', action: 'ensureUser' }
     ]
   },
 
@@ -16,7 +19,15 @@ App({
   },
 
   _isUnknownActionError(error) {
-    return error && error.code === -1 && /未知操作/.test(String(error.message || ''))
+    if (!error) return false
+    const rawCode = error.code
+    const code = typeof rawCode === 'number' ? rawCode : Number(rawCode)
+    const msg = String(error.message || error.errMsg || error.result?.msg || '')
+    const hasUnknownMsg = /未知操作|No such action|not found|不存在|not exist|no such cloud function|Unknown operation|No such function/i.test(msg)
+    if (!Number.isFinite(code)) {
+      return hasUnknownMsg
+    }
+    return code === -1 && hasUnknownMsg
   },
 
   async _callCloudWithFallback(candidates, payload) {

@@ -18,12 +18,12 @@
 }
 .shape-1 {
   width: 480rpx; height: 480rpx;
-  background: #F5E6D3;
+  background: var(--color-primary-bg);
   top: -120rpx; right: -80rpx;
 }
 .shape-2 {
   width: 360rpx; height: 360rpx;
-  background: #E8DDD2;
+  background: var(--color-ai-bg);
   top: 500rpx; left: -140rpx;
 }
 
@@ -93,6 +93,9 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
   overflow: hidden;
+  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 72%, var(--color-bg-white) 100%);
+  border: 1rpx solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 .bento-item:active { transform: scale(0.965); transition: transform 0.15s ease; }
 .bento-bg-icon {
@@ -119,6 +122,7 @@
   font-size: var(--font-xs);
   line-height: 1.5;
   opacity: 0.85;
+  color: var(--color-text-sub);
 }
 .desc-sub { color: var(--color-text-sub) !important; opacity: 1; }
 
@@ -169,7 +173,7 @@
   border-radius: var(--radius-lg);
   margin-bottom: var(--spacing-lg);
   overflow: hidden;
-  background: linear-gradient(135deg, #C9A06C, #B0845A, #8E6B42);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark), var(--color-text-main));
   color: #fff;
 }
 .promo-bg-pattern {
@@ -262,7 +266,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(165deg, #F5E6D3 0%, #F0E4D8 40%, #EDE0D4 100%);
+  background: linear-gradient(165deg, var(--color-primary-bg) 0%, var(--color-ai-bg) 40%, var(--color-bg-white) 100%);
   gap: var(--spacing-xs);
 }
 .therapist-placeholder-emoji {
@@ -371,6 +375,8 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: var(--spacing-lg);
+  border: 1rpx solid var(--color-border);
+  background: linear-gradient(165deg, var(--bg-card), var(--color-bg-white));
 }
 .package-img-wrap {
   width: 230rpx;
@@ -389,7 +395,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, #F5E6D3, #F0E0D0);
+  background: linear-gradient(145deg, var(--color-primary-bg), var(--color-bg-white));
 }
 .package-img-placeholder .placeholder-emoji {
   font-size: 72rpx;
@@ -439,6 +445,9 @@
 .grid-product-card {
   border-radius: var(--radius-lg);
   overflow: hidden;
+  background: linear-gradient(165deg, var(--bg-card), var(--color-bg-white));
+  border: 1rpx solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 .grid-product-img-wrap {
   width: 100%;
@@ -467,7 +476,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, #F5E6D3, #EDE0D4, #F0E8E0);
+  background: linear-gradient(145deg, var(--color-primary-bg), var(--color-bg-white), var(--color-bg-white));
   gap: var(--spacing-xs);
 }
 .placeholder-emoji {
@@ -525,7 +534,7 @@
 .skeleton-line {
   height: 36rpx;
   border-radius: var(--radius-sm);
-  background: #EDE5DC;
+  background: var(--color-primary-bg);
 }
 .skeleton-w60 { width: 55%; }
 .skeleton-w40 { width: 38%; height: 26rpx; }
@@ -536,7 +545,7 @@
 }
 .skeleton-block {
   border-radius: var(--radius-lg);
-  background: #EDE5DC;
+  background: var(--color-primary-bg);
 }
 .skeleton-large {
   flex: 1.6;
@@ -569,7 +578,7 @@
   100% { background-position: 200% 0; }
 }
 .skeleton-shimmer {
-  background: linear-gradient(90deg, #EDE5DC 25%, #F5EDE4 50%, #EDE5DC 75%);
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--color-primary-bg) 50%, var(--bg-card) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
