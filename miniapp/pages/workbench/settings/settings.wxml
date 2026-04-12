@@ -1,0 +1,31 @@
+<view class="simple-page">
+  <view class="list-card" wx:if="{{settings.storeInfo}}">
+    <text class="list-title">{{settings.storeInfo.name || '门店信息未配置'}}</text>
+    <text class="list-desc">电话 {{settings.storeInfo.phone || '未设置'}}</text>
+    <text class="list-desc">地址 {{settings.storeInfo.address || '未设置'}}</text>
+  </view>
+
+  <view class="list-card" wx:if="{{settings.aiConfig}}">
+    <text class="list-title">AI 舌象配置</text>
+    <text class="list-desc">模型 {{settings.aiConfig.model || '未设置'}}</text>
+    <text class="list-desc">每日总额度 {{settings.aiConfig.dailyLimit || 0}}</text>
+    <text class="list-desc">单用户日额度 {{settings.aiConfig.userDailyLimit || 0}}</text>
+  </view>
+
+  <view class="list-card" wx:if="{{settings.payConfig}}">
+    <text class="list-title">支付配置</text>
+    <text class="list-desc">商户号 {{settings.payConfig.mchId || '未设置'}}</text>
+    <text class="list-desc">密钥 {{settings.payConfig.mchKey || '未配置'}}</text>
+  </view>
+
+  <view class="list-card">
+    <view class="staff-head">
+      <text class="list-title">员工权限</text>
+      <button size="mini" class="action-btn" bindtap="openStaffManage">管理员工</button>
+    </view>
+    <view wx:for="{{settings.staff}}" wx:key="openid" class="staff-item">
+      <text class="staff-name">{{item.name || '员工'}}</text>
+      <text class="staff-desc">{{item.phone || '未填写手机'}} · {{item.permissionsText}}</text>
+    </view>
+  </view>
+</view>

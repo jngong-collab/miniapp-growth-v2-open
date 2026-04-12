@@ -1,0 +1,65 @@
+{
+  "cloud": true,
+  "pages": [
+    "pages/index/index",
+    "pages/tongue/tongue",
+    "pages/mall/mall",
+    "pages/fission/fission",
+    "pages/product-detail/product-detail",
+    "pages/package-usage/package-usage",
+    "pages/tongue-report/tongue-report",
+    "pages/lottery/lottery",
+    "pages/profile/profile",
+    "pages/workbench/verify/verify",
+    "pages/workbench/staff/staff",
+    "pages/orders/orders",
+    "pages/workbench/dashboard/dashboard",
+    "pages/workbench/orders/orders",
+    "pages/workbench/leads/leads",
+    "pages/workbench/catalog/catalog",
+    "pages/workbench/campaigns/campaigns",
+    "pages/workbench/settings/settings"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#FAF6F1",
+    "navigationBarTitleText": "浴小主",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#FAF6F1",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#9C9088",
+    "selectedColor": "#C08B5C",
+    "backgroundColor": "#FFFCF8",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "assets/icons/home.png",
+        "selectedIconPath": "assets/icons/home-active.png"
+      },
+      {
+        "pagePath": "pages/tongue/tongue",
+        "text": "AI看舌象",
+        "iconPath": "assets/icons/tongue.png",
+        "selectedIconPath": "assets/icons/tongue-active.png"
+      },
+      {
+        "pagePath": "pages/mall/mall",
+        "text": "商城",
+        "iconPath": "assets/icons/mall.png",
+        "selectedIconPath": "assets/icons/mall-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "assets/icons/profile.png",
+        "selectedIconPath": "assets/icons/profile-active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

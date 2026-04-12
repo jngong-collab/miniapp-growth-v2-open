@@ -1,0 +1,47 @@
+.simple-page {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding: var(--spacing-md);
+  box-sizing: border-box;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+}
+
+.summary-card,
+.list-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.summary-value,
+.list-title {
+  display: block;
+  color: var(--color-text-title);
+  font-weight: 700;
+}
+
+.summary-value {
+  font-size: var(--font-xl);
+}
+
+.summary-label,
+.list-desc {
+  display: block;
+  margin-top: var(--spacing-xs);
+  color: var(--color-text-sub);
+  font-size: var(--font-sm);
+}
+
+.list-card {
+  margin-bottom: var(--spacing-md);
+}
+
+.list-title {
+  font-size: var(--font-md);
+}

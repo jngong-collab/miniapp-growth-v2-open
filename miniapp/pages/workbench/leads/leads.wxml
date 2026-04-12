@@ -1,0 +1,38 @@
+<view class="leads-page">
+  <scroll-view class="filter-scroll" scroll-x="true" show-scrollbar="false">
+    <view class="filter-row">
+      <view
+        wx:for="{{sourceFilters}}"
+        wx:key="key"
+        class="filter-chip {{activeSource === item.key ? 'filter-chip-active' : ''}}"
+        data-source="{{item.key}}"
+        bindtap="switchSource"
+      >
+        {{item.label}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="lead-card" wx:for="{{leads}}" wx:key="_id">
+    <view class="lead-top">
+      <view>
+        <text class="lead-name">{{item.nickName || '微信用户'}}</text>
+        <text class="lead-source">{{item.primarySourceLabel}} · {{item.updatedAtText}}</text>
+      </view>
+      <text class="lead-status">{{item.followupStatusLabel}}</text>
+    </view>
+    <view class="lead-track">
+      <text wx:for="{{item.tracks}}" wx:key="*this" class="track-pill">{{item}}</text>
+    </view>
+    <text class="lead-note" wx:if="{{item.followupNote}}">备注：{{item.followupNote}}</text>
+    <button
+      class="action-btn"
+      size="mini"
+      data-id="{{item._openid}}"
+      data-status="{{item.followupStatus}}"
+      bindtap="updateFollowup"
+    >
+      更新跟进
+    </button>
+  </view>
+</view>

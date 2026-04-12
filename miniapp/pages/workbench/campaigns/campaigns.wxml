@@ -1,0 +1,21 @@
+<view class="simple-page">
+  <view class="section-header">
+    <text class="section-title">裂变活动</text>
+    <text class="section-subtitle">FISSION</text>
+  </view>
+  <view class="list-card" wx:for="{{fissionCampaigns}}" wx:key="_id">
+    <text class="list-title">{{item.productName}}</text>
+    <text class="list-desc">活动价 ¥{{item.activityPriceYuan}} · 已售 {{item.soldCount || 0}}</text>
+    <text class="list-desc">{{item.periodText}}</text>
+  </view>
+
+  <view class="section-header">
+    <text class="section-title">抽奖活动</text>
+    <text class="section-subtitle">LOTTERY</text>
+  </view>
+  <view class="list-card" wx:for="{{lotteryCampaigns}}" wx:key="_id">
+    <text class="list-title">{{item.name}}</text>
+    <text class="list-desc">{{item.periodText}}</text>
+    <text class="list-desc">参与 {{item.entryCount || 0}} · 中奖 {{item.winCount || 0}}</text>
+  </view>
+</view>

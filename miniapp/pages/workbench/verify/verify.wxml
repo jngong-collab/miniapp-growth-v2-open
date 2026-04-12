@@ -1,0 +1,63 @@
+<view class="page-workbench-verify">
+  <view class="verify-header">
+    <text class="verify-title">核销中心</text>
+    <text class="verify-subtitle">输入顾客核销码完成服务核销</text>
+  </view>
+
+  <view class="code-input-section">
+    <view class="code-input-wrap">
+      <input class="code-input"
+             type="number"
+             maxlength="8"
+             placeholder="请输入 8 位核销码"
+             value="{{verifyCode}}"
+             bindinput="onCodeInput"
+             focus="{{!orderItem}}" />
+      <view class="code-query-btn {{verifyCode.length >= 6 ? 'active' : ''}}" bindtap="queryCode">
+        查询
+      </view>
+    </view>
+  </view>
+
+  <view class="order-info-card" wx:if="{{orderItem}}">
+    <view class="order-info-header">
+      <text class="order-info-title">{{orderItem.productName}}</text>
+      <view class="order-type-tag tag-{{orderItem.productType}}">
+        {{orderItem.productType === 'service' ? '单次服务' : '套餐'}}
+      </view>
+    </view>
+
+    <view class="service-select-section" wx:if="{{serviceList.length > 0}}">
+      <text class="service-select-label">选择核销服务项：</text>
+      <view class="service-options">
+        <view class="service-option {{serviceName === item.name ? 'selected' : ''}}"
+              wx:for="{{serviceList}}"
+              wx:key="name"
+              bindtap="selectService"
+              data-name="{{item.name}}">
+          <text class="service-option-name">{{item.name}}</text>
+          <text class="service-option-count">剩余 {{item.remaining}} 次</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="verify-action-section">
+      <view class="verify-btn verify-btn-confirm" bindtap="doVerify">
+        确认核销
+      </view>
+      <view class="verify-btn verify-btn-cancel" bindtap="resetForm">
+        重新输入
+      </view>
+    </view>
+  </view>
+
+  <view class="result-card {{result.success ? 'success' : 'error'}}" wx:if="{{result}}">
+    <text class="result-icon">{{result.success ? '✅' : '❌'}}</text>
+    <text class="result-msg">{{result.msg}}</text>
+    <view class="verify-btn verify-btn-reset" bindtap="resetForm" wx:if="{{result.success}}">继续核销</view>
+  </view>
+
+  <view class="loading-mask" wx:if="{{loading}}">
+    <text>处理中...</text>
+  </view>
+</view>

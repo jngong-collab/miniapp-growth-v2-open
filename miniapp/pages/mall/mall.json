@@ -1,0 +1,7 @@
+{
+    "usingComponents": {},
+    "navigationBarTitleText": "健康商城",
+    "navigationBarBackgroundColor": "#FAF6F1",
+    "navigationBarTextStyle": "black",
+    "enablePullDownRefresh": true
+}

@@ -1,0 +1,53 @@
+<view class="workbench-page">
+  <scroll-view class="filter-scroll" scroll-x="true" show-scrollbar="false">
+    <view class="filter-row">
+      <view
+        wx:for="{{filters}}"
+        wx:key="key"
+        class="filter-chip {{activeStatus === item.key ? 'filter-chip-active' : ''}}"
+        data-status="{{item.key}}"
+        bindtap="switchStatus"
+      >
+        {{item.label}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="empty-block" wx:if="{{!loading && !orders.length}}">
+    <text class="empty-title">当前没有符合条件的订单</text>
+  </view>
+
+  <view class="list-wrap" wx:else>
+    <view class="list-card" wx:for="{{orders}}" wx:key="_id">
+      <view class="card-top">
+        <view>
+          <text class="card-title">{{item.productName || '门店订单'}}</text>
+          <text class="card-sub">{{item.createdAtText}} · {{item.orderNo}}</text>
+        </view>
+        <text class="tag">{{item.statusLabel}}</text>
+      </view>
+      <view class="meta-row">
+        <text>用户 {{item.userLabel}}</text>
+        <text>金额 ¥{{item.totalAmountYuan}}</text>
+      </view>
+      <view class="meta-row">
+        <text>数量 {{item.quantity || 1}}</text>
+        <text>来源 {{item.leadSourceLabel || '自然到店'}}</text>
+      </view>
+      <view class="refund-box" wx:if="{{item.refundRequest}}">
+        <text class="refund-title">退款申请：{{item.refundRequest.reason || '未填写原因'}}</text>
+        <text class="refund-sub">状态 {{item.refundRequest.statusLabel}}</text>
+        <button
+          wx:if="{{role === 'admin' && item.refundRequest.status === 'pending'}}"
+          class="action-btn"
+          size="mini"
+          data-request-id="{{item.refundRequest._id}}"
+          data-order-id="{{item._id}}"
+          bindtap="processRefund"
+        >
+          处理申请
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

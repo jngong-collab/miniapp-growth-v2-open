@@ -1,0 +1,51 @@
+<view class="orders-page">
+  <scroll-view class="filter-scroll" scroll-x="true" show-scrollbar="false">
+    <view class="filter-row">
+      <view
+        wx:for="{{filters}}"
+        wx:key="key"
+        class="filter-chip {{activeStatus === item.key ? 'filter-chip-active' : ''}}"
+        data-status="{{item.key}}"
+        bindtap="switchStatus"
+      >
+        {{item.label}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="empty-block" wx:if="{{!loading && !orders.length}}">
+    <text class="empty-title">还没有符合条件的订单</text>
+    <text class="empty-desc">参与活动、购买体验项目后会显示在这里</text>
+  </view>
+
+  <view class="order-list" wx:else>
+    <view class="order-card" wx:for="{{orders}}" wx:key="_id">
+      <view class="card-head">
+        <view>
+          <text class="order-title">{{item.productName || '门店订单'}}</text>
+          <text class="order-no">{{item.orderNo}}</text>
+        </view>
+        <text class="status-tag">{{item.statusLabel}}</text>
+      </view>
+      <view class="card-meta">
+        <text>下单时间 {{item.createdAtText}}</text>
+        <text>数量 {{item.quantity || 1}}</text>
+      </view>
+      <view class="card-bottom">
+        <view class="price-box">
+          <text class="price-label">实付</text>
+          <text class="price-value">¥{{item.payAmountYuan}}</text>
+        </view>
+        <button
+          wx:if="{{item.canRefund}}"
+          class="ghost-btn"
+          data-id="{{item._id}}"
+          bindtap="requestRefund"
+          size="mini"
+        >
+          申请退款
+        </button>
+      </view>
+    </view>
+  </view>
+</view>

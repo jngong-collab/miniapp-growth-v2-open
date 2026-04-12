@@ -1,0 +1,123 @@
+<!--pages/tongue/tongue.wxml - 高级版 AI 舌诊-->
+<view class="page-container">
+  <!-- 顶部背景装饰 (同首页) -->
+  <view class="bg-decoration">
+    <view class="shape-1"></view>
+    <view class="shape-2"></view>
+  </view>
+
+  <view class="content-wrapper">
+    <!-- 头部模块 -->
+    <view class="header-area animate-fade-up">
+      <text class="page-main-title">AI 智能舌诊</text>
+      <text class="page-sub-title">拍照秒出体质报告 · 专业中医辅助</text>
+    </view>
+
+    <!-- 闲置/表单状态 -->
+    <block wx:if="{{state === 'idle'}}">
+      <!-- 卡片 1：宝宝基本信息 -->
+      <view class="premium-card card-float animate-fade-up" style="animation-delay: 0.1s">
+        <view class="card-head">
+          <view class="head-icon-bg blue-bg"><text class="head-icon">👶</text></view>
+          <text class="head-title">宝宝信息</text>
+        </view>
+
+        <view class="form-body">
+          <view class="form-row">
+            <text class="f-label">宝宝年龄</text>
+            <picker class="age-picker-box" bindchange="onAgeChange" value="{{ageIndex}}" range="{{ageList}}">
+              <view class="f-picker">
+                <text class="f-picker-text {{ageIndex >= 0 ? '' : 'f-picker-ph'}}">{{ageIndex >= 0 ? ageList[ageIndex] : '请选择'}}</text>
+                <text class="f-picker-arrow">›</text>
+              </view>
+            </picker>
+          </view>
+          
+          <view class="form-row-divider"></view>
+
+          <view class="form-row">
+            <text class="f-label">宝宝性别</text>
+            <view class="f-pills">
+              <view class="pill-btn {{babyGender === 'boy' ? 'boy-on' : ''}}" bindtap="onGenderTap" data-gender="boy">👦 男宝</view>
+              <view class="pill-btn {{babyGender === 'girl' ? 'girl-on' : ''}}" bindtap="onGenderTap" data-gender="girl">👧 女宝</view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 卡片 2：症状信息 -->
+      <view class="premium-card card-float animate-fade-up" style="animation-delay: 0.15s">
+        <view class="card-head">
+          <view class="head-icon-bg purple-bg"><text class="head-icon">🤒</text></view>
+          <text class="head-title">宝宝症状描述</text>
+        </view>
+        <view class="other-symptom-box">
+          <textarea class="sym-textarea" placeholder="请描述宝宝目前的症状，例如：夜间老是睡不安稳，腹泻，发烧..." value="{{otherSymptom}}" bindinput="onOtherSymptomInput" auto-height="{{false}}" fixed="{{true}}" />
+        </view>
+      </view>
+
+      <!-- 拍照指引（精简横条） -->
+      <view class="guide-strip animate-fade-up" style="animation-delay: 0.2s">
+        <view class="g-item">
+          <view class="icon-circle check-circle">✓</view>
+          <text class="g-text">光线明亮</text>
+        </view>
+        <view class="g-item">
+          <view class="icon-circle check-circle">✓</view>
+          <text class="g-text">舌体舒展</text>
+        </view>
+        <view class="g-item">
+          <view class="icon-circle cross-circle">×</view>
+          <text class="g-text">勿加滤镜</text>
+        </view>
+      </view>
+
+      <!-- 底部操作区 -->
+      <view class="action-dock animate-fade-up" style="animation-delay: 0.25s">
+        <button class="scan-btn shadow-btn" bindtap="chooseImage">
+          <text class="btn-icon">📷</text>
+          <text class="btn-text">立即拍舌象</text>
+        </button>
+        <view class="history-link-wrap" bindtap="goToHistory" wx:if="{{historyCount > 0}}">
+          <text class="history-link">查看历史分析报告 ({{historyCount}})</text>
+        </view>
+        <view class="history-link-wrap" bindtap="goToHistory" wx:else>
+          <text class="history-link">暂无历史报告</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- 预览状态 -->
+    <block wx:if="{{state === 'preview'}}">
+      <view class="preview-card card-float animate-fade-up">
+        <view class="preview-frame">
+          <image class="preview-img" src="{{selectedImage}}" mode="aspectFill"></image>
+          <view class="scanning-laser"></view>
+          <!-- 四角扫描框装饰 -->
+          <view class="scanner-corner tc-tl"></view>
+          <view class="scanner-corner tc-tr"></view>
+          <view class="scanner-corner tc-bl"></view>
+          <view class="scanner-corner tc-br"></view>
+        </view>
+        <view class="preview-dock">
+          <view class="prev-btn btn-light" bindtap="retakePhoto">重新拍摄</view>
+          <view class="prev-btn btn-brand shadow-btn" bindtap="startAnalyze">✨ 开始 AI 分析</view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 分析中状态 -->
+    <block wx:if="{{state === 'analyzing'}}">
+      <view class="analyzing-state animate-fade-up">
+        <view class="ai-brain-loader">
+          <view class="circle c1"></view>
+          <view class="circle c2"></view>
+          <view class="circle c3"></view>
+          <view class="core-icon">🔮</view>
+        </view>
+        <text class="analyzing-title">正在深度提取舌象特征</text>
+        <text class="analyzing-sub">结合黄帝内经理论进行体质推演...</text>
+      </view>
+    </block>
+  </view>
+</view>

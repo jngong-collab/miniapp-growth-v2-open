@@ -1,0 +1,28 @@
+.simple-page {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding: var(--spacing-md);
+  box-sizing: border-box;
+}
+
+.list-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.list-title {
+  display: block;
+  font-size: var(--font-md);
+  color: var(--color-text-title);
+  font-weight: 700;
+}
+
+.list-desc {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-sm);
+  color: var(--color-text-sub);
+}

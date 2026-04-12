@@ -1,0 +1,144 @@
+<!-- pages/fission/fission.wxml - 裂变活动页 -->
+<view class="page-fission">
+
+  <view wx:if="{{campaigns.length > 0}}">
+    <view wx:for="{{campaigns}}" wx:key="_id">
+
+      <!-- 顶部产品大图 -->
+      <view class="cover-wrap">
+        <image class="cover-img" src="{{item.productDetail.images[0] || '/assets/images/baby-massage.png'}}" mode="aspectFill"></image>
+        <view class="cover-gradient"></view>
+        <view class="cover-info">
+          <view class="cover-badge">限时活动</view>
+          <text class="cover-name">{{item.productName}}</text>
+        </view>
+      </view>
+
+      <!-- 内容区 -->
+      <view class="content-area">
+
+        <!-- 价格卡片 -->
+        <view class="price-card">
+          <view class="price-col">
+            <text class="price-tip">活动价</text>
+            <view class="price-row">
+              <text class="yen">¥</text><text class="price-big">{{item.activityPriceYuan}}</text>
+            </view>
+            <text class="price-orig" wx:if="{{item.productDetail.originalPriceYuan}}">原价 ¥{{item.productDetail.originalPriceYuan}}</text>
+          </view>
+          <view class="price-divider"></view>
+          <view class="price-col">
+            <text class="price-tip">推荐返现</text>
+            <view class="price-row cashback-color">
+              <text class="yen">¥</text><text class="price-big">{{item.cashbackAmountYuan}}</text>
+            </view>
+            <text class="price-sub">每成功一单</text>
+          </view>
+        </view>
+
+        <!-- 进度条 -->
+        <view class="progress-section" wx:if="{{item.soldPercent > 0}}">
+          <view class="progress-meta">
+            <text>已有 {{item.soldCount}} 人参与</text>
+            <text>剩余 {{item.remainingStock}} 份</text>
+          </view>
+          <view class="progress-track">
+            <view class="progress-fill" style="width: {{item.soldPercent}}%"></view>
+          </view>
+        </view>
+
+        <!-- 购买按钮 -->
+        <view class="buy-btn" bindtap="buyNow" data-product-id="{{item.productId}}">
+          🔥 ¥{{item.activityPriceYuan}} 立即购买
+        </view>
+
+        <!-- 产品介绍 -->
+        <view class="info-card" wx:if="{{item.productDetail}}">
+          <view class="info-head">📋 产品介绍</view>
+          <view class="info-tags">
+            <text class="tag tag-green" wx:if="{{item.productDetail.efficacy}}">✨ {{item.productDetail.efficacy}}</text>
+            <text class="tag tag-blue" wx:if="{{item.productDetail.type === 'service'}}">🏥 到店服务</text>
+            <text class="tag tag-blue" wx:elif="{{item.productDetail.type === 'physical'}}">📦 实物商品</text>
+          </view>
+          <text class="info-text" wx:if="{{item.productDetail.detail}}">{{item.productDetail.detail}}</text>
+        </view>
+
+        <!-- 推荐三步 -->
+        <view class="info-card">
+          <view class="info-head">💡 推荐好友三步赚现金</view>
+          <view class="steps">
+            <view class="step">
+              <view class="step-num">1</view>
+              <text class="step-emoji">🛒</text>
+              <text class="step-text">购买活动产品</text>
+            </view>
+            <text class="step-arrow">→</text>
+            <view class="step">
+              <view class="step-num">2</view>
+              <text class="step-emoji">📤</text>
+              <text class="step-text">分享给好友</text>
+            </view>
+            <text class="step-arrow">→</text>
+            <view class="step">
+              <view class="step-num">3</view>
+              <text class="step-emoji">💰</text>
+              <text class="step-text">好友购买即返现</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 我的收益 -->
+        <view class="info-card" wx:if="{{earnings}}">
+          <view class="info-head">💰 我的收益</view>
+          <view class="earn-row">
+            <view class="earn-cell">
+              <text class="earn-val">{{earnings.totalInvited}}</text>
+              <text class="earn-label">邀请好友</text>
+            </view>
+            <view class="earn-cell">
+              <text class="earn-val coral">¥{{totalEarnedYuan}}</text>
+              <text class="earn-label">累计赚到</text>
+            </view>
+            <view class="earn-cell">
+              <text class="earn-val">¥{{balanceYuan}}</text>
+              <text class="earn-label">账户余额</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 邀请记录 -->
+        <view class="info-card" wx:if="{{records.length > 0}}">
+          <view class="info-head">📋 邀请记录</view>
+          <view class="record" wx:for="{{records}}" wx:key="_id">
+            <view class="record-left">
+              <image class="record-avatar" src="{{item.inviteeAvatar}}" mode="aspectFill" wx:if="{{item.inviteeAvatar}}"></image>
+              <view class="record-avatar record-avatar-placeholder" wx:else>👤</view>
+              <view class="record-meta">
+                <text class="record-name">{{item.inviteeName || '微信用户'}}</text>
+                <text class="record-time">{{item.createdAtStr}}</text>
+              </view>
+            </view>
+            <text class="record-amount">+¥{{item.cashbackAmountYuan}}</text>
+          </view>
+        </view>
+
+        <!-- 活动规则 -->
+        <view class="rules-card">
+          <view class="rules-head">📜 活动规则</view>
+          <text class="rules-item">1. 推荐好友购买活动产品，好友成功下单即返现</text>
+          <text class="rules-item">2. 返现自动到账余额，可用于购买门店商品</text>
+          <text class="rules-item">3. 每人限购活动产品一份</text>
+          <text class="rules-item">4. 活动最终解释权归门店所有</text>
+        </view>
+
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{campaigns.length === 0 && !loading}}">
+    <text class="empty-emoji">🎉</text>
+    <text class="empty-title">暂无进行中的活动</text>
+    <text class="empty-hint">请等待门店开启裂变活动</text>
+  </view>
+</view>

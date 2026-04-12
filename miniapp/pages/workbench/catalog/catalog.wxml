@@ -1,0 +1,30 @@
+<view class="simple-page">
+  <view class="summary-row">
+    <view class="summary-card">
+      <text class="summary-value">{{overview.products.length}}</text>
+      <text class="summary-label">在售商品/服务</text>
+    </view>
+    <view class="summary-card">
+      <text class="summary-value">{{overview.packages.length}}</text>
+      <text class="summary-label">套餐模板</text>
+    </view>
+  </view>
+
+  <view class="section-header">
+    <text class="section-title">商品列表</text>
+    <text class="section-subtitle">PRODUCTS</text>
+  </view>
+  <view class="list-card" wx:for="{{overview.products}}" wx:key="_id">
+    <text class="list-title">{{item.name}}</text>
+    <text class="list-desc">{{item.type}} · ¥{{item.priceYuan}} · 库存 {{item.stock}}</text>
+  </view>
+
+  <view class="section-header">
+    <text class="section-title">套餐模板</text>
+    <text class="section-subtitle">PACKAGES</text>
+  </view>
+  <view class="list-card" wx:for="{{overview.packages}}" wx:key="_id">
+    <text class="list-title">{{item.name}}</text>
+    <text class="list-desc">{{item.itemsText}}</text>
+  </view>
+</view>

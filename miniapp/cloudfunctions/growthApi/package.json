@@ -1,0 +1,9 @@
+{
+  "name": "growth-api",
+  "version": "1.0.0",
+  "description": "2.0 增长与活动云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

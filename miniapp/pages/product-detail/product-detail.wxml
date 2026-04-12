@@ -1,0 +1,180 @@
+<!--pages/product-detail/product-detail.wxml — V2 沉浸式设计-->
+<view class="page-detail">
+
+  <!-- 背景装饰 -->
+  <view class="bg-deco deco-1"></view>
+  <view class="bg-deco deco-2"></view>
+
+  <!-- 加载状态 -->
+  <view class="loader-wrap" wx:if="{{loading}}">
+    <view class="loader-spinner"></view>
+    <text class="loader-text">加载中...</text>
+  </view>
+
+  <block wx:if="{{!loading && product}}">
+
+    <!-- ========== 1. 商品图片 Hero ========== -->
+    <view class="hero-gallery animate-fade-up">
+      <swiper class="gallery-swiper"
+              indicator-dots="{{product.images.length > 1}}"
+              indicator-color="rgba(255,255,255,0.4)"
+              indicator-active-color="#FFFFFF"
+              autoplay circular>
+        <swiper-item wx:for="{{product.images}}" wx:key="index">
+          <image class="gallery-img" src="{{item}}" mode="aspectFill"></image>
+        </swiper-item>
+        <swiper-item wx:if="{{product.images.length === 0}}">
+          <view class="gallery-placeholder">
+            <text class="gallery-placeholder-emoji">🛒</text>
+            <text class="gallery-placeholder-text">暂无图片</text>
+          </view>
+        </swiper-item>
+      </swiper>
+    </view>
+
+    <!-- ========== 2. 价格信息卡片 ========== -->
+    <view class="content-wrap">
+      <view class="price-card card-float animate-fade-up" style="animation-delay:.06s">
+        <view class="price-main-row">
+          <view class="price-group">
+            <text class="price-sym">¥</text>
+            <text class="price-num">{{product.priceYuan}}</text>
+          </view>
+          <view class="price-extra" wx:if="{{product.originalPrice > product.price}}">
+            <text class="price-orig">¥{{product.originalPriceYuan}}</text>
+            <view class="discount-tag">{{product.discountText}}</view>
+          </view>
+          <text class="sold-text">已售 {{product.soldCount || 0}} 件</text>
+        </view>
+      </view>
+
+      <!-- ========== 3. 产品名称 & 描述 ========== -->
+      <view class="info-card card-float animate-fade-up" style="animation-delay:.12s">
+        <view class="info-header">
+          <view class="type-badge type-{{product.type}}">
+            {{product.type === 'physical' ? '产品' : product.type === 'service' ? '服务' : '套餐'}}
+          </view>
+          <text class="product-name">{{product.name}}</text>
+        </view>
+        <text class="product-desc" wx:if="{{product.description}}">{{product.description}}</text>
+
+        <!-- 功效标签 -->
+        <view class="efficacy-strip" wx:if="{{product.efficacy}}">
+          <text class="efficacy-icon">✨</text>
+          <text class="efficacy-text">{{product.efficacy}}</text>
+        </view>
+      </view>
+
+      <!-- ========== 4. 裂变活动 ========== -->
+      <view class="fission-card card-float animate-fade-up" style="animation-delay:.18s"
+            wx:if="{{campaign}}" bindtap="goToFissionDetail">
+        <view class="fission-left">
+          <view class="fission-title-row">
+            <text class="fission-fire">🔥</text>
+            <text class="fission-title">裂变返现活动</text>
+          </view>
+          <text class="fission-desc">购买此商品，分享给好友，好友购买后返现</text>
+        </view>
+        <view class="fission-right">
+          <text class="fission-amount">+¥{{campaign.cashbackAmountYuan}}</text>
+          <text class="fission-label">返现</text>
+        </view>
+        <view class="fission-arrow">›</view>
+      </view>
+
+      <!-- ========== 5. 套餐明细 ========== -->
+      <view class="package-card card-float animate-fade-up" style="animation-delay:.24s"
+            wx:if="{{product.type === 'package' && packageItems}}">
+        <view class="package-header">
+          <text class="package-icon">📦</text>
+          <text class="package-title">套餐包含</text>
+        </view>
+        <view class="package-list">
+          <view class="package-chip" wx:for="{{packageItems}}" wx:key="name">
+            <text class="package-chip-name">{{item.name}}</text>
+            <text class="package-chip-count">×{{item.count}}</text>
+          </view>
+        </view>
+        <text class="package-valid">有效期：购买后 {{packageValidDays}} 天内使用</text>
+      </view>
+
+      <!-- ========== 6. 服务保障 ========== -->
+      <view class="service-card card-float animate-fade-up" style="animation-delay:.30s">
+        <view class="service-row">
+          <view class="service-item">
+            <text class="service-icon">🛡️</text>
+            <text class="service-label">品质保障</text>
+          </view>
+          <view class="service-item">
+            <text class="service-icon">📦</text>
+            <text class="service-label">{{deliveryLabel || '到店使用'}}</text>
+          </view>
+          <view class="service-item">
+            <text class="service-icon">💬</text>
+            <text class="service-label">售后无忧</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- ========== 底部操作栏 ========== -->
+  <view class="bottom-bar animate-fade-up" style="animation-delay:.36s" wx:if="{{!loading && product}}">
+    <view class="bar-actions">
+      <view class="bar-action-item" bindtap="onShare">
+        <text class="bar-action-icon">📤</text>
+        <text class="bar-action-text">分享</text>
+      </view>
+      <view class="bar-action-item" bindtap="goToMall">
+        <text class="bar-action-icon">🏪</text>
+        <text class="bar-action-text">商城</text>
+      </view>
+    </view>
+    <view class="bar-buy-btn" bindtap="onBuy">
+      {{campaign ? '🔥 ¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
+    </view>
+  </view>
+
+  <!-- ========== 购买确认弹窗 ========== -->
+  <view class="modal-mask" wx:if="{{showBuyModal}}" bindtap="closeBuyModal">
+    <view class="modal-sheet" catchtap="noop">
+      <view class="modal-handle"></view>
+
+      <view class="modal-product-row">
+        <view class="modal-img-wrap">
+          <image class="modal-img" src="{{product.images[0]}}" mode="aspectFill"></image>
+        </view>
+        <view class="modal-product-info">
+          <text class="modal-product-name">{{product.name}}</text>
+          <view class="modal-price-row">
+            <text class="modal-price-sym">¥</text>
+            <text class="modal-price-num">{{campaign ? campaign.activityPriceYuan : product.priceYuan}}</text>
+          </view>
+          <text class="modal-stock" wx:if="{{product.stock !== -1}}">库存：{{product.stock}}</text>
+        </view>
+      </view>
+
+      <!-- 数量选择（仅限实物） -->
+      <view class="modal-qty-row" wx:if="{{product.type === 'physical'}}">
+        <text class="modal-qty-label">数量</text>
+        <view class="modal-qty-ctrl">
+          <view class="qty-btn {{quantity <= 1 ? 'disabled' : ''}}" bindtap="decQuantity">−</view>
+          <text class="qty-num">{{quantity}}</text>
+          <view class="qty-btn" bindtap="incQuantity">+</view>
+        </view>
+      </view>
+
+      <view class="modal-total-row">
+        <text>合计</text>
+        <view class="modal-total-price">
+          <text class="modal-price-sym">¥</text>
+          <text class="modal-price-num">{{totalAmountYuan}}</text>
+        </view>
+      </view>
+
+      <view class="modal-confirm-btn" bindtap="confirmBuy">确认购买</view>
+    </view>
+  </view>
+
+</view>

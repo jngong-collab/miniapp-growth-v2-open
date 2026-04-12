@@ -1,0 +1,118 @@
+<!-- pages/package-usage/package-usage.wxml - 套餐核销页 -->
+<view class="page-package">
+
+  <!-- Tab：我的套餐 / 核销二维码 -->
+  <view class="pkg-tabs">
+    <view class="pkg-tab {{activeTab === 'list' ? 'active' : ''}}" bindtap="switchTab" data-tab="list">我的套餐</view>
+    <view class="pkg-tab {{activeTab === 'qr' ? 'active' : ''}}" bindtap="switchTab" data-tab="qr">出示核销码</view>
+  </view>
+
+  <!-- 我的套餐列表 -->
+  <view class="pkg-list" wx:if="{{activeTab === 'list'}}">
+    <view class="pkg-item {{item.isUsed ? 'pkg-used' : ''}}"
+          wx:for="{{packages}}"
+          wx:key="_id"
+          bindtap="selectPackage"
+          data-item="{{item}}">
+
+      <view class="pkg-item-header">
+        <view class="pkg-item-type tag-{{item.productType}}">
+          {{item.productType === 'service' ? '单次服务' : '套餐'}}
+        </view>
+        <view class="pkg-status {{item.isUsed ? 'used' : 'valid'}}">
+          {{item.isUsed ? '已核销' : '有效'}}
+        </view>
+      </view>
+
+      <text class="pkg-item-name">{{item.productName}}</text>
+
+      <!-- 套餐剩余次数 -->
+      <view class="pkg-remaining" wx:if="{{item.productType === 'package' && item.remainingItems}}">
+        <view class="remaining-item" wx:for="{{item.remainingItems}}" wx:key="name" wx:for-item="ri">
+          <text class="remaining-name">{{ri.name}}</text>
+          <view class="remaining-dots">
+            <view class="dot-circle filled" wx:for="{{ri.remaining}}" wx:key="*this"></view>
+            <view class="dot-circle empty" wx:for="{{ri.used}}" wx:key="*this"></view>
+          </view>
+          <text class="remaining-count">剩余 {{ri.remaining}} 次</text>
+        </view>
+      </view>
+
+      <view class="pkg-item-footer">
+        <text class="pkg-code">核销码：{{item.verifyCode}}</text>
+        <view class="btn btn-sm btn-primary show-qr-btn" catchtap="showQrCode" data-item="{{item}}">
+          出示核销码
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{!loading && packages.length === 0}}">
+      <text class="empty-icon">🎫</text>
+      <text class="empty-text">暂无套餐</text>
+      <view class="btn btn-primary" bindtap="goToMall">去商城购买</view>
+    </view>
+  </view>
+
+  <!-- 核销码展示 -->
+  <view class="qr-display" wx:if="{{activeTab === 'qr' && selectedPackage}}">
+    <view class="qr-header">
+      <text class="qr-product-name">{{selectedPackage.productName}}</text>
+      <text class="qr-status-tag {{selectedPackage.isUsed ? 'used' : 'valid'}}">{{selectedPackage.isUsed ? '已核销' : '有效'}}</text>
+    </view>
+
+    <!-- Canvas 条形码 -->
+    <view class="qr-code-wrap">
+      <canvas canvas-id="verifyCanvas" class="verify-canvas" style="width:300px;height:300px;"></canvas>
+    </view>
+
+    <!-- 套餐：服务选择 -->
+    <view class="service-selector" wx:if="{{selectedPackage.productType === 'package' && selectedPackage.remainingItems}}">
+      <view class="selector-header">
+        <text class="selector-title">核销服务项</text>
+        <view class="selector-btn" bindtap="openServicePicker">
+          {{selectedService || '请选择要核销的服务'}} ›
+        </view>
+      </view>
+    </view>
+
+    <!-- 套餐剩余 -->
+    <view class="qr-remaining" wx:if="{{selectedPackage.remainingItems}}">
+      <view class="remaining-item" wx:for="{{selectedPackage.remainingItems}}" wx:key="name" wx:for-item="ri">
+        <text>{{ri.name}}</text>
+        <text class="remaining-count-highlight {{ri.remaining === 0 ? 'exhausted' : ''}}">
+          {{ri.remaining === 0 ? '已用完' : '剩余 ' + ri.remaining + ' 次'}}
+        </text>
+      </view>
+    </view>
+
+    <view class="qr-tip">
+      <text>⚠️ 核销后本次记录将扣减，请确认后交由工作人员操作</text>
+    </view>
+  </view>
+
+  <!-- 未选中套餐时的提示 -->
+  <view class="qr-empty" wx:if="{{activeTab === 'qr' && !selectedPackage}}">
+    <text class="empty-icon">📱</text>
+    <text class="empty-text">请先从"我的套餐"选择要核销的套餐</text>
+    <view class="btn btn-outline" bindtap="switchToList">查看我的套餐</view>
+  </view>
+
+  <!-- 服务选择弹窗 -->
+  <view class="service-picker-mask" wx:if="{{showServicePicker}}" bindtap="closeServicePicker">
+    <view class="service-picker" catchtap="">
+      <view class="picker-title">选择要核销的服务</view>
+      <view class="picker-list">
+        <view class="picker-item {{ri.remaining <= 0 ? 'disabled' : ''}}"
+              wx:for="{{selectedPackage.remainingItems}}"
+              wx:key="name"
+              wx:for-item="ri"
+              bindtap="{{ri.remaining > 0 ? 'selectService' : ''}}"
+              data-name="{{ri.name}}">
+          <text class="picker-item-name">{{ri.name}}</text>
+          <text class="picker-item-count">{{ri.remaining > 0 ? '剩余 ' + ri.remaining + ' 次' : '已用完'}}</text>
+        </view>
+      </view>
+      <view class="picker-cancel" bindtap="closeServicePicker">取消</view>
+    </view>
+  </view>
+</view>

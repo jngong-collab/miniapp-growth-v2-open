@@ -1,0 +1,47 @@
+.simple-page {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding: var(--spacing-md);
+  box-sizing: border-box;
+}
+
+.list-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.list-title,
+.staff-name {
+  display: block;
+  color: var(--color-text-title);
+  font-size: var(--font-md);
+  font-weight: 700;
+}
+
+.list-desc,
+.staff-desc {
+  display: block;
+  margin-top: var(--spacing-xs);
+  color: var(--color-text-sub);
+  font-size: var(--font-sm);
+}
+
+.staff-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.staff-item {
+  padding-top: var(--spacing-sm);
+}
+
+.action-btn {
+  margin: 0;
+  border-radius: 999rpx;
+  background: var(--color-text-title);
+  color: #fff;
+}

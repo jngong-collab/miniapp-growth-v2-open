@@ -1,0 +1,53 @@
+<!-- pages/lottery/lottery.wxml -->
+<view class="page-lottery">
+
+  <!-- 顶部装饰 -->
+  <view class="lottery-header">
+    <text class="header-title">{{campaign ? (campaign.name || '🎰 幸运大抽奖') : '🎰 幸运大抽奖'}}</text>
+    <text class="header-sub">每日{{campaign ? campaign.dailyLimitPerUser : 3}}次免费抽奖机会</text>
+    <view class="chances-badge">
+      今日剩余 <text class="chances-num">{{remainChances}}</text> 次
+    </view>
+  </view>
+
+  <!-- 九宫格抽奖区 -->
+  <view class="grid-wrap">
+    <view class="grid-box">
+      <view wx:for="{{prizes}}" wx:key="id"
+            class="grid-cell {{index === 4 ? 'grid-btn' : ''}} {{currentIndex === index ? 'cell-active' : ''}}"
+            style="{{index !== 4 ? 'background:' + item.color : ''}}"
+            bindtap="{{index === 4 ? 'startLottery' : ''}}">
+        <!-- 普通奖品格 -->
+        <block wx:if="{{index !== 4}}">
+          <text class="cell-icon">{{item.icon}}</text>
+          <text class="cell-name">{{item.name}}</text>
+        </block>
+        <!-- 中间抽奖按钮 -->
+        <block wx:else>
+          <text class="btn-text-big">GO</text>
+          <text class="btn-text-small">{{isRunning ? '抽奖中...' : '点击抽奖'}}</text>
+        </block>
+      </view>
+    </view>
+  </view>
+
+  <!-- 活动说明 -->
+  <view class="lottery-info">
+    <view class="info-title">📜 活动说明</view>
+    <text class="info-item" wx:for="{{rules}}" wx:key="*this">{{item}}</text>
+  </view>
+
+  <!-- 中奖弹窗 -->
+  <view class="result-mask" wx:if="{{showResult}}" bindtap="closeResult">
+    <view class="result-popup" catchtap="">
+      <text class="result-emoji">{{resultPrize.icon}}</text>
+      <text class="result-title" wx:if="{{resultPrize.name !== '谢谢参与'}}">🎉 恭喜中奖！</text>
+      <text class="result-title" wx:else>😊 再接再厉</text>
+      <text class="result-name">{{resultPrize.name}}</text>
+      <text class="result-hint" wx:if="{{resultPrize.name !== '谢谢参与'}}">{{resultPrize.claimHint || '请到门店出示此页面领取奖品'}}</text>
+      <text class="result-hint" wx:else>下次一定！每天有3次机会哦</text>
+      <view class="result-btn" bindtap="closeResult">知道了</view>
+    </view>
+  </view>
+
+</view>

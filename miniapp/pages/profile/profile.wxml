@@ -1,0 +1,158 @@
+<!--pages/profile/profile.wxml-->
+<view class="page-profile">
+  <!-- 背景装饰 -->
+  <view class="profile-header-bg"></view>
+
+  <!-- 会员卡片 -->
+  <view class="member-card-wrap animate-fade-up">
+    <view class="member-card">
+      <view class="card-shine"></view>
+      <view class="card-content">
+        <view class="card-row-top">
+          <view class="user-info">
+            <view class="avatar" wx:if="{{userInfo.avatarUrl}}">
+              <image src="{{userInfo.avatarUrl}}" mode="aspectFill" style="width:100%;height:100%"></image>
+            </view>
+            <view class="avatar avatar-placeholder" wx:else>👤</view>
+            <view class="user-meta">
+              <text class="user-name">{{userInfo.nickName || '微信用户'}}</text>
+              <view class="level-badge">
+                <text class="badge-icon">👑</text>
+                <text>{{levelLabel}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view class="card-row-bottom">
+          <view class="balance-info">
+            <text class="balance-label">账户余额 (元)</text>
+            <text class="balance-amount">¥{{balanceYuan}}</text>
+          </view>
+          <text class="card-brand">BABY SPA</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 数据统计条 -->
+  <view class="stat-bar animate-fade-up" style="animation-delay: 0.08s">
+    <view class="stat-cell" bindtap="goToOrders" data-status="all">
+      <text class="stat-val">{{orderCount || 0}}</text>
+      <text class="stat-label">全部订单</text>
+    </view>
+    <view class="stat-line"></view>
+    <view class="stat-cell" bindtap="goToPackage">
+      <text class="stat-val green">{{packageCount || 0}}</text>
+      <text class="stat-label">有效套餐</text>
+    </view>
+    <view class="stat-line"></view>
+    <view class="stat-cell" bindtap="goToFission">
+      <text class="stat-val coral">{{invitedCount || 0}}</text>
+      <text class="stat-label">已邀好友</text>
+    </view>
+  </view>
+
+  <!-- 主体内容 -->
+  <view class="profile-body">
+
+    <!-- 订单快捷入口 -->
+    <view class="section-block animate-fade-up" style="animation-delay: 0.15s">
+      <view class="section-head">
+        <text class="section-name">我的订单</text>
+        <text class="section-more" bindtap="goToOrders" data-status="all">查看全部 ›</text>
+      </view>
+      <view class="order-grid">
+        <view class="order-entry" bindtap="goToOrders" data-status="pending">
+          <text class="entry-icon">💳</text>
+          <text class="entry-text">待支付</text>
+        </view>
+        <view class="order-entry" bindtap="goToOrders" data-status="paid">
+          <text class="entry-icon">✅</text>
+          <text class="entry-text">已支付</text>
+        </view>
+        <view class="order-entry" bindtap="goToPackage">
+          <text class="entry-icon">🎫</text>
+          <text class="entry-text">去核销</text>
+        </view>
+        <view class="order-entry" bindtap="goToOrders" data-status="refund_requested">
+          <text class="entry-icon">↩️</text>
+          <text class="entry-text">退款</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 功能菜单 -->
+    <view class="section-block animate-fade-up" style="animation-delay: 0.22s">
+      <view class="menu-row" bindtap="goToFission">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-earn">💰</view>
+          <text class="menu-label">分享赚钱</text>
+        </view>
+        <view class="menu-row-right">
+          <text class="menu-extra highlight" wx:if="{{balanceYuan && balanceYuan !== '0.0'}}">累计赚 ¥{{balanceYuan}}</text>
+          <text class="menu-chevron">›</text>
+        </view>
+      </view>
+      <view class="menu-row" bindtap="goToTongue">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-ai">🔮</view>
+          <text class="menu-label">AI 舌象记录</text>
+        </view>
+        <view class="menu-row-right">
+          <text class="menu-extra" wx:if="{{tongueCount}}">{{tongueCount}} 次分析</text>
+          <text class="menu-chevron">›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 门店服务 -->
+    <view class="section-block animate-fade-up" style="animation-delay: 0.28s">
+      <view class="menu-row" bindtap="callStore">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-default">📞</view>
+          <text class="menu-label">联系门店</text>
+        </view>
+        <text class="menu-chevron">›</text>
+      </view>
+      <view class="menu-row" bindtap="openMap" wx:if="{{storeInfo}}">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-default">📍</view>
+          <text class="menu-label">门店导航</text>
+        </view>
+        <text class="menu-chevron">›</text>
+      </view>
+    </view>
+
+    <!-- 管理员/员工 -->
+    <view class="section-block animate-fade-up" style="animation-delay: 0.34s"
+          wx:if="{{canEnterWorkbench}}">
+      <view class="section-head" style="margin-bottom: 0">
+        <text class="section-name">{{role === 'admin' ? '🔧 门店管理' : '🔧 工作台'}}</text>
+      </view>
+      <view class="menu-row" bindtap="goToWorkbench">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-blue">📊</view>
+          <text class="menu-label">门店工作台</text>
+        </view>
+        <text class="menu-chevron">›</text>
+      </view>
+      <view class="menu-row" bindtap="goToVerify"
+            wx:if="{{permissions && permissions.indexOf('verify') !== -1}}">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-green">🔑</view>
+          <text class="menu-label">核销中心</text>
+        </view>
+        <text class="menu-chevron">›</text>
+      </view>
+      <view class="menu-row" bindtap="goToStaffManage" wx:if="{{role === 'admin'}}">
+        <view class="menu-row-left">
+          <view class="menu-icon icon-blue">👥</view>
+          <text class="menu-label">员工管理</text>
+        </view>
+        <text class="menu-chevron">›</text>
+      </view>
+    </view>
+
+    <view class="page-footer animate-fade-up" style="animation-delay: 0.4s">v{{version}} · Powered by AI</view>
+  </view>
+</view>

@@ -1,0 +1,210 @@
+/* ============================================
+   浴小主 — 全局设计系统 v2
+   奶油暖棕 · 柔和圆角 · 暖调阴影 · 精致质感
+   ============================================ */
+
+page {
+  /* ─── 焦糖暖棕 · 主色 ─── */
+  --color-primary: #C08B5C;
+  --color-primary-light: #D4A574;
+  --color-primary-dark: #A67443;
+  --color-primary-bg: #FFF5EB;
+
+  /* ─── 温润靛蓝 · AI辅色 ─── */
+  --color-ai: #6B8A99;
+  --color-ai-light: #8AA5B0;
+  --color-ai-bg: #F0F4F6;
+
+  /* ─── 鼠尾草绿 · 健康辅色 ─── */
+  --color-eco: #7BAF8E;
+  --color-eco-dark: #5E9A72;
+  --color-eco-bg: #F0F5F1;
+
+  /* ─── 点缀色 ─── */
+  --color-accent: #D4918B;      /* 灰豆沙粉，用于轻提示 */
+  --color-gold: #C9A96E;        /* 暖金，用于会员/徽章 */
+  --color-danger: #C75C5C;      /* 柔和红，用于错误/警告 */
+
+  /* ─── 文字 ─── */
+  --color-text-title: #2C2420;
+  --color-text-main: #4A4039;
+  --color-text-sub: #9C9088;
+  --color-text-muted: #C8BFB8;
+  --color-text: var(--color-text-main);
+  --color-text-light: var(--color-text-sub);
+  --color-text-secondary: var(--color-text-sub);
+
+  /* ─── 背景 & 边框 ─── */
+  --bg-page: #FAF6F1;
+  --bg-card: #FFFCF8;
+  --color-bg-white: var(--bg-card);
+  --color-border: rgba(44,36,32,0.06);
+
+  /* ─── 字号兼容层 ─── */
+  --font-xs: 20rpx;
+  --font-sm: 24rpx;
+  --font-base: 28rpx;
+  --font-md: 32rpx;
+  --font-lg: 36rpx;
+  --font-xl: 40rpx;
+
+  /* 间距 Tokens */
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 24rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 48rpx;
+
+  /* ─── 圆角 ─── */
+  --radius-sm: 12rpx;
+  --radius-md: 20rpx;
+  --radius-lg: 24rpx;
+  --radius-xl: 36rpx;
+  --radius-capsule: 999rpx;
+
+  /* ─── 阴影（暖色调） ─── */
+  --shadow-sm: 0 2rpx 12rpx rgba(44,36,32,0.05);
+  --shadow-md: 0 6rpx 24rpx rgba(44,36,32,0.07);
+  --shadow-float: 0 12rpx 36rpx rgba(192,139,92,0.14);
+  --shadow-ai: 0 12rpx 36rpx rgba(107,138,153,0.12);
+
+  font-size: 28rpx;
+  color: var(--color-text-main);
+  background: var(--bg-page);
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ====== 通用组件 ====== */
+
+/* 卡片 */
+.card-float {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: transform 0.25s ease;
+}
+.card-float:active {
+  transform: scale(0.975);
+}
+
+/* 毛玻璃面板 */
+.glass-panel {
+  background: rgba(255, 252, 248, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1rpx solid rgba(255,255,255,0.5);
+  border-radius: var(--radius-lg);
+}
+
+/* 渐变 */
+.bg-grad-primary {
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+  color: #fff;
+}
+.bg-grad-ai {
+  background: linear-gradient(135deg, #8AA5B0, #6B8A99);
+  color: #fff;
+}
+.bg-grad-warm {
+  background: linear-gradient(135deg, #D4A574, #C08B5C, #A67443);
+  color: #fff;
+}
+
+/* 微标签 */
+.micro-tag {
+  display: inline-flex;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+}
+.tag-coral {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+.tag-purple {
+  background: var(--color-ai-bg);
+  color: var(--color-ai);
+}
+.tag-green {
+  background: var(--color-eco-bg);
+  color: var(--color-eco-dark);
+}
+
+/* 价格组 */
+.currency-box {
+  display: flex;
+  align-items: baseline;
+  color: var(--color-primary-dark);
+}
+.currency-symbol {
+  font-size: 24rpx;
+  font-weight: 700;
+  margin-right: 2rpx;
+}
+.currency-value {
+  font-size: 40rpx;
+  font-weight: 800;
+  letter-spacing: -1rpx;
+}
+.currency-original {
+  font-size: 22rpx;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  margin-left: 8rpx;
+}
+
+/* 区块标题 */
+.section-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20rpx;
+  padding: 0 4rpx;
+}
+.section-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--color-text-title);
+  letter-spacing: 1rpx;
+}
+.section-subtitle {
+  font-size: 20rpx;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2rpx;
+  margin-top: 4rpx;
+}
+
+/* ====== 动效 ====== */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+/* ====== 加载 ====== */
+.loader-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+
+
+/* ====== 鍩虹缁勪欢 ====== */
+
+.btn { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center; font-weight: 600; border-radius: var(--radius-capsule); padding: var(--spacing-xs) var(--spacing-lg); font-size: var(--font-base); }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-secondary { background: var(--color-primary-bg); color: var(--color-primary); }
+
+.tag, .badge { display: inline-flex; align-items: center; justify-content: center; padding: 4rpx 12rpx; border-radius: var(--radius-sm); font-size: var(--font-xs); font-weight: 500; }
+.tag-primary { background: var(--color-primary-bg); color: var(--color-primary); }
+.tag-ai { background: var(--color-ai-bg); color: var(--color-ai); }
+.tag-eco { background: var(--color-eco-bg); color: var(--color-eco-dark); }
+
+.list-item { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-md); background: var(--bg-card); border-radius: var(--radius-lg); margin-bottom: var(--spacing-sm); }
+.card { padding: var(--spacing-md); background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); margin-bottom: var(--spacing-md); }

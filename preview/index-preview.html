@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>浴小主 · 首页预览（奶油暖棕）</title>
+<style>
+  /* ── Reset ── */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --color-primary: #C08B5C;
+    --color-primary-light: #D4A574;
+    --color-primary-dark: #A67443;
+    --color-primary-bg: #FFF5EB;
+    --color-ai: #6B8A99;
+    --color-ai-light: #8AA5B0;
+    --color-ai-bg: #F0F4F6;
+    --color-eco: #7BAF8E;
+    --color-eco-dark: #5E9A72;
+    --color-eco-bg: #F0F5F1;
+    --color-text-title: #2C2420;
+    --color-text-main: #4A4039;
+    --color-text-sub: #9C9088;
+    --color-text-muted: #C8BFB8;
+    --bg-page: #FAF6F1;
+    --bg-card: #FFFCF8;
+    --color-border: rgba(44,36,32,0.06);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 18px;
+    --radius-capsule: 999px;
+    --shadow-sm: 0 1px 6px rgba(44,36,32,0.05);
+    --shadow-md: 0 3px 12px rgba(44,36,32,0.07);
+    --shadow-float: 0 6px 18px rgba(192,139,92,0.14);
+  }
+
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    background: #2C2420;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .phone-frame {
+    width: 375px;
+    min-height: 812px;
+    background: var(--bg-page);
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  .page-home {
+    min-height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* 背景光斑 */
+  .bg-deco { position: absolute; border-radius: 50%; filter: blur(50px); opacity: 0.4; pointer-events: none; }
+  .bg-deco-1 { width: 240px; height: 240px; background: #F5E6D3; top: -60px; right: -40px; }
+  .bg-deco-2 { width: 180px; height: 180px; background: #E8DDD2; top: 260px; left: -70px; }
+
+  .content { position: relative; z-index: 1; padding: 36px 16px 20px; }
+
+  /* ── 头部 ── */
+  .header { margin-bottom: 18px; }
+  .greeting { font-size: 21px; font-weight: 800; color: var(--color-text-title); }
+  .store-name { font-size: 13px; color: var(--color-text-sub); margin-top: 3px; }
+  .location-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 5px 10px; margin-top: 8px;
+    background: rgba(192,139,92,0.08); border-radius: var(--radius-capsule);
+    font-size: 11px; color: var(--color-text-sub);
+  }
+
+  /* ── Bento Box ── */
+  .bento { display: flex; gap: 7px; margin-bottom: 16px; }
+  .bento-card {
+    border-radius: var(--radius-lg); padding: 14px; position: relative; overflow: hidden;
+    cursor: pointer; transition: transform 0.15s ease;
+  }
+  .bento-card:active { transform: scale(0.96); }
+  .bento-card .bg-icon {
+    position: absolute; right: -4px; bottom: -12px;
+    font-size: 60px; opacity: 0.12; transform: rotate(-12deg);
+  }
+  .bento-card .label { position: relative; z-index: 1; }
+  .bento-card .title { font-size: 15px; font-weight: 800; display: block; margin-bottom: 3px; }
+  .bento-card .desc { font-size: 10.5px; opacity: 0.85; display: block; line-height: 1.5; }
+  .bento-card .glass-btn {
+    display: inline-block; margin-top: 12px;
+    padding: 5px 12px; font-size: 11px; font-weight: 600; color: #fff;
+    background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35);
+    border-radius: var(--radius-capsule); backdrop-filter: blur(8px);
+  }
+  .bento-large { flex: 1.6; min-height: 110px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .bento-right { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .bento-sm { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .bento-sm .bg-icon { font-size: 42px; }
+  .bento-sm .title { font-size: 13px; }
+  .bento-sm .desc { font-size: 10px; }
+
+  /* AI 大卡颜色 */
+  .bg-ai { background: linear-gradient(135deg, #8AA5B0, #6B8A99); color: #fff; }
+  /* 小卡 */
+  .bg-white {
+    background: var(--bg-card); color: var(--color-text-main);
+    box-shadow: var(--shadow-sm);
+  }
+  .bg-white .title { color: var(--color-text-title); }
+  .bg-white .desc { color: var(--color-text-sub); opacity: 1; }
+  .bg-white .bg-icon { opacity: 0.06; }
+
+  /* ── 活动横幅 ── */
+  .promo {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px; border-radius: var(--radius-lg); margin-bottom: 18px;
+    background: linear-gradient(135deg, #C9A06C, #B0845A, #8E6B42);
+    color: #fff; position: relative; overflow: hidden;
+  }
+  .promo .bg-circle {
+    position: absolute; top: -25px; right: -15px;
+    width: 90px; height: 90px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .promo-left { flex: 1; display: flex; flex-direction: column; gap: 5px; position: relative; z-index: 1; }
+  .promo-badge {
+    align-self: flex-start; padding: 2px 8px;
+    background: rgba(255,255,255,0.18); border-radius: var(--radius-capsule);
+    font-size: 10px; font-weight: 600;
+  }
+  .promo-title { font-size: 12.5px; font-weight: 700; line-height: 1.5; }
+  .promo-sub { font-size: 10.5px; opacity: 0.78; }
+  .promo-bar { height: 3px; width: 140px; background: rgba(255,255,255,0.2); border-radius: 2px; margin-top: 6px; }
+  .promo-bar-fill { height: 100%; width: 35%; background: rgba(255,255,255,0.85); border-radius: 2px; }
+  .promo-right { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-left: 12px; }
+  .promo-price { font-size: 18px; font-weight: 800; }
+  .promo-btn {
+    padding: 5px 12px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+    border-radius: var(--radius-capsule); font-size: 11px; font-weight: 600;
+    backdrop-filter: blur(8px);
+  }
+
+  /* ── 区块标题 ── */
+  .sec-hd { margin-bottom: 12px; }
+  .sec-hd .sec-title { font-size: 17px; font-weight: 800; color: var(--color-text-title); display: block; }
+  .sec-hd .sec-sub {
+    font-size: 10px; color: var(--color-text-muted);
+    text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; display: block;
+  }
+
+  /* ── 技师卡片 ── */
+  .therapist-card {
+    background: var(--bg-card); border-radius: var(--radius-lg);
+    overflow: hidden; box-shadow: var(--shadow-sm); margin-bottom: 18px;
+  }
+  .therapist-photo {
+    width: 100%; height: 190px;
+    background: linear-gradient(165deg, #F5E6D3 0%, #F0E4D8 40%, #EDE0D4 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    position: relative;
+  }
+  .therapist-photo .emoji { font-size: 52px; }
+  .therapist-photo .hint { font-size: 12px; color: var(--color-text-muted); }
+  .therapist-badge {
+    position: absolute; top: 10px; right: 10px;
+    padding: 4px 10px; background: rgba(255,252,248,0.88); backdrop-filter: blur(8px);
+    border-radius: var(--radius-capsule); font-size: 11px; font-weight: 600;
+    color: var(--color-primary-dark); box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  }
+  .therapist-info { padding: 14px; }
+  .therapist-name-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 10px; }
+  .therapist-name-row .name { font-size: 17px; font-weight: 800; color: var(--color-text-title); }
+  .therapist-name-row .role {
+    font-size: 11px; color: var(--color-primary); font-weight: 600;
+    padding: 2px 8px; background: var(--color-primary-bg); border-radius: var(--radius-capsule);
+  }
+  .stats-row {
+    display: flex; background: var(--bg-page); border-radius: var(--radius-md);
+    padding: 10px 0; margin-bottom: 10px;
+  }
+  .stat-item {
+    flex: 1; text-align: center;
+    border-right: 1px solid var(--color-border);
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-item .val { font-size: 14px; font-weight: 800; color: var(--color-text-title); display: block; }
+  .stat-item .lbl { font-size: 10px; color: var(--color-text-muted); display: block; margin-top: 2px; }
+  .therapist-bio { font-size: 13px; color: var(--color-text-sub); line-height: 1.7; margin-bottom: 10px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    padding: 4px 10px; background: var(--color-primary-bg);
+    color: var(--color-primary-dark); border-radius: var(--radius-capsule);
+    font-size: 11px; font-weight: 500;
+  }
+
+  /* ── 套餐卡 ── */
+  .pkg-card {
+    display: flex; background: var(--bg-card); border-radius: var(--radius-lg);
+    overflow: hidden; box-shadow: var(--shadow-sm); margin-bottom: 18px;
+  }
+  .pkg-img {
+    width: 115px; min-height: 100px; flex-shrink: 0;
+    background: linear-gradient(145deg, #F5E6D3, #F0E0D0);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .pkg-img .emoji { font-size: 36px; }
+  .pkg-img .tag-abs {
+    position: absolute; top: 6px; left: 6px;
+    padding: 2px 8px; background: var(--color-ai-bg);
+    color: var(--color-ai); border-radius: 4px; font-size: 10px; font-weight: 600;
+  }
+  .pkg-info { flex: 1; padding: 14px; display: flex; flex-direction: column; justify-content: center; }
+  .pkg-info .name { font-size: 15px; font-weight: 800; color: var(--color-text-title); margin-bottom: 4px; }
+  .pkg-info .efficacy { font-size: 11px; color: var(--color-text-sub); }
+  .price-row { display: flex; align-items: baseline; margin-top: 6px; color: var(--color-primary-dark); }
+  .price-row .sym { font-size: 12px; font-weight: 700; }
+  .price-row .amount { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .price-row .orig { font-size: 11px; color: var(--color-text-muted); text-decoration: line-through; margin-left: 4px; }
+  .pkg-info .action-btn {
+    align-self: flex-start; margin-top: 8px;
+    padding: 5px 12px; font-size: 11px; font-weight: 600; color: #fff;
+    background: var(--color-primary); border-radius: var(--radius-capsule); border: none;
+  }
+
+  /* ── 商品网格 ── */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 12px; }
+  .grid-item {
+    background: var(--bg-card); border-radius: var(--radius-lg);
+    overflow: hidden; box-shadow: var(--shadow-sm);
+  }
+  .grid-item-img {
+    width: 100%; height: 105px;
+    background: linear-gradient(145deg, #F5E6D3, #EDE0D4, #F0E8E0);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  }
+  .grid-item-img .emoji { font-size: 28px; }
+  .grid-item-img .pname { font-size: 10px; color: var(--color-text-muted); }
+  .grid-item-info { padding: 8px 10px 10px; }
+  .grid-item-info .name {
+    font-size: 13px; font-weight: 600; color: var(--color-text-main);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .grid-item-info .price-row { margin-top: 3px; }
+  .grid-item-info .price-row .amount { font-size: 16px; }
+
+  /* ── 底部 Tab 模拟 ── */
+  .tabbar {
+    position: sticky; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-around;
+    padding: 8px 0 20px; background: var(--bg-card);
+    border-top: 1px solid var(--color-border);
+  }
+  .tab-item { text-align: center; flex: 1; }
+  .tab-item .icon { font-size: 22px; display: block; }
+  .tab-item .text { font-size: 10px; color: var(--color-text-muted); display: block; margin-top: 2px; }
+  .tab-item.active .text { color: var(--color-primary); font-weight: 600; }
+
+  /* ── 色板展示 ── */
+  .palette {
+    position: fixed; top: 20px; right: 420px;
+    background: #fff; border-radius: 12px; padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 200px;
+    font-size: 12px; color: #333;
+  }
+  .palette h3 { font-size: 14px; margin-bottom: 12px; font-weight: 700; }
+  .swatch { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .swatch-dot { width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.06); }
+  .swatch-label { font-size: 11px; color: #666; }
+  .swatch-hex { font-family: 'SF Mono', monospace; font-size: 10px; color: #999; }
+
+  @media (max-width: 800px) {
+    .palette { display: none; }
+    body { padding: 0; background: var(--bg-page); }
+    .phone-frame { border-radius: 0; width: 100%; min-height: 100vh; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 色板 -->
+<div class="palette">
+  <h3>奶油暖棕 · 色板</h3>
+  <div class="swatch"><div class="swatch-dot" style="background:#C08B5C"></div><div><div class="swatch-label">主色 焦糖</div><div class="swatch-hex">#C08B5C</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#D4A574"></div><div><div class="swatch-label">主色浅</div><div class="swatch-hex">#D4A574</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#A67443"></div><div><div class="swatch-label">主色深</div><div class="swatch-hex">#A67443</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#6B8A99"></div><div><div class="swatch-label">AI 靛蓝</div><div class="swatch-hex">#6B8A99</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#7BAF8E"></div><div><div class="swatch-label">健康绿</div><div class="swatch-hex">#7BAF8E</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#FAF6F1"></div><div><div class="swatch-label">页面背景</div><div class="swatch-hex">#FAF6F1</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#FFFCF8"></div><div><div class="swatch-label">卡片白</div><div class="swatch-hex">#FFFCF8</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#2C2420"></div><div><div class="swatch-label">标题文字</div><div class="swatch-hex">#2C2420</div></div></div>
+  <div class="swatch"><div class="swatch-dot" style="background:#9C9088"></div><div><div class="swatch-label">辅助文字</div><div class="swatch-hex">#9C9088</div></div></div>
+</div>
+
+<!-- 手机框 -->
+<div class="phone-frame">
+  <div class="page-home">
+    <!-- 背景光斑 -->
+    <div class="bg-deco bg-deco-1"></div>
+    <div class="bg-deco bg-deco-2"></div>
+
+    <div class="content">
+      <!-- 头部 -->
+      <div class="header">
+        <div class="greeting">Hi, 下午好 🍵</div>
+        <div class="store-name">欢迎来到浴小主小儿推拿</div>
+        <div class="location-pill">📍 长沙市岳麓区梅溪湖路88号 ›</div>
+      </div>
+
+      <!-- Bento Box -->
+      <div class="bento">
+        <div class="bento-card bento-large bg-ai">
+          <span class="bg-icon">🔮</span>
+          <div class="label">
+            <span class="title">AI看舌象</span>
+            <span class="desc">拍舌识别体质 · 获取调理方案</span>
+            <span class="glass-btn">立即体验 →</span>
+          </div>
+        </div>
+        <div class="bento-right">
+          <div class="bento-card bento-sm bg-white">
+            <span class="bg-icon">📋</span>
+            <div class="label">
+              <span class="title">套餐查询</span>
+              <span class="desc">查看套餐使用进度</span>
+            </div>
+          </div>
+          <div class="bento-card bento-sm bg-white">
+            <span class="bg-icon">🎰</span>
+            <div class="label">
+              <span class="title">幸运大抽奖</span>
+              <span class="desc">每日好礼等你来抽</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 裂变活动 -->
+      <div class="promo">
+        <div class="bg-circle"></div>
+        <div class="promo-left">
+          <span class="promo-badge">限时活动</span>
+          <div class="promo-title">推荐好友购买【祛湿药浴体验装】每单返 ¥15.9</div>
+          <div class="promo-sub">推荐一位好友成功下单即返现 · 已有 28 人参与</div>
+          <div class="promo-bar"><div class="promo-bar-fill"></div></div>
+        </div>
+        <div class="promo-right">
+          <span class="promo-price">¥19.9</span>
+          <span class="promo-btn">立即参与</span>
+        </div>
+      </div>
+
+      <!-- 技师推荐 -->
+      <div class="sec-hd">
+        <span class="sec-title">儿童健康管理师</span>
+        <span class="sec-sub">Expert Therapist</span>
+      </div>
+      <div class="therapist-card">
+        <div class="therapist-photo">
+          <span class="emoji">👩‍⚕️</span>
+          <span class="hint">推拿师形象照</span>
+          <span class="therapist-badge">🏅 首席调理师</span>
+        </div>
+        <div class="therapist-info">
+          <div class="therapist-name-row">
+            <span class="name">李老师</span>
+            <span class="role">高级调理师</span>
+          </div>
+          <div class="stats-row">
+            <div class="stat-item"><span class="val">8年</span><span class="lbl">从业经验</span></div>
+            <div class="stat-item"><span class="val">3000+</span><span class="lbl">服务人次</span></div>
+            <div class="stat-item"><span class="val">99%</span><span class="lbl">好评率</span></div>
+          </div>
+          <div class="therapist-bio">毕业于中医药大学，专注小儿推拿领域。擅长运用传统中医手法结合现代理疗技术，为宝宝提供温和有效的调理方案。</div>
+          <div class="tags">
+            <span class="tag">小儿推拿</span>
+            <span class="tag">脾胃调理</span>
+            <span class="tag">体质辨识</span>
+            <span class="tag">生长发育</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 套餐推荐 -->
+      <div class="sec-hd">
+        <span class="sec-title">套餐推荐</span>
+        <span class="sec-sub">Recommended Packages</span>
+      </div>
+      <div class="pkg-card">
+        <div class="pkg-img">
+          <span class="emoji">🎁</span>
+          <span class="tag-abs">套餐</span>
+        </div>
+        <div class="pkg-info">
+          <div class="name">脾胃调理月卡</div>
+          <div class="efficacy">健脾益胃 · 改善食欲 · 促进消化</div>
+          <div class="price-row">
+            <span class="sym">¥</span><span class="amount">299</span>
+            <span class="orig">¥599</span>
+          </div>
+          <button class="action-btn">查看详情 →</button>
+        </div>
+      </div>
+
+      <!-- 产品优选 -->
+      <div class="sec-hd">
+        <span class="sec-title">产品优选</span>
+        <span class="sec-sub">Premium Products</span>
+      </div>
+      <div class="grid">
+        <div class="grid-item">
+          <div class="grid-item-img"><span class="emoji">🧴</span><span class="pname">艾草泡浴</span></div>
+          <div class="grid-item-info">
+            <div class="name">艾草泡浴液</div>
+            <div class="price-row"><span class="sym">¥</span><span class="amount">39.9</span><span class="orig">¥69</span></div>
+          </div>
+        </div>
+        <div class="grid-item">
+          <div class="grid-item-img"><span class="emoji">🌿</span><span class="pname">祛湿药浴</span></div>
+          <div class="grid-item-info">
+            <div class="name">祛湿药浴体验装</div>
+            <div class="price-row"><span class="sym">¥</span><span class="amount">19.9</span><span class="orig">¥49</span></div>
+          </div>
+        </div>
+        <div class="grid-item">
+          <div class="grid-item-img"><span class="emoji">🍃</span><span class="pname">金银花泡浴</span></div>
+          <div class="grid-item-info">
+            <div class="name">金银花清热泡浴</div>
+            <div class="price-row"><span class="sym">¥</span><span class="amount">45</span></div>
+          </div>
+        </div>
+        <div class="grid-item">
+          <div class="grid-item-img"><span class="emoji">🌸</span><span class="pname">红花泡浴</span></div>
+          <div class="grid-item-info">
+            <div class="name">红花活血泡浴</div>
+            <div class="price-row"><span class="sym">¥</span><span class="amount">42</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TabBar -->
+    <div class="tabbar">
+      <div class="tab-item active"><span class="icon">🏠</span><span class="text">首页</span></div>
+      <div class="tab-item"><span class="icon">👅</span><span class="text">AI看舌象</span></div>
+      <div class="tab-item"><span class="icon">🛒</span><span class="text">商城</span></div>
+      <div class="tab-item"><span class="icon">👤</span><span class="text">我的</span></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

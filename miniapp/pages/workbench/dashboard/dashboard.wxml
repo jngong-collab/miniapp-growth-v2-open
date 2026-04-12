@@ -1,0 +1,25 @@
+<view class="dashboard-page">
+  <view class="hero-card bg-grad-warm">
+    <text class="hero-kicker">{{role === 'admin' ? '店长视角' : '员工视角'}}</text>
+    <text class="hero-title">今日门店增长工作台</text>
+    <text class="hero-subtitle">聚焦线索、转化、履约和退款处理</text>
+  </view>
+
+  <view class="summary-grid">
+    <view class="summary-card" wx:for="{{summaryCards}}" wx:key="label">
+      <text class="summary-value">{{item.value}}</text>
+      <text class="summary-label">{{item.label}}</text>
+    </view>
+  </view>
+
+  <view class="section-header">
+    <text class="section-title">核心模块</text>
+    <text class="section-subtitle">WORKBENCH</text>
+  </view>
+  <view class="module-grid">
+    <view class="module-card" wx:for="{{modules}}" wx:key="key" data-url="{{item.url}}" bindtap="openModule">
+      <text class="module-title">{{item.title}}</text>
+      <text class="module-desc">{{item.desc}}</text>
+    </view>
+  </view>
+</view>
