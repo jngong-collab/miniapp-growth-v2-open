@@ -173,7 +173,7 @@
 }
 .hero-badge {
   align-self: flex-start;
-  padding: 6rpx 18rpx;
+  padding: 6rpx var(--spacing-sm);
   background: rgba(192, 139, 92, 0.85);
   border-radius: var(--radius-capsule);
   font-size: var(--font-sm);
@@ -286,12 +286,12 @@
 }
 .type-badge {
   position: absolute;
-  top: 12rpx;
-  left: 12rpx;
-  padding: 4rpx 14rpx;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  padding: 4rpx var(--spacing-sm);
   font-size: var(--font-sm);
   font-weight: 800;
-  border-radius: 8rpx;
+  border-radius: var(--radius-sm);
   backdrop-filter: blur(4px);
   letter-spacing: 1rpx;
 }
@@ -316,7 +316,7 @@
   font-weight: 800;
   color: var(--color-text-title);
   line-height: 1.4;
-  margin-bottom: 8rpx;
+  margin-bottom: var(--spacing-xs);
   /* 限制两行 */
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -327,8 +327,8 @@
   font-size: var(--font-base);
   color: var(--color-text-sub);
   background: rgba(0,0,0,0.03);
-  padding: 6rpx 14rpx;
-  border-radius: 8rpx;
+  padding: 6rpx var(--spacing-sm);
+  border-radius: var(--radius-sm);
   align-self: flex-start;
 }
 
@@ -395,7 +395,7 @@
   align-items: center;
   gap: 4rpx;
 }
-.cb-icon { font-size: 20rpx; }
+.cb-icon { font-size: var(--font-xs); }
 .cb-text { font-size: var(--font-sm); color: var(--color-primary); font-weight: 700; }
 
 /* 到底提示状态区 */
@@ -403,7 +403,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 60rpx 0 40rpx;
+  padding: 60rpx 0 var(--spacing-xl);
   gap: var(--spacing-sm);
 }
 .bottom-tips .line { width: 40rpx; height: 1rpx; background: rgba(0,0,0,0.06); }
@@ -417,5 +417,5 @@
   justify-content: center;
   padding: 120rpx 0;
 }
-.empty-icon { font-size: 100rpx; opacity: 0.6; margin-bottom: 24rpx; }
+.empty-icon { font-size: 100rpx; opacity: 0.6; margin-bottom: var(--spacing-md); }
 .empty-text { font-size: var(--font-base); color: var(--color-text-muted); font-weight: 500; }
