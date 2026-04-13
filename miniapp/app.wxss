@@ -36,10 +36,10 @@ page {
   --color-text-secondary: var(--color-text-sub);
 
   /* ─── 背景 & 边框 ─── */
-  --bg-page: linear-gradient(180deg, #F0F4FF 0%, #F7FAFF 46%, #FFFFFF 100%);
+  --bg-page: #F8F5EE;
   --bg-card: #FFFFFF;
   --color-bg-white: var(--bg-card);
-  --color-border: rgba(44,36,32,0.08);
+  --color-border: rgba(44,36,32,0.05);
 
   /* ─── 字号兼容层 ─── */
   --font-xs: 20rpx;
@@ -63,11 +63,11 @@ page {
   --radius-xl: 40rpx;
   --radius-capsule: 999rpx;
 
-  /* ─── 阴影（暖色调） ─── */
-  --shadow-sm: 0 2rpx 12rpx rgba(44,36,32,0.05);
-  --shadow-md: 0 6rpx 24rpx rgba(44,36,32,0.07);
-  --shadow-float: 0 12rpx 36rpx rgba(192,139,92,0.14);
-  --shadow-ai: 0 12rpx 36rpx rgba(107,138,153,0.12);
+  /* ─── 阴影（中性偏暖，更柔和） ─── */
+  --shadow-sm: 0 4rpx 16rpx rgba(60, 50, 40, 0.04);
+  --shadow-md: 0 12rpx 32rpx rgba(60, 50, 40, 0.08);
+  --shadow-float: 0 20rpx 48rpx rgba(60, 50, 40, 0.06);
+  --shadow-ai: 0 16rpx 40rpx rgba(60, 50, 40, 0.06);
 
   font-size: 28rpx;
   color: var(--color-text-main);
@@ -80,7 +80,7 @@ page {
 
 /* 卡片 */
 .card-float {
-  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 76%, #F4F8FF 100%);
+  background: var(--bg-card);
   border: 1rpx solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
@@ -181,12 +181,23 @@ page {
 
 /* ====== 动效 ====== */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20rpx); }
+  from { opacity: 0; transform: translateY(16rpx); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up {
   animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   opacity: 0;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.8; }
+  50% { opacity: 0.4; }
+  100% { opacity: 0.8; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ====== 加载 ====== */
@@ -262,7 +273,7 @@ page {
 .package-usage,
 .section-card,
 .card-float {
-  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 78%, var(--color-bg-white) 100%);
+  background: var(--bg-card);
   border: 1rpx solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);

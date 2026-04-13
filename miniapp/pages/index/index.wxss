@@ -93,7 +93,7 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
   overflow: hidden;
-  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 72%, var(--color-bg-white) 100%);
+  background: var(--bg-card);
   border: 1rpx solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
@@ -173,7 +173,7 @@
   border-radius: var(--radius-lg);
   margin-bottom: var(--spacing-lg);
   overflow: hidden;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark), var(--color-text-main));
+  background: var(--color-primary);
   color: #fff;
 }
 .promo-bg-pattern {
@@ -266,7 +266,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(165deg, var(--color-primary-bg) 0%, var(--color-ai-bg) 40%, var(--color-bg-white) 100%);
+  background: var(--color-primary-bg);
   gap: var(--spacing-xs);
 }
 .therapist-placeholder-emoji {
@@ -376,7 +376,7 @@
   overflow: hidden;
   margin-bottom: var(--spacing-lg);
   border: 1rpx solid var(--color-border);
-  background: linear-gradient(165deg, var(--bg-card), var(--color-bg-white));
+  background: var(--bg-card);
 }
 .package-img-wrap {
   width: 230rpx;
@@ -395,7 +395,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, var(--color-primary-bg), var(--color-bg-white));
+  background: var(--color-primary-bg);
 }
 .package-img-placeholder .placeholder-emoji {
   font-size: 72rpx;
@@ -445,7 +445,7 @@
 .grid-product-card {
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: linear-gradient(165deg, var(--bg-card), var(--color-bg-white));
+  background: var(--bg-card);
   border: 1rpx solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
@@ -476,7 +476,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, var(--color-primary-bg), var(--color-bg-white), var(--color-bg-white));
+  background: var(--color-primary-bg);
   gap: var(--spacing-xs);
 }
 .placeholder-emoji {
