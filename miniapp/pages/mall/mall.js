@@ -1,7 +1,8 @@
 // pages/mall/mall.js
 const { callCloud } = require('../../utils/cloud-api')
+const { addCartItem, canAddProductToCart, getCartBadgeCount } = require('../../utils/cart')
 
-const MALL_CATEGORIES = ['五行泡浴', '百草元气灸', '靶向敷贴', '精油系列', '超值套餐']
+const MALL_CATEGORIES = ['五行泡浴', '百草元气灸', '靶向敷贴', '精油系列']
 
 Page({
     data: {
@@ -9,22 +10,33 @@ Page({
         activeTab: MALL_CATEGORIES[0],
         keyword: '',
         products: [],
+        packages: [], // 超值套餐专区数据
+        cartCount: 0,
         campaignMap: {},  // productId -> campaign 映射
         fissionCampaigns: [], // 限时活动列表
         page: 1,
-        pageSize: 10,
+        pageSize: 50,
         hasMore: false,
         loading: false
     },
 
     onLoad: function () {
         this._productsRequestSeq = 0
+        this.refreshCartCount()
         this._loadData()
+    },
+
+    onShow: function () {
+        this.refreshCartCount()
     },
 
     onPullDownRefresh: async function () {
         await this._loadData(true)
         wx.stopPullDownRefresh()
+    },
+
+    onReachBottom: function () {
+        this.loadMore()
     },
 
     // 切换分类
@@ -45,10 +57,11 @@ Page({
 
     // 加载所有数据
     _loadData: async function (reset = true) {
-        // 并行加载活动和商品
+        // 并行加载活动、商品和套餐
         await Promise.all([
             this._loadCampaigns(),
-            this._loadProducts(reset)
+            this._loadProducts(reset),
+            this._loadPackages()
         ])
         // 加载完成后，用产品数据回填活动的图片
         this._enrichCampaignImages()
@@ -98,6 +111,27 @@ Page({
         } catch (e) { /* ignore */ }
     },
 
+    // 加载超值套餐专区
+    _loadPackages: async function () {
+        try {
+            const data = await callCloud('contentApi', {
+                action: 'getMallContent',
+                category: '超值套餐',
+                page: 1,
+                pageSize: 10,
+                keyword: ''
+            })
+            if (data && data.products) {
+                const packages = data.products.map(p => ({
+                    ...p,
+                    priceYuan: (p.price / 100).toFixed(1),
+                    originalPriceYuan: p.originalPrice > 0 ? (p.originalPrice / 100).toFixed(1) : ''
+                }))
+                this.setData({ packages })
+            }
+        } catch (e) { /* ignore */ }
+    },
+
     // 加载商品列表
     _loadProducts: async function (reset = false) {
         if (this.data.loading && !reset) return
@@ -136,7 +170,8 @@ Page({
                         priceYuan: (p.price / 100).toFixed(1),
                         originalPriceYuan: p.originalPrice > 0 ? (p.originalPrice / 100).toFixed(1) : '',
                         hasCashback: !!campaign,
-                        cashbackAmountYuan: campaign ? campaign.cashbackAmountYuan : ''
+                        cashbackAmountYuan: campaign ? campaign.cashbackAmountYuan : '',
+                        canAddToCart: canAddProductToCart(p, campaign).ok
                     }
                 })
                 const products = reset ? newProducts : this.data.products.concat(newProducts)
@@ -168,9 +203,36 @@ Page({
         wx.navigateTo({ url: `/pages/product-detail/product-detail?id=${id}` })
     },
 
+    addToCart: function (e) {
+        const productId = e.currentTarget.dataset.id
+        const product = this.data.products.find(item => item._id === productId)
+        if (!product) return
+
+        const eligibility = canAddProductToCart(product, this.data.campaignMap[productId] || null)
+        if (!eligibility.ok) {
+            wx.showToast({ title: eligibility.reason, icon: 'none' })
+            return
+        }
+
+        try {
+            addCartItem(product, 1)
+            this.refreshCartCount()
+            wx.showToast({ title: '已加入购物车', icon: 'success' })
+        } catch (error) {
+            wx.showToast({ title: error.message || '加入购物车失败', icon: 'none' })
+        }
+    },
+
+    refreshCartCount: function () {
+        this.setData({ cartCount: getCartBadgeCount() })
+    },
+
+    goToCart: function () {
+        wx.navigateTo({ url: '/pages/cart/cart' })
+    },
+
     // 跳转裂变活动
     goToFission: function () {
         wx.navigateTo({ url: '/pages/fission/fission' })
     }
 })
-

@@ -10,6 +10,7 @@
     "pages/tongue-report/tongue-report",
     "pages/lottery/lottery",
     "pages/profile/profile",
+    "pages/cart/cart",
     "pages/workbench/verify/verify",
     "pages/workbench/staff/staff",
     "pages/orders/orders",

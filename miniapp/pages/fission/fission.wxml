@@ -87,6 +87,18 @@
           </view>
         </view>
 
+
+        <!-- 活动规则 -->
+        <view class="rules-card">
+          <view class="rules-head">活动规则</view>
+          <text class="rules-item">1. 推荐好友购买活动产品，好友成功下单即返现</text>
+          <text class="rules-item">2. 返现自动到账余额，可用于购买门店商品</text>
+          <text class="rules-item">3. 每人限购活动产品一份</text>
+          <text class="rules-item">4. 活动最终解释权归门店所有</text>
+        </view>
+
+      </view>
+    </view>
         <!-- 我的收益 -->
         <view class="info-card" wx:if="{{earnings}}">
           <view class="info-head">我的收益</view>
@@ -121,18 +133,6 @@
             <text class="record-amount">+¥{{item.cashbackAmountYuan}}</text>
           </view>
         </view>
-
-        <!-- 活动规则 -->
-        <view class="rules-card">
-          <view class="rules-head">活动规则</view>
-          <text class="rules-item">1. 推荐好友购买活动产品，好友成功下单即返现</text>
-          <text class="rules-item">2. 返现自动到账余额，可用于购买门店商品</text>
-          <text class="rules-item">3. 每人限购活动产品一份</text>
-          <text class="rules-item">4. 活动最终解释权归门店所有</text>
-        </view>
-
-      </view>
-    </view>
   </view>
 
   <!-- 空状态 -->

@@ -44,18 +44,17 @@ Page({
     _loadUserStats: async function () {
         try {
             // 并发请求基础统计数据
-            const [earningsRes, packagesRes, tongueRes, pendingOrdersRes, allOrders] = await Promise.all([
+            const [earningsRes, packagesRes, tongueRes, orderCounts] = await Promise.all([
                 callCloud('growthApi', { action: 'getMyEarnings' }).catch(() => ({})),
                 callCloud('growthApi', { action: 'getMyPackages' }).catch(() => []),
                 callCloud('growthApi', { action: 'getTongueHistory' }).catch(() => []),
-                callCloud('commerceApi', { action: 'getMyOrders', status: 'pending' }).catch(() => []),
-                callCloud('commerceApi', { action: 'getMyOrders', status: 'all' }).catch(() => [])
+                callCloud('commerceApi', { action: 'getMyOrderCounts' }).catch(() => ({ all: 0, pending: 0, refund: 0 }))
             ])
 
             const earnings = earningsRes || {}
             const packages = packagesRes || []
             const tongues = tongueRes || []
-            const pendingOrders = pendingOrdersRes || []
+            const counts = orderCounts || {}
 
             const levelMap = { vip: 'VIP 会员', svip: 'SVIP 会员', normal: '普通会员' }
 
@@ -63,8 +62,8 @@ Page({
                 balanceYuan: ((earnings.balance || 0) / 100).toFixed(1),
                 invitedCount: earnings.totalInvited || 0,
                 levelLabel: levelMap[earnings.memberLevel] || '普通会员',
-                orderCount: allOrders.length,
-                pendingCount: pendingOrders.length,
+                orderCount: counts.all || 0,
+                pendingCount: counts.pending || 0,
                 packageCount: countActivePackageItems(packages),
                 tongueCount: tongues.length
             })

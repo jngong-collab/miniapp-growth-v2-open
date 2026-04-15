@@ -54,8 +54,9 @@ async function getMallContent(event) {
     const resolvedCategory = resolveMallCategory(category, type)
     if (resolvedCategory) productCondition.category = resolvedCategory
     if (keyword && keyword.trim()) {
+        const safeKeyword = keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         productCondition.name = db.RegExp({
-            regexp: keyword.trim(),
+            regexp: safeKeyword,
             options: 'i'
         })
     }

@@ -1,0 +1,233 @@
+.cart-page {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding: var(--spacing-md);
+  padding-bottom: 220rpx;
+  box-sizing: border-box;
+}
+
+.cart-tip {
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: rgba(184,145,107,0.08);
+  color: var(--color-primary-dark);
+  font-size: var(--font-xs);
+  border: 1rpx solid rgba(184,145,107,0.14);
+}
+
+.cart-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.cart-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1rpx solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.check-icon {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 2rpx solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 22rpx;
+  flex-shrink: 0;
+}
+
+.check-icon.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.cart-image {
+  width: 156rpx;
+  height: 156rpx;
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+  flex-shrink: 0;
+}
+
+.cart-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.cart-name {
+  font-size: var(--font-base);
+  color: var(--color-text-title);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.cart-price {
+  font-size: var(--font-md);
+  color: var(--color-primary-dark);
+  font-weight: 800;
+}
+
+.cart-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.qty-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.qty-btn {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-page);
+  border: 1rpx solid var(--color-border);
+  color: var(--color-text-title);
+  font-size: var(--font-base);
+}
+
+.qty-btn.disabled {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.qty-num {
+  min-width: 32rpx;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--color-text-title);
+  font-weight: 700;
+}
+
+.remove-link {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+}
+
+.cart-toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  padding-bottom: calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1rpx solid var(--color-border);
+}
+
+.toolbar-select {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.select-text {
+  font-size: var(--font-sm);
+  color: var(--color-text-title);
+  font-weight: 600;
+}
+
+.toolbar-summary {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.summary-top {
+  font-size: var(--font-xs);
+  color: var(--color-text-sub);
+}
+
+.summary-price {
+  font-size: var(--font-md);
+  color: var(--color-primary-dark);
+  font-weight: 800;
+}
+
+.checkout-btn {
+  min-width: 190rpx;
+  height: 84rpx;
+  padding: 0 28rpx;
+  border-radius: var(--radius-capsule);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+}
+
+.checkout-btn.disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.empty-block {
+  padding: 180rpx var(--spacing-lg);
+  text-align: center;
+}
+
+.empty-icon {
+  display: block;
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto var(--spacing-sm);
+}
+
+.empty-title {
+  display: block;
+  font-size: var(--font-lg);
+  color: var(--color-text-title);
+  font-weight: 800;
+  margin-bottom: var(--spacing-xs);
+}
+
+.empty-desc {
+  display: block;
+  font-size: var(--font-sm);
+  color: var(--color-text-sub);
+  margin-bottom: var(--spacing-lg);
+}
+
+.empty-btn {
+  width: 240rpx;
+  height: 84rpx;
+  margin: 0 auto;
+  border-radius: var(--radius-capsule);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+}

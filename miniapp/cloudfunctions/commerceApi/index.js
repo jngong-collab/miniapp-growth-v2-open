@@ -18,10 +18,14 @@ exports.main = async (event) => {
             return proxyPayApi({ ...event, action: 'ensureUser' })
         case 'createOrder':
             return proxyPayApi({ ...event, action: 'createOrder' })
+        case 'createCartOrder':
+            return proxyPayApi({ ...event, action: 'createCartOrder' })
         case 'requestPay':
             return proxyPayApi({ ...event, action: 'requestPay' })
         case 'getMyOrders':
             return getMyOrders(event, OPENID)
+        case 'getMyOrderCounts':
+            return getMyOrderCounts(OPENID)
         case 'requestRefund':
             return requestRefund(event, OPENID)
         default:
@@ -68,15 +72,49 @@ async function getProductDetail(event) {
 async function getMyOrders(event, openid) {
     const { status = 'all', page = 1, pageSize = 30 } = event
     const condition = { _openid: openid }
-    if (status && status !== 'all') condition.status = status
+    const statusCondition = buildOrderStatusCondition(status)
+    if (statusCondition !== null) condition.status = statusCondition
 
-    const orders = await db.collection('orders').where(condition)
+    const ordersRes = await db.collection('orders').where(condition)
         .orderBy('createdAt', 'desc')
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .get()
 
-    return { code: 0, data: orders.data || [] }
+    const orders = ordersRes.data || []
+    if (!orders.length) return { code: 0, data: [] }
+
+    const itemEntries = await Promise.all(orders.map(async (order) => {
+        const itemsRes = await db.collection('order_items').where({ orderId: order._id }).get().catch(() => ({ data: [] }))
+        return [order._id, itemsRes.data || []]
+    }))
+    const itemMap = Object.fromEntries(itemEntries)
+
+    return {
+        code: 0,
+        data: orders.map(order => ({
+            ...order,
+            items: itemMap[order._id] || []
+        }))
+    }
+}
+
+async function getMyOrderCounts(openid) {
+    const baseCondition = { _openid: openid }
+    const [allCount, pendingCount, refundCount] = await Promise.all([
+        db.collection('orders').where(baseCondition).count().then(res => res.total || 0).catch(() => 0),
+        db.collection('orders').where({ ...baseCondition, status: 'pending' }).count().then(res => res.total || 0).catch(() => 0),
+        db.collection('orders').where({ ...baseCondition, status: buildOrderStatusCondition('refund') }).count().then(res => res.total || 0).catch(() => 0)
+    ])
+
+    return {
+        code: 0,
+        data: {
+            all: allCount,
+            pending: pendingCount,
+            refund: refundCount
+        }
+    }
 }
 
 async function requestRefund(event, openid) {
@@ -94,4 +132,12 @@ async function proxyPayApi(data) {
         console.error('proxyPayApi failed:', error)
         return { code: -1, msg: error.message || '交易服务异常' }
     }
+}
+
+function buildOrderStatusCondition(status) {
+    if (!status || status === 'all') return null
+    if (status === 'refund') {
+        return _.in(['refund_requested', 'refunding', 'refunded'])
+    }
+    return status
 }

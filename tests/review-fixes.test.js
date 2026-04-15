@@ -14,27 +14,85 @@ test('internal callback auth fails closed without PAY_CALLBACK_SECRET', () => {
   assert.equal(payAuth.isAuthorizedInternalCall({ _internalSecret: 'known' }, { PAY_CALLBACK_SECRET: 'known' }), true);
 });
 
-test('refund requests only mark the order for follow-up processing', () => {
+test('refund request planning creates both order state and review queue records', () => {
   const { buildRefundRequestPlan } = require('../miniapp/cloudfunctions/payApi/refund-flow');
   const serverDate = Symbol('serverDate');
 
-  assert.deepEqual(buildRefundRequestPlan('重复下单', serverDate), {
+  assert.deepEqual(buildRefundRequestPlan({
+    orderId: 'order-1',
+    orderNo: 'ORD202604150001',
+    requesterOpenid: 'openid-1',
+    previousStatus: 'paid',
+    refundAmount: 1990,
+    reason: '重复下单'
+  }, serverDate), {
     orderUpdate: {
-      status: 'refunding',
+      status: 'refund_requested',
       refundReason: '重复下单',
-      refundRequestedAt: serverDate
+      refundRequestedAt: serverDate,
+      updatedAt: serverDate
     },
-    rollbackRelatedState: false
+    refundRequestData: {
+      orderId: 'order-1',
+      orderNo: 'ORD202604150001',
+      requesterOpenid: 'openid-1',
+      reason: '重复下单',
+      status: 'pending',
+      previousStatus: 'paid',
+      refundAmount: 1990,
+      createdAt: serverDate,
+      updatedAt: serverDate
+    }
   });
 
-  assert.deepEqual(buildRefundRequestPlan('', serverDate), {
+  assert.deepEqual(buildRefundRequestPlan({
+    orderId: 'order-2',
+    requesterOpenid: 'openid-2',
+    previousStatus: 'paid',
+    refundAmount: 0,
+    reason: ''
+  }, serverDate), {
     orderUpdate: {
-      status: 'refunding',
+      status: 'refund_requested',
       refundReason: '',
-      refundRequestedAt: serverDate
+      refundRequestedAt: serverDate,
+      updatedAt: serverDate
     },
-    rollbackRelatedState: false
+    refundRequestData: {
+      orderId: 'order-2',
+      orderNo: '',
+      requesterOpenid: 'openid-2',
+      reason: '',
+      status: 'pending',
+      previousStatus: 'paid',
+      refundAmount: 0,
+      createdAt: serverDate,
+      updatedAt: serverDate
+    }
   });
+});
+
+test('refund workflow writes review queue records, executes refund settlement, and uses composite refund filters', () => {
+  const payApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'payApi', 'index.js'), 'utf8');
+  const refundFlow = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'payApi', 'refund-flow.js'), 'utf8');
+  const commerceApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'commerceApi', 'index.js'), 'utf8');
+  const opsApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'opsApi', 'index.js'), 'utf8');
+  const ordersPage = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'orders', 'orders.js'), 'utf8');
+  const profilePage = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'profile', 'profile.js'), 'utf8');
+  const profileWxml = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'profile', 'profile.wxml'), 'utf8');
+
+  assert.match(payApi, /collection\('refund_requests'\)\.add/);
+  assert.match(refundFlow, /status:\s*'refund_requested'/);
+  assert.match(opsApi, /cloud\.cloudPay\.refund/);
+  assert.match(opsApi, /status:\s*'refunded'/);
+  assert.match(commerceApi, /case 'getMyOrderCounts'/);
+  assert.match(commerceApi, /status === 'refund'/);
+  assert.match(ordersPage, /key:\s*'refund'/);
+  assert.doesNotMatch(ordersPage, /key:\s*'refund_requested'/);
+  assert.match(profilePage, /getMyOrderCounts/);
+  assert.doesNotMatch(profilePage, /getMyOrders', status: 'all'/);
+  assert.doesNotMatch(profilePage, /getMyOrders', status: 'pending'/);
+  assert.match(profileWxml, /data-status="refund"/);
 });
 
 test('package usage state is derived consistently across pages', () => {
@@ -220,4 +278,18 @@ test('page json files avoid unsupported share config flags', () => {
     assert.doesNotMatch(jsonText, /"enableShareAppMessage"\s*:/);
     assert.doesNotMatch(jsonText, /"enableShareTimeline"\s*:/);
   }
+});
+
+
+test('payCallback uses CAS update for idempotency', () => {
+  const payApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'payApi', 'index.js'), 'utf8');
+  assert.match(payApi, /casUpdate\.stats\.updated === 0/);
+  assert.match(payApi, /status:\s*_\.\s*neq\s*\(\s*'paid'\s*\)/);
+});
+
+test('verifyPackage uses conditional atomic decrement and expiry check', () => {
+  const opsApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'opsApi', 'index.js'), 'utf8');
+  assert.match(opsApi, /packageExpireAt\s*&&\s*new\s+Date\s*\(\s*item\.packageExpireAt\s*\)\s*<\s*new\s+Date\s*\(\s*\)/);
+  assert.match(opsApi, /packageRemaining\.\${serviceName}.*_\.\s*gt\s*\(\s*0\s*\)/);
+  assert.match(opsApi, /packageRemaining\.\${serviceName}.*_\.\s*inc\s*\(\s*-1\s*\)/);
 });

@@ -3,12 +3,29 @@
   <view class="bg-deco bg-deco-1"></view>
   <view class="bg-deco bg-deco-2"></view>
 
+  <!-- 悬浮购物车 -->
+  <view class="float-cart card-press" bindtap="goToCart">
+    <image class="float-cart-icon" src="/assets/icons/cart.svg" mode="aspectFit"></image>
+    <view class="float-cart-badge" wx:if="{{cartCount > 0}}">
+      {{cartCount > 99 ? '99+' : cartCount}}
+    </view>
+  </view>
+
   <!-- 吸顶导航 -->
   <view class="mall-sticky-header">
-    <view class="search-box">
-      <view class="search-inner">
-        <text class="search-icon">🔍</text>
-        <input class="search-input" placeholder="搜索服务、调理套餐…" placeholder-class="search-ph" bindinput="onSearch" value="{{keyword}}" />
+    <view class="header-top-row">
+      <view class="search-box">
+        <view class="search-inner">
+          <text class="search-icon">🔍</text>
+          <input class="search-input" placeholder="搜索服务、调理套餐…" placeholder-class="search-ph" bindinput="onSearch" value="{{keyword}}" />
+        </view>
+      </view>
+
+      <view class="header-cart card-press" bindtap="goToCart">
+        <image class="header-cart-icon" src="/assets/icons/cart.svg" mode="aspectFit"></image>
+        <view class="header-cart-badge" wx:if="{{cartCount > 0}}">
+          {{cartCount > 99 ? '99+' : cartCount}}
+        </view>
       </view>
     </view>
 
@@ -54,6 +71,34 @@
       </swiper>
     </view>
 
+    <!-- 超值套餐专区 -->
+    <view class="package-section animate-fade-up" style="animation-delay: 0.1s" wx:if="{{packages.length > 0}}">
+      <view class="section-title-row">
+        <view class="section-title">
+          <text class="section-icon">🔥</text>
+          <text>超值调理套餐</text>
+          <text class="section-tag">到店核销</text>
+        </view>
+      </view>
+      <scroll-view class="package-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="package-list">
+          <view class="package-card card-press {{item.name === '脾胃养护调理套餐' ? 'pkg-spleen' : item.name === '安神助眠调理套餐' ? 'pkg-sleep' : 'pkg-growth'}}" wx:for="{{packages}}" wx:key="_id" bindtap="goToProduct" data-id="{{item._id}}">
+            <view class="package-top">
+              <text class="package-name">{{item.name}}</text>
+              <text class="package-desc" wx:if="{{item.description}}">{{item.description}}</text>
+            </view>
+            <view class="package-footer">
+              <view class="package-price-row">
+                <text class="package-price"><text class="package-yen">¥</text>{{item.priceYuan}}</text>
+                <text class="package-origin" wx:if="{{item.originalPriceYuan}}">¥{{item.originalPriceYuan}}</text>
+              </view>
+              <view class="package-btn">去购买</view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
     <!-- 商品列表 -->
     <view class="prod-list">
       <view class="prod-card animate-fade-up" wx:for="{{products}}" wx:key="_id" bindtap="goToProduct" data-id="{{item._id}}" style="animation-delay: {{index * 0.06}}s">
@@ -78,7 +123,8 @@
               </view>
               <text class="origin-price" wx:if="{{item.originalPriceYuan && item.originalPriceYuan !== '0.0'}}">¥{{item.originalPriceYuan}}</text>
             </view>
-            <view class="action-btn card-press">＋</view>
+            <view wx:if="{{item.canAddToCart}}" class="action-btn card-press" catchtap="addToCart" data-id="{{item._id}}">＋</view>
+            <view wx:else class="action-btn action-btn-secondary">›</view>
           </view>
 
           <view class="cashback-strip" wx:if="{{item.hasCashback}}">

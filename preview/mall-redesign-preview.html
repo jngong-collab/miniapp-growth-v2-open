@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商城重构预览</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #f5f5f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex; justify-content: center; padding: 20px;
+  }
+  .phone {
+    width: 375px;
+    background: #FAF7F2;
+    min-height: 812px;
+    border-radius: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    overflow: hidden;
+    position: relative;
+  }
+  .header {
+    background: rgba(250,247,242,0.96);
+    backdrop-filter: blur(20px);
+    padding: 16px 20px 12px;
+    position: sticky; top:0; z-index: 100;
+    border-radius: 0 0 16px 16px;
+  }
+  .search-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .search-box {
+    flex:1; height: 40px; background: #fff; border-radius: 20px;
+    display: flex; align-items: center; padding: 0 16px;
+    border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .search-icon { font-size: 14px; margin-right: 8px; opacity: .6; }
+  .search-text { font-size: 14px; color: #999; }
+  .header-cart {
+    width: 40px; height: 40px; border-radius: 50%; background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    position: relative; flex-shrink: 0;
+  }
+  .cart-badge {
+    position: absolute; top: -2px; right: -2px;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: #D65C4F; color: #fff; font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; padding: 0 5px;
+  }
+
+  .cat-scroll {
+    display: flex; gap: 10px; overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .cat-scroll::-webkit-scrollbar { display: none; }
+  .cat-item {
+    padding: 6px 14px; border-radius: 16px; font-size: 13px; font-weight: 500;
+    color: #666; background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(0,0,0,0.04);
+  }
+  .cat-item.active {
+    background: #B8916B; color: #fff; font-weight: 600;
+  }
+
+  .content { padding: 0 16px 100px; }
+
+  /* 裂变活动轮播 */
+  .hero-swiper {
+    height: 170px; border-radius: 16px; overflow: hidden;
+    margin: 16px 0 20px; position: relative;
+    background: linear-gradient(135deg, #E8D5C4 0%, #D4B896 100%);
+  }
+  .hero-card {
+    width: 100%; height: 100%; padding: 20px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    color: #fff; position: relative;
+  }
+  .hero-badge {
+    align-self: flex-start; padding: 3px 10px; background: #B8916B;
+    border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 8px;
+  }
+  .hero-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; text-shadow: 0 2px 4px rgba(0,0,0,.2); }
+  .hero-price { font-size: 14px; font-weight: 600; opacity: .95; }
+
+  /* 超值套餐专区 */
+  .section-title-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-size: 17px; font-weight: 800; color: #333;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .section-tag {
+    font-size: 11px; color: #B8916B; background: rgba(184,145,107,0.10);
+    padding: 2px 8px; border-radius: 10px; font-weight: 600;
+  }
+  .section-more {
+    font-size: 13px; color: #999;
+  }
+
+  .package-scroll {
+    display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px;
+    margin-bottom: 24px; scrollbar-width: none;
+  }
+  .package-scroll::-webkit-scrollbar { display: none; }
+
+  .package-card {
+    min-width: 260px; height: 130px; border-radius: 16px; padding: 16px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    color: #fff; position: relative; overflow: hidden;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  }
+  .package-card::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 60%);
+  }
+  .pkg-spleen { background: linear-gradient(135deg, #E8C39E 0%, #D4A574 100%); }
+  .pkg-sleep { background: linear-gradient(135deg, #C5B9E0 0%, #A99BD4 100%); }
+  .pkg-growth { background: linear-gradient(135deg, #F4C495 0%, #E8A868 100%); }
+
+  .pkg-name { font-size: 16px; font-weight: 800; position: relative; z-index: 1; }
+  .pkg-desc { font-size: 12px; opacity: .95; margin-top: 4px; position: relative; z-index: 1; }
+  .pkg-footer {
+    display: flex; align-items: baseline; justify-content: space-between;
+    position: relative; z-index: 1;
+  }
+  .pkg-price { font-size: 20px; font-weight: 800; }
+  .pkg-origin { font-size: 12px; text-decoration: line-through; opacity: .8; margin-left: 6px; }
+  .pkg-btn {
+    background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35);
+    padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 700;
+    backdrop-filter: blur(4px);
+  }
+
+  /* 商品列表 */
+  .product-list-title {
+    font-size: 17px; font-weight: 800; color: #333; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .prod-card {
+    display: flex; gap: 12px; background: #fff; border-radius: 16px;
+    padding: 12px; margin-bottom: 12px;
+    border: 1px solid rgba(0,0,0,0.04); box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  }
+  .prod-img-wrap {
+    width: 100px; height: 100px; border-radius: 12px; overflow: hidden;
+    background: #f5f5f5; flex-shrink: 0;
+  }
+  .prod-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .prod-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+  .prod-title { font-size: 15px; font-weight: 700; color: #333; line-height: 1.35; }
+  .prod-tag {
+    display: inline-block; font-size: 11px; color: #B8916B;
+    background: rgba(184,145,107,0.08); padding: 2px 8px; border-radius: 8px;
+    margin-top: 6px; align-self: flex-start;
+  }
+  .prod-bottom {
+    display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
+  }
+  .prod-price { font-size: 18px; font-weight: 800; color: #B8916B; }
+  .prod-price small { font-size: 12px; }
+  .add-btn {
+    width: 28px; height: 28px; border-radius: 50%; background: #B8916B;
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 600;
+  }
+
+  /* 悬浮购物车 */
+  .float-cart {
+    position: fixed; right: 20px; bottom: 100px;
+    width: 52px; height: 52px; border-radius: 50%; background: #fff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12); display: flex;
+    align-items: center; justify-content: center; z-index: 50;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .float-badge {
+    position: absolute; top: 2px; right: 2px;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: #D65C4F; color: #fff; font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; padding: 0 5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <!-- 吸顶头部 -->
+  <div class="header">
+    <div class="search-row">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <span class="search-text">搜索服务、调理套餐…</span>
+      </div>
+      <div class="header-cart">
+        <span>🛒</span>
+        <span class="cart-badge">3</span>
+      </div>
+    </div>
+    <div class="cat-scroll">
+      <div class="cat-item active">五行泡浴</div>
+      <div class="cat-item">百草元气灸</div>
+      <div class="cat-item">靶向敷贴</div>
+      <div class="cat-item">精油系列</div>
+      <div class="cat-item">超值套餐</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- 裂变活动 -->
+    <div class="hero-swiper">
+      <div class="hero-card">
+        <span class="hero-badge">限时活动</span>
+        <div class="hero-title">脾胃养护推拿 · 新客体验</div>
+        <div class="hero-price">¥19.9 起 · 推荐返 ¥10/单</div>
+      </div>
+    </div>
+
+    <!-- 超值套餐专区 -->
+    <div class="section-title-row">
+      <div class="section-title">🔥 超值调理套餐 <span class="section-tag">到店核销</span></div>
+      <div class="section-more">全部 ›</div>
+    </div>
+    <div class="package-scroll">
+      <div class="package-card pkg-spleen">
+        <div>
+          <div class="pkg-name">脾胃养护调理套餐</div>
+          <div class="pkg-desc">脾胃推拿6次 + 积食推拿2次</div>
+        </div>
+        <div class="pkg-footer">
+          <div>
+            <span class="pkg-price">¥498</span>
+            <span class="pkg-origin">¥880</span>
+          </div>
+          <div class="pkg-btn">去购买</div>
+        </div>
+      </div>
+
+      <div class="package-card pkg-sleep">
+        <div>
+          <div class="pkg-name">安神助眠调理套餐</div>
+          <div class="pkg-desc">安神推拿5次 + 头部舒缓2次</div>
+        </div>
+        <div class="pkg-footer">
+          <div>
+            <span class="pkg-price">¥528</span>
+            <span class="pkg-origin">¥880</span>
+          </div>
+          <div class="pkg-btn">去购买</div>
+        </div>
+      </div>
+
+      <div class="package-card pkg-growth">
+        <div>
+          <div class="pkg-name">春季助长免疫套餐</div>
+          <div class="pkg-desc">助长推拿8次 + 捏脊保健4次</div>
+        </div>
+        <div class="pkg-footer">
+          <div>
+            <span class="pkg-price">¥798</span>
+            <span class="pkg-origin">¥1440</span>
+          </div>
+          <div class="pkg-btn">去购买</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 实物商品列表 -->
+    <div class="product-list-title">🌿 五行泡浴</div>
+
+    <div class="prod-card">
+      <div class="prod-img-wrap">
+        <img src="https://placehold.co/200x200/E8D5C4/B8916B?text=鸡内金" alt="">
+      </div>
+      <div class="prod-info">
+        <div>
+          <div class="prod-title">鸡内金泡浴</div>
+          <span class="prod-tag">消食化积</span>
+        </div>
+        <div class="prod-bottom">
+          <div class="prod-price"><small>¥</small>168</div>
+          <div class="add-btn">＋</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prod-card">
+      <div class="prod-img-wrap">
+        <img src="https://placehold.co/200x200/D4E8D4/6B8F5E?text=紫苏" alt="">
+      </div>
+      <div class="prod-info">
+        <div>
+          <div class="prod-title">紫苏泡浴</div>
+          <span class="prod-tag">疏散风寒</span>
+        </div>
+        <div class="prod-bottom">
+          <div class="prod-price"><small>¥</small>168</div>
+          <div class="add-btn">＋</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prod-card">
+      <div class="prod-img-wrap">
+        <img src="https://placehold.co/200x200/F4E4C4/E8A868?text=金银花" alt="">
+      </div>
+      <div class="prod-info">
+        <div>
+          <div class="prod-title">金银花泡浴</div>
+          <span class="prod-tag">清热解毒</span>
+        </div>
+        <div class="prod-bottom">
+          <div class="prod-price"><small>¥</small>168</div>
+          <div class="add-btn">＋</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 悬浮购物车 -->
+  <div class="float-cart">
+    <span>🛒</span>
+    <span class="float-badge">3</span>
+  </div>
+</div>
+
+</body>
+</html>

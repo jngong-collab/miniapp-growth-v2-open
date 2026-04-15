@@ -45,15 +45,15 @@ Page({
             })
             this.setData({ campaigns: campaignList })
 
-            for (let i = 0; i < campaignList.length; i++) {
-                const campaign = campaignList[i]
-                if (!campaign.productId) continue
-                try {
-                    const productRes = await callCloud('commerceApi', { action: 'getProductDetail', productId: campaign.productId })
-                    if (productRes?.product) {
+            const detailTasks = campaignList.map((campaign, i) => {
+                if (!campaign.productId) return null
+                return callCloud('commerceApi', { action: 'getProductDetail', productId: campaign.productId })
+                    .then(productRes => {
+                        if (!productRes?.product) return null
                         const product = productRes.product
-                        this.setData({
-                            [`campaigns[${i}].productDetail`]: {
+                        return {
+                            index: i,
+                            productDetail: {
                                 description: product.description || '',
                                 detail: product.detail || '',
                                 efficacy: product.efficacy || '',
@@ -61,10 +61,14 @@ Page({
                                 type: product.type || 'service',
                                 originalPriceYuan: product.originalPrice ? (product.originalPrice / 100).toFixed(1) : ''
                             }
-                        })
-                    }
-                } catch (e) { /* ignore single product fetch error */ }
-            }
+                        }
+                    })
+                    .catch(() => null)
+            }).filter(Boolean)
+            const details = (await Promise.all(detailTasks)).filter(Boolean)
+            const updates = {}
+            details.forEach(d => { updates[`campaigns[${d.index}].productDetail`] = d.productDetail })
+            if (Object.keys(updates).length) this.setData(updates)
         } catch (e) { /* ignore */ }
     },
 

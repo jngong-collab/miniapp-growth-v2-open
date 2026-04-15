@@ -5,7 +5,7 @@ const FILTERS = [
     { key: 'all', label: '全部' },
     { key: 'pending', label: '待支付' },
     { key: 'paid', label: '已支付' },
-    { key: 'refund_requested', label: '退款中' },
+    { key: 'refund', label: '退款中' },
     { key: 'completed', label: '已完成' }
 ]
 
@@ -19,7 +19,7 @@ Page({
 
     onLoad(options) {
         this.setData({
-            activeStatus: options.status || 'all'
+            activeStatus: normalizeOrderFilter(options.status)
         })
     },
 
@@ -76,16 +76,72 @@ Page({
             if (error && error.errMsg && error.errMsg.includes('cancel')) return
             showToast(error.message || '退款申请失败')
         }
+    },
+
+    async payOrder(e) {
+        const orderId = e.currentTarget.dataset.id
+        if (!orderId) return
+
+        try {
+            wx.showLoading({ title: '拉起支付...', mask: true })
+            let payRes
+            try {
+                payRes = await callCloud('commerceApi', {
+                    action: 'requestPay',
+                    orderId
+                })
+            } catch (error) {
+                wx.hideLoading()
+                if (error.code === -2) {
+                    wx.showModal({
+                        title: '支付功能待配置',
+                        content: '请在云开发控制台开通"云支付"功能并绑定商户号后再使用',
+                        showCancel: false
+                    })
+                    return
+                }
+                throw error
+            }
+
+            wx.hideLoading()
+            const { payment } = payRes
+            await wx.requestPayment({
+                timeStamp: payment.timeStamp,
+                nonceStr: payment.nonceStr,
+                package: payment.package,
+                signType: payment.signType,
+                paySign: payment.paySign
+            })
+            showToast('支付成功', 'success')
+            this.loadOrders()
+        } catch (error) {
+            wx.hideLoading()
+            if (error && error.errMsg && error.errMsg.includes('cancel')) {
+                showToast('已取消支付')
+                return
+            }
+            showToast(error.message || '支付失败，请重试')
+        }
     }
 })
 
 function formatOrder(order) {
+    const items = (order.items || []).map(item => ({
+        ...item,
+        subtotalYuan: fenToYuan(item.subtotal || 0),
+        priceYuan: fenToYuan(item.price || 0, 1)
+    }))
+
     return {
         ...order,
+        items,
         payAmountYuan: fenToYuan(order.payAmount || order.totalAmount || 0),
         createdAtText: formatDate(order.createdAt),
+        displayProductName: order.productName || (items[0] && items[0].productName) || '门店订单',
         statusLabel: getStatusLabel(order.status),
-        canRefund: order.status === 'paid'
+        itemCount: order.itemCount || items.length || 1,
+        canRefund: order.status === 'paid',
+        canPay: order.status === 'pending'
     }
 }
 
@@ -100,4 +156,11 @@ function getStatusLabel(status) {
         completed: '已完成'
     }
     return statusMap[status] || status || '未知状态'
+}
+
+function normalizeOrderFilter(status) {
+    if (status === 'refund_requested' || status === 'refunding' || status === 'refunded') {
+        return 'refund'
+    }
+    return status || 'all'
 }

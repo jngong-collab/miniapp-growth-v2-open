@@ -118,20 +118,27 @@
   </block>
 
   <!-- 底部操作栏 -->
-  <view class="bottom-bar animate-fade-up" style="animation-delay:.36s" wx:if="{{!loading && product}}">
-    <view class="bar-actions">
-      <button class="bar-action-item share-action card-press" open-type="share">
-        <text class="bar-action-icon">📤</text>
-        <text class="bar-action-text">分享</text>
-      </button>
-      <view class="bar-action-item card-press" bindtap="goToMall">
-        <text class="bar-action-icon">🏪</text>
-        <text class="bar-action-text">商城</text>
+  <view class="bottom-bar" wx:if="{{!loading && product}}">
+    <view class="bar-icon-wrap">
+      <button class="share-btn" open-type="share"></button>
+      <image class="bar-icon-img" src="/assets/icons/share.svg" mode="aspectFit"></image>
+      <text class="bar-icon-label">分享</text>
+    </view>
+    <view class="bar-icon-wrap" bindtap="goToCart">
+      <view class="bar-cart-badge" wx:if="{{cartCount > 0}}">{{cartCount > 99 ? '99+' : cartCount}}</view>
+      <image class="bar-icon-img" src="/assets/icons/cart.svg" mode="aspectFit"></image>
+      <text class="bar-icon-label">购物车</text>
+    </view>
+
+    <block wx:if="{{cartEligible}}">
+      <view class="btn-cart" bindtap="addToCart">加入购物车</view>
+      <view class="btn-buy" bindtap="onBuy">立即购买</view>
+    </block>
+    <block wx:else>
+      <view class="btn-buy btn-buy--full" bindtap="onBuy">
+        {{campaign ? '¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
       </view>
-    </view>
-    <view class="bar-buy-btn card-press" bindtap="onBuy">
-      {{campaign ? '¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
-    </view>
+    </block>
   </view>
 
   <!-- 购买确认弹窗 -->

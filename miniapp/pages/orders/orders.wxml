@@ -24,29 +24,46 @@
     <view class="order-card animate-fade-up" wx:for="{{orders}}" wx:key="_id" style="animation-delay: {{index * 0.05}}s">
       <view class="card-head">
         <view>
-          <text class="order-title">{{item.productName || '门店订单'}}</text>
+          <text class="order-title">{{item.displayProductName}}</text>
           <text class="order-no">{{item.orderNo}}</text>
         </view>
         <text class="status-tag">{{item.statusLabel}}</text>
       </view>
       <view class="card-meta">
         <text>下单时间 {{item.createdAtText}}</text>
-        <text>数量 {{item.quantity || 1}}</text>
+        <text>数量 {{item.quantity || 1}} 件</text>
+      </view>
+      <view class="order-items-preview" wx:if="{{item.items && item.items.length}}">
+        <view class="order-item-row" wx:for="{{item.items}}" wx:key="productId">
+          <text class="order-item-name">{{item.productName}}</text>
+          <text class="order-item-meta">×{{item.quantity}}</text>
+        </view>
       </view>
       <view class="card-bottom">
         <view class="price-box">
           <text class="price-label">实付</text>
           <text class="price-value">¥{{item.payAmountYuan}}</text>
         </view>
-        <button
-          wx:if="{{item.canRefund}}"
-          class="ghost-btn"
-          data-id="{{item._id}}"
-          bindtap="requestRefund"
-          size="mini"
-        >
-          申请退款
-        </button>
+        <view class="action-group">
+          <button
+            wx:if="{{item.canPay}}"
+            class="ghost-btn pay-btn"
+            data-id="{{item._id}}"
+            bindtap="payOrder"
+            size="mini"
+          >
+            去支付
+          </button>
+          <button
+            wx:if="{{item.canRefund}}"
+            class="ghost-btn"
+            data-id="{{item._id}}"
+            bindtap="requestRefund"
+            size="mini"
+          >
+            申请退款
+          </button>
+        </view>
       </view>
     </view>
   </view>

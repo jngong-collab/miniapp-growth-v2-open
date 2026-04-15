@@ -80,7 +80,7 @@
           </view>
           <text class="entry-text">去核销</text>
         </view>
-        <view class="order-entry card-press" bindtap="goToOrders" data-status="refund_requested">
+        <view class="order-entry card-press" bindtap="goToOrders" data-status="refund">
           <view class="entry-icon-wrap" style="background:#FAF7F2">
             <text class="entry-icon">↩️</text>
           </view>

@@ -1,0 +1,54 @@
+<view class="cart-page">
+  <view class="cart-tip" wx:if="{{items.length}}">
+    仅支持普通实物商品加入购物车，活动商品请直接购买
+  </view>
+
+  <view class="empty-block" wx:if="{{!items.length}}">
+    <image class="empty-icon" src="/assets/icons/cart.svg" mode="aspectFit"></image>
+    <text class="empty-title">购物车还是空的</text>
+    <text class="empty-desc">去商城挑几件常规实物商品吧</text>
+    <view class="empty-btn card-press" bindtap="goToMall">去逛商城</view>
+  </view>
+
+  <view class="cart-list" wx:else>
+    <view class="cart-card" wx:for="{{items}}" wx:key="productId">
+      <view class="check-icon {{item.checked ? 'active' : ''}}" bindtap="toggleItem" data-id="{{item.productId}}">
+        <text wx:if="{{item.checked}}">✓</text>
+      </view>
+
+      <image class="cart-image" src="{{item.image}}" mode="aspectFill" bindtap="goToProduct" data-id="{{item.productId}}"></image>
+
+      <view class="cart-main" bindtap="goToProduct" data-id="{{item.productId}}">
+        <text class="cart-name">{{item.name}}</text>
+        <text class="cart-price">¥{{item.priceYuan}}</text>
+      </view>
+
+      <view class="cart-side">
+        <view class="qty-ctrl">
+          <view class="qty-btn {{item.quantity <= 1 ? 'disabled' : ''}}" bindtap="decQuantity" data-id="{{item.productId}}">−</view>
+          <text class="qty-num">{{item.quantity}}</text>
+          <view class="qty-btn" bindtap="incQuantity" data-id="{{item.productId}}">+</view>
+        </view>
+        <text class="remove-link" bindtap="removeItem" data-id="{{item.productId}}">删除</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="cart-toolbar" wx:if="{{items.length}}">
+    <view class="toolbar-select" bindtap="toggleAll">
+      <view class="check-icon {{allSelected ? 'active' : ''}}">
+        <text wx:if="{{allSelected}}">✓</text>
+      </view>
+      <text class="select-text">全选</text>
+    </view>
+
+    <view class="toolbar-summary">
+      <text class="summary-top">已选 {{selectedQuantity}} 件</text>
+      <text class="summary-price">合计 ¥{{totalAmountYuan}}</text>
+    </view>
+
+    <view class="checkout-btn {{selectedCount ? '' : 'disabled'}} card-press" bindtap="checkout">
+      去支付
+    </view>
+  </view>
+</view>

@@ -14,22 +14,21 @@
 
       <!-- 顶部信息区 -->
       <view class="hero-section animate-fade-up">
-        <view class="hero-greeting">
-          <text class="hero-title">舌象分析报告</text>
+        <view class="hero-header">
+          <text class="hero-label">舌象分析报告</text>
           <text class="hero-date">{{createdAtStr}}</text>
         </view>
-        <view class="hero-card card-float">
-          <view class="hero-top">
-            <view class="hero-photo-wrap">
-              <image class="hero-photo" src="{{report.imageFileId}}" mode="aspectFill"></image>
+
+        <view class="hero-card">
+          <view class="hero-photo-wrap">
+            <image class="hero-photo" src="{{report.imageFileId}}" mode="aspectFill"></image>
+          </view>
+          <view class="hero-info">
+            <view class="hero-badge">
+              <text class="hero-badge-icon">✨</text>
+              <text class="hero-badge-text">AI 智能分析</text>
             </view>
-            <view class="hero-info">
-              <view class="hero-badge">
-                <text class="hero-badge-icon">✨</text>
-                <text class="hero-badge-text">AI 智能分析</text>
-              </view>
-              <text class="hero-conclusion">{{report.result.conclusion || '分析完成'}}</text>
-            </view>
+            <text class="hero-conclusion">{{report.result.conclusion || '分析完成'}}</text>
           </view>
         </view>
       </view>
@@ -38,28 +37,44 @@
       <view class="section animate-fade-up" style="animation-delay:.08s">
         <view class="section-header">
           <text class="section-title">舌象特征</text>
-          <text class="section-subtitle">Tongue Features</text>
+          <text class="section-subtitle">基于 AI 识别的四大维度</text>
         </view>
         <view class="feat-grid">
-          <view class="feat-card card-float">
-            <view class="feat-dot" style="background:var(--color-primary)"></view>
-            <text class="feat-label">舌色</text>
-            <text class="feat-value">{{report.result.tongueColor || report.result.features.color || '正常'}}</text>
+          <view class="feat-card">
+            <view class="feat-icon-wrap" style="background:#FEF2F2">
+              <view class="feat-dot" style="background:#EF4444"></view>
+            </view>
+            <view class="feat-meta">
+              <text class="feat-label">舌色</text>
+              <text class="feat-value">{{report.result.tongueColor || report.result.features.color || '正常'}}</text>
+            </view>
           </view>
-          <view class="feat-card card-float">
-            <view class="feat-dot" style="background:var(--color-ai)"></view>
-            <text class="feat-label">舌苔</text>
-            <text class="feat-value">{{report.result.tongueCoating || report.result.features.coating || '正常'}}</text>
+          <view class="feat-card">
+            <view class="feat-icon-wrap" style="background:#F0FDF4">
+              <view class="feat-dot" style="background:#22C55E"></view>
+            </view>
+            <view class="feat-meta">
+              <text class="feat-label">舌苔</text>
+              <text class="feat-value">{{report.result.tongueCoating || report.result.features.coating || '正常'}}</text>
+            </view>
           </view>
-          <view class="feat-card card-float">
-            <view class="feat-dot" style="background:var(--color-accent)"></view>
-            <text class="feat-label">舌形</text>
-            <text class="feat-value">{{report.result.tongueShape || report.result.features.shape || '正常'}}</text>
+          <view class="feat-card">
+            <view class="feat-icon-wrap" style="background:#FFFBEB">
+              <view class="feat-dot" style="background:#EAB308"></view>
+            </view>
+            <view class="feat-meta">
+              <text class="feat-label">舌形</text>
+              <text class="feat-value">{{report.result.tongueShape || report.result.features.shape || '正常'}}</text>
+            </view>
           </view>
-          <view class="feat-card card-float">
-            <view class="feat-dot" style="background:var(--color-eco-dark)"></view>
-            <text class="feat-label">润燥</text>
-            <text class="feat-value">{{report.result.moisture || report.result.features.moisture || '适中'}}</text>
+          <view class="feat-card">
+            <view class="feat-icon-wrap" style="background:#EFF6FF">
+              <view class="feat-dot" style="background:#3B82F6"></view>
+            </view>
+            <view class="feat-meta">
+              <text class="feat-label">润燥</text>
+              <text class="feat-value">{{report.result.moisture || report.result.features.moisture || '适中'}}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -68,10 +83,10 @@
       <view class="section animate-fade-up" style="animation-delay:.14s" wx:if="{{report.result.analysis_details}}">
         <view class="section-header">
           <text class="section-title">分析详情</text>
-          <text class="section-subtitle">Analysis</text>
+          <text class="section-subtitle">AI 综合研判</text>
         </view>
         <view class="analysis-card">
-          <view class="analysis-deco"></view>
+          <view class="analysis-quote">“</view>
           <text class="analysis-text">{{report.result.analysis_details}}</text>
         </view>
       </view>
@@ -80,46 +95,43 @@
       <view class="section animate-fade-up" style="animation-delay:.20s" wx:if="{{recommendGroups.length > 0}}">
         <view class="section-header">
           <text class="section-title">为您甄选</text>
-          <text class="section-subtitle">Personalized Picks</text>
+          <text class="section-subtitle">根据舌象匹配的调理方案</text>
         </view>
-        <text class="rx-intro">根据您的体质分析，AI 为您精准匹配以下调理方案</text>
 
         <view class="rx-product-list">
           <block wx:for="{{recommendGroups}}" wx:key="category">
-            <view class="rx-product-card animate-fade-up card-press"
-                  wx:for="{{item.items}}" wx:for-item="prod" wx:key="product_name"
-                  style="animation-delay:{{0.24 + index * 0.04}}s"
-                  bindtap="goToProduct" data-id="{{prod.productId}}">
+            <view class="rx-group" wx:if="{{item.items.length > 0}}">
+              <text class="rx-group-title">{{item.category}}</text>
+              <view class="rx-group-list">
+                <view class="rx-product-card card-press"
+                      wx:for="{{item.items}}" wx:for-item="prod" wx:key="product_name"
+                      bindtap="goToProduct" data-id="{{prod.productId}}">
 
-              <view class="rx-card-visual">
-                <view class="rx-card-img-wrap">
-                  <image class="rx-card-img" src="{{prod.image}}" mode="aspectFit" wx:if="{{prod.image}}"></image>
-                  <view class="rx-card-img-placeholder" wx:else>
-                    <text class="rx-card-img-emoji">🧴</text>
+                  <view class="rx-image-zone">
+                    <image class="rx-img" src="{{prod.image}}" mode="aspectFill" wx:if="{{prod.image}}"></image>
+                    <view class="rx-img-placeholder" wx:else>
+                      <text class="rx-img-emoji">🧴</text>
+                    </view>
+                    <view class="rx-match-tag">
+                      <text>体质匹配</text>
+                    </view>
                   </view>
-                </view>
-                <view class="rx-card-reason">
-                  <text class="rx-card-desc">{{prod.efficacy_match || '根据您的舌象特征，该产品与您当前体质高度匹配'}}</text>
-                </view>
-              </view>
 
-              <view class="rx-card-bottom">
-                <view class="rx-card-name-row">
-                  <text class="rx-card-name">{{prod.product_name}}</text>
-                  <view class="rx-match-badge">
-                    <text class="rx-match-icon">✦</text>
-                    <text class="rx-match-text">体质匹配</text>
-                  </view>
-                </view>
-                <view class="rx-card-footer">
-                  <view class="rx-card-price-group">
-                    <text class="rx-card-price-symbol">¥</text>
-                    <text class="rx-card-price">{{prod.priceYuan}}</text>
-                    <text class="rx-card-orig" wx:if="{{prod.originalPriceYuan}}">¥{{prod.originalPriceYuan}}</text>
-                  </view>
-                  <view class="rx-card-cta">
-                    <text>了解详情</text>
-                    <text class="rx-card-cta-arrow">→</text>
+                  <view class="rx-info-zone">
+                    <view class="rx-info-top">
+                      <text class="rx-name">{{prod.product_name}}</text>
+                      <text class="rx-reason" wx:if="{{prod.efficacy_match}}">{{prod.efficacy_match}}</text>
+                      <text class="rx-reason" wx:else>根据您的舌象特征，该产品与您当前体质高度匹配</text>
+                    </view>
+
+                    <view class="rx-info-bottom">
+                      <view class="rx-price-wrap">
+                        <text class="rx-symbol">¥</text>
+                        <text class="rx-price">{{prod.priceYuan}}</text>
+                        <text class="rx-origin" wx:if="{{prod.originalPriceYuan}}">¥{{prod.originalPriceYuan}}</text>
+                      </view>
+                      <view class="rx-action">了解详情</view>
+                    </view>
                   </view>
                 </view>
               </view>
@@ -128,16 +140,17 @@
         </view>
       </view>
 
-
       <!-- 调理建议 -->
       <view class="section animate-fade-up" style="animation-delay:.28s" wx:if="{{report.result.suggestions.length > 0}}">
         <view class="section-header">
           <text class="section-title">调理建议</text>
-          <text class="section-subtitle">Suggestions</text>
+          <text class="section-subtitle">日常生活中的改善方向</text>
         </view>
         <view class="tip-list">
           <view class="tip-item" wx:for="{{report.result.suggestions}}" wx:key="*this">
-            <view class="tip-num">{{index + 1}}</view>
+            <view class="tip-icon">
+              <text>{{['💡','🍵','🧘','🌿','🛁','✨'][index % 6]}}</text>
+            </view>
             <text class="tip-text">{{item}}</text>
           </view>
         </view>
@@ -145,7 +158,8 @@
 
       <!-- 免责声明 -->
       <view class="disclaimer animate-fade-up" style="animation-delay:.32s">
-        <text>本报告由 AI 辅助分析，仅供参考，不作为医疗诊断依据。如有不适请及时就医。</text>
+        <text class="disclaimer-icon">⚕️</text>
+        <text class="disclaimer-text">本报告由 AI 辅助分析，仅供参考，不作为医疗诊断依据。如有不适请及时就医。</text>
       </view>
 
     </view>

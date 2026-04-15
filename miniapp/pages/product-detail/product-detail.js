@@ -1,10 +1,13 @@
 // pages/product-detail/product-detail.js
 const { callCloud } = require('../../utils/cloud-api')
+const { addCartItem, canAddProductToCart, getCartBadgeCount } = require('../../utils/cart')
 
 Page({
     data: {
         product: null,
         campaign: null,
+        cartCount: 0,
+        cartEligible: false,
         packageItems: null,
         packageValidDays: 180,
         deliveryLabel: '',
@@ -23,7 +26,12 @@ Page({
             const app = getApp()
             app.setInviter(inviter)
         }
+        this.refreshCartCount()
         if (id) this._loadProduct(id)
+    },
+
+    onShow: function () {
+        this.refreshCartCount()
     },
 
     _loadProduct: async function (productId) {
@@ -61,6 +69,7 @@ Page({
             this.setData({
                 product,
                 campaign,
+                cartEligible: canAddProductToCart(product, campaign).ok,
                 deliveryLabel,
                 packageItems,
                 packageValidDays,
@@ -208,8 +217,31 @@ Page({
         wx.navigateTo({ url: '/pages/fission/fission' })
     },
 
-    goToMall: function () {
-        wx.switchTab({ url: '/pages/mall/mall' })
+    addToCart: function () {
+        const { product, campaign } = this.data
+        if (!product) return
+
+        const eligibility = canAddProductToCart(product, campaign)
+        if (!eligibility.ok) {
+            wx.showToast({ title: eligibility.reason, icon: 'none' })
+            return
+        }
+
+        try {
+            addCartItem(product, 1)
+            this.refreshCartCount()
+            wx.showToast({ title: '已加入购物车', icon: 'success' })
+        } catch (error) {
+            wx.showToast({ title: error.message || '加入购物车失败', icon: 'none' })
+        }
+    },
+
+    refreshCartCount: function () {
+        this.setData({ cartCount: getCartBadgeCount() })
+    },
+
+    goToCart: function () {
+        wx.navigateTo({ url: '/pages/cart/cart' })
     },
 
     onShare: function () {

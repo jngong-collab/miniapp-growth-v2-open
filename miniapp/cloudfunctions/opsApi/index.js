@@ -4,6 +4,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const _ = db.command
+const {
+    planEnterRefunding,
+    planFinalizeRefund
+} = require('./refund-state-machine')
 
 const ADMIN_PERMISSIONS = [
     'verify',
@@ -252,14 +256,18 @@ async function verifyPackage(event, openid) {
 
     if (item.productType === 'package') {
         if (!serviceName) return { code: -1, msg: '请指定要核销的服务项目' }
-        const remaining = item.packageRemaining || {}
-        if (!remaining[serviceName] || remaining[serviceName] <= 0) {
+        if (item.packageExpireAt && new Date(item.packageExpireAt) < new Date()) {
+            return { code: -1, msg: '该套餐已过期' }
+        }
+        const updateRes = await db.collection('order_items').where({
+            _id: item._id,
+            [`packageRemaining.${serviceName}`]: _.gt(0)
+        }).update({
+            data: { [`packageRemaining.${serviceName}`]: _.inc(-1) }
+        })
+        if (updateRes.stats.updated === 0) {
             return { code: -1, msg: `「${serviceName}」已无剩余次数` }
         }
-        remaining[serviceName] = remaining[serviceName] - 1
-        await db.collection('order_items').doc(item._id).update({
-            data: { packageRemaining: remaining }
-        })
     } else {
         const remaining = item.packageRemaining || {}
         if (remaining.used) return { code: -1, msg: '该服务已核销，不可重复核销' }
@@ -580,7 +588,6 @@ async function updateRefundRequest(event, openid) {
 
     const requestStatus = status === 'approved' ? 'approved' : 'rejected'
     const fallbackOrderStatus = request.previousStatus || order.status || 'paid'
-    const orderStatus = requestStatus === 'approved' ? 'refunding' : fallbackOrderStatus
     if (request.status !== 'pending') {
         return { code: -1, msg: '该申请已处理' }
     }
@@ -588,23 +595,204 @@ async function updateRefundRequest(event, openid) {
         return { code: -1, msg: '订单已退款，不能重复处理' }
     }
 
-    await db.collection('refund_requests').doc(requestId).update({
-        data: {
-            status: requestStatus,
-            reviewedBy: openid,
-            reviewedAt: db.serverDate(),
-            updatedAt: db.serverDate()
-        }
+    if (requestStatus === 'approved') {
+        return approveRefundRequest({ request, order, reviewerOpenid: openid })
+    }
+
+    await db.runTransaction(async transaction => {
+        await transaction.collection('refund_requests').doc(requestId).update({
+            data: {
+                status: 'rejected',
+                reviewedBy: openid,
+                reviewedAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        })
+
+        await transaction.collection('orders').doc(orderId).update({
+            data: {
+                status: fallbackOrderStatus,
+                updatedAt: db.serverDate()
+            }
+        })
     })
 
-    await db.collection('orders').doc(orderId).update({
-        data: {
-            status: orderStatus,
-            updatedAt: db.serverDate()
-        }
-    })
+    return { code: 0, msg: '退款申请已驳回' }
+}
 
-    return { code: 0, msg: '退款申请已处理' }
+async function approveRefundRequest({ request, order, reviewerOpenid }) {
+    const payConfig = await safeGetFirst('pay_config', {})
+    if (!payConfig || !payConfig.mchId) {
+        return { code: -1, msg: '支付商户号未配置，无法处理退款' }
+    }
+
+    const refundAmount = Number(request.refundAmount || order.payAmount || order.totalAmount || 0)
+    if (refundAmount <= 0) {
+        return { code: -1, msg: '退款金额异常' }
+    }
+
+    const orderItems = await safeList('order_items', { orderId: order._id }, { limit: 100 })
+    const productAdjustments = buildProductRollbackAdjustments(order, orderItems)
+    const products = await Promise.all(Object.keys(productAdjustments).map(productId => safeGetById('products', productId)))
+    const productMap = products.filter(Boolean).reduce((acc, item) => {
+        acc[item._id] = item
+        return acc
+    }, {})
+
+    const refundableRecords = (await safeList('fission_records', {
+        orderId: order._id
+    }, { limit: 20 })).filter(item => item && item.status !== 'refunded')
+    const cashbackAdjustments = buildCashbackRollbackAdjustments(refundableRecords)
+
+    const generatedOutRefundNo = generateRefundNo()
+    let outRefundNo = generatedOutRefundNo
+
+    // 查询返现用户文档ID（用于事务内doc更新）
+    const inviterUserIds = {}
+    for (const inviterOpenid of Object.keys(cashbackAdjustments.byInviter)) {
+        const user = await safeGetFirst('users', { _openid: inviterOpenid })
+        if (user) inviterUserIds[inviterOpenid] = user._id
+    }
+
+    // 先更新为退款处理中状态
+    try {
+        await db.runTransaction(async transaction => {
+            const currentRequestRes = await transaction.collection('refund_requests').doc(request._id).get()
+            const currentOrderRes = await transaction.collection('orders').doc(order._id).get()
+            const currentRequest = currentRequestRes.data || null
+            const currentOrder = currentOrderRes.data || null
+            const now = db.serverDate()
+            const transition = planEnterRefunding({
+                request: currentRequest,
+                order: currentOrder,
+                reviewerOpenid,
+                generatedOutRefundNo,
+                now
+            })
+            outRefundNo = transition.outRefundNo
+            if (transition.requestUpdate) {
+                await transaction.collection('refund_requests').doc(request._id).update({
+                    data: transition.requestUpdate
+                })
+            }
+            if (transition.orderUpdate) {
+                await transaction.collection('orders').doc(order._id).update({
+                    data: transition.orderUpdate
+                })
+            }
+        })
+    } catch (error) {
+        console.error('写入退款处理中状态失败:', error)
+        return { code: -1, msg: error.message || '退款状态更新失败' }
+    }
+
+    let refundResult
+    try {
+        refundResult = await cloud.cloudPay.refund({
+            functionName: 'payApi',
+            envId: cloud.DYNAMIC_CURRENT_ENV,
+            subMchId: payConfig.mchId,
+            nonceStr: randomToken(24),
+            transactionId: order.paymentId || undefined,
+            outTradeNo: order.orderNo,
+            outRefundNo,
+            totalFee: Number(order.payAmount || order.totalAmount || 0),
+            refundFee: refundAmount,
+            refundDesc: request.reason || order.refundReason || '用户申请退款'
+        })
+    } catch (error) {
+        console.error('发起退款失败:', error)
+        return { code: -1, msg: error.message || '发起退款失败' }
+    }
+
+    if (refundResult.returnCode !== 'SUCCESS' || refundResult.resultCode !== 'SUCCESS') {
+        return {
+            code: -1,
+            msg: refundResult.errCodeDes || refundResult.returnMsg || '退款申请失败'
+        }
+    }
+
+    try {
+        await db.runTransaction(async transaction => {
+            const currentRequestRes = await transaction.collection('refund_requests').doc(request._id).get()
+            const currentOrderRes = await transaction.collection('orders').doc(order._id).get()
+            const currentRequest = currentRequestRes.data || null
+            const currentOrder = currentOrderRes.data || null
+
+            const now = db.serverDate()
+            const finalize = planFinalizeRefund({
+                request: currentRequest,
+                order: currentOrder,
+                reviewerOpenid,
+                outRefundNo,
+                refundResult,
+                now
+            })
+            await transaction.collection('refund_requests').doc(request._id).update({
+                data: finalize.requestUpdate
+            })
+
+            await transaction.collection('orders').doc(order._id).update({
+                data: finalize.orderUpdate
+            })
+
+            for (const productId of Object.keys(productAdjustments)) {
+                const adjustment = productAdjustments[productId]
+                const product = productMap[productId]
+                if (!product || !adjustment) continue
+                const data = {
+                    soldCount: _.inc(-adjustment.quantity)
+                }
+                if (Number(product.stock) !== -1) {
+                    data.stock = _.inc(adjustment.quantity)
+                }
+                await transaction.collection('products').doc(productId).update({ data })
+            }
+
+            const campaignUpdate = {}
+            if (order.fissionCampaignId) {
+                campaignUpdate.soldCount = _.inc(-Number(order.quantity || 1))
+            }
+            if (cashbackAdjustments.totalCashback > 0) {
+                campaignUpdate.newCustomers = _.inc(-cashbackAdjustments.recordCount)
+                campaignUpdate.totalCashback = _.inc(-cashbackAdjustments.totalCashback)
+            }
+            if (order.fissionCampaignId && Object.keys(campaignUpdate).length > 0) {
+                await transaction.collection('fission_campaigns').doc(order.fissionCampaignId).update({
+                    data: campaignUpdate
+                })
+            }
+
+            for (const record of refundableRecords) {
+                await transaction.collection('fission_records').doc(record._id).update({
+                    data: {
+                        status: 'refunded',
+                        refundedAt: now,
+                        refundRequestId: request._id
+                    }
+                })
+            }
+
+            for (const inviterOpenid of Object.keys(cashbackAdjustments.byInviter)) {
+                const adjustment = cashbackAdjustments.byInviter[inviterOpenid]
+                const userDocId = inviterUserIds[inviterOpenid]
+                if (!userDocId) continue
+                await transaction.collection('users').doc(userDocId).update({
+                    data: {
+                        balance: _.inc(-adjustment.cashbackAmount),
+                        totalEarned: _.inc(-adjustment.cashbackAmount),
+                        totalInvited: _.inc(-adjustment.recordCount),
+                        updatedAt: now
+                    }
+                })
+            }
+        })
+    } catch (error) {
+        console.error('落库退款结果失败:', error)
+        return { code: -1, msg: error.message || '退款结果保存失败' }
+    }
+
+    return { code: 0, msg: '退款已完成' }
 }
 
 async function requireWorkbench(openid, requiredPermission = '') {
@@ -699,6 +887,62 @@ async function fetchOrdersMap(orderIds) {
         acc[item._id] = item
         return acc
     }, {})
+}
+
+function buildProductRollbackAdjustments(order, orderItems = []) {
+    const adjustments = {}
+    if (orderItems.length > 0) {
+        orderItems.forEach(item => {
+            if (!item || !item.productId) return
+            adjustments[item.productId] = {
+                productId: item.productId,
+                quantity: (adjustments[item.productId]?.quantity || 0) + Number(item.quantity || 0)
+            }
+        })
+        return adjustments
+    }
+
+    if (order && order.productId) {
+        adjustments[order.productId] = {
+            productId: order.productId,
+            quantity: Number(order.quantity || 1)
+        }
+    }
+    return adjustments
+}
+
+function buildCashbackRollbackAdjustments(records = []) {
+    return records.reduce((acc, item) => {
+        const inviterOpenid = item && item.inviterOpenid ? item.inviterOpenid : ''
+        const cashbackAmount = Number(item && item.cashbackAmount ? item.cashbackAmount : 0)
+        if (!inviterOpenid || cashbackAmount <= 0) return acc
+
+        if (!acc.byInviter[inviterOpenid]) {
+            acc.byInviter[inviterOpenid] = { cashbackAmount: 0, recordCount: 0 }
+        }
+        acc.byInviter[inviterOpenid].cashbackAmount += cashbackAmount
+        acc.byInviter[inviterOpenid].recordCount += 1
+        acc.totalCashback += cashbackAmount
+        acc.recordCount += 1
+        return acc
+    }, {
+        totalCashback: 0,
+        recordCount: 0,
+        byInviter: {}
+    })
+}
+
+function generateRefundNo() {
+    return `RFD${Date.now()}${randomToken(8)}`
+}
+
+function randomToken(length = 12) {
+    const seed = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let output = ''
+    for (let i = 0; i < length; i += 1) {
+        output += seed[Math.floor(Math.random() * seed.length)]
+    }
+    return output
 }
 
 async function safeCount(collectionName, condition) {
