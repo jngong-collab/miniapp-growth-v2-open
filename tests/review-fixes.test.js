@@ -114,3 +114,110 @@ test('global theme exports legacy token aliases still used by old pages', () => 
     assert.match(css, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
+
+test('interactive templates avoid dynamic event handler bindings', () => {
+  for (const relPath of [
+    path.join('miniapp', 'pages', 'lottery', 'lottery.wxml'),
+    path.join('miniapp', 'pages', 'package-usage', 'package-usage.wxml')
+  ]) {
+    const source = fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
+    assert.doesNotMatch(source, /bindtap="\{\{/);
+    assert.doesNotMatch(source, /catchtap="\{\{/);
+  }
+});
+
+test('mall page and content API use category-based mall taxonomy', () => {
+  const mallWxml = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'mall', 'mall.wxml'), 'utf8');
+  const mallJs = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'mall', 'mall.js'), 'utf8');
+  const contentApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'contentApi', 'index.js'), 'utf8');
+
+  for (const category of ['五行泡浴', '百草元气灸', '靶向敷贴', '精油系列', '超值套餐']) {
+    assert.match(mallJs, new RegExp(category));
+  }
+
+  for (const legacyTab of ['全部推荐', '推拿服务', '周期套餐', '甄选产品']) {
+    assert.doesNotMatch(mallWxml, new RegExp(legacyTab));
+  }
+
+  assert.match(mallJs, /activeTab:\s*MALL_CATEGORIES\[0\]/);
+  assert.match(mallJs, /category,\s*\n\s*page,/);
+  assert.match(contentApi, /showInMall:\s*true/);
+  assert.match(contentApi, /productCondition\.category\s*=\s*resolvedCategory/);
+});
+
+test('product detail share action uses native share button', () => {
+  const productDetailWxml = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'product-detail', 'product-detail.wxml'), 'utf8');
+
+  assert.match(productDetailWxml, /open-type="share"/);
+  assert.doesNotMatch(productDetailWxml, /bindtap="onShare"/);
+});
+
+test('catalog asset paths resolve inside the published mini program root', () => {
+  const { visibleProductsData, retainedFissionProduct } = require('../scripts/catalog_data');
+  const miniprogramRoot = path.join(repoRoot, 'miniapp');
+
+  for (const product of [...visibleProductsData, retainedFissionProduct]) {
+    for (const imagePath of product.images || []) {
+      const normalizedPath = imagePath.replace(/^\//, '').replace(/\//g, path.sep);
+      const absolutePath = path.join(miniprogramRoot, normalizedPath);
+      assert.equal(
+        fs.existsSync(absolutePath),
+        true,
+        `missing published asset for ${product.name}: ${imagePath}`
+      );
+    }
+  }
+});
+
+test('catalog source derives all products from visible products plus retained fission product', () => {
+  const {
+    visibleProductsData,
+    retainedFissionProduct,
+    allProductsData
+  } = require('../scripts/catalog_data');
+
+  assert.equal(allProductsData.length, visibleProductsData.length + 1);
+  assert.strictEqual(allProductsData[0], visibleProductsData[0]);
+  assert.strictEqual(allProductsData[allProductsData.length - 1], retainedFissionProduct);
+});
+
+test('fission campaign seed data stays environment-agnostic', () => {
+  const { fissionCampaigns } = require('../scripts/catalog_data');
+
+  assert.equal(Array.isArray(fissionCampaigns), true);
+  assert.equal(fissionCampaigns.length > 0, true);
+  assert.equal(typeof fissionCampaigns[0].productId, 'string');
+  assert.doesNotMatch(fissionCampaigns[0].productId, /^[a-f0-9]{32}$/);
+  assert.equal(fissionCampaigns[0].soldCount, 0);
+  assert.equal(fissionCampaigns[0].newCustomers, 0);
+  assert.equal(fissionCampaigns[0].totalCashback, 0);
+});
+
+test('mall single-character search falls back to the active category list', () => {
+  const mallJs = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'mall', 'mall.js'), 'utf8');
+
+  assert.doesNotMatch(mallJs, /trimmed\.length === 1\)\s*return/);
+});
+
+test('workbench catalog exposes formal category and mall visibility', () => {
+  const catalogWxml = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'workbench', 'catalog', 'catalog.wxml'), 'utf8');
+  const catalogJs = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'workbench', 'catalog', 'catalog.js'), 'utf8');
+
+  assert.match(catalogWxml, /item\.category/);
+  assert.match(catalogWxml, /showInMall|商城/);
+  assert.match(catalogJs, /categoryLabel|mallVisibilityLabel|showInMall/);
+});
+
+test('page json files avoid unsupported share config flags', () => {
+  for (const relPath of [
+    path.join('miniapp', 'pages', 'index', 'index.json'),
+    path.join('miniapp', 'pages', 'tongue', 'tongue.json'),
+    path.join('miniapp', 'pages', 'fission', 'fission.json'),
+    path.join('miniapp', 'pages', 'product-detail', 'product-detail.json'),
+    path.join('miniapp', 'pages', 'tongue-report', 'tongue-report.json')
+  ]) {
+    const jsonText = fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
+    assert.doesNotMatch(jsonText, /"enableShareAppMessage"\s*:/);
+    assert.doesNotMatch(jsonText, /"enableShareTimeline"\s*:/);
+  }
+});

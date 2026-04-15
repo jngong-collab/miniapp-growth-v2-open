@@ -1,0 +1,9 @@
+{
+  "name": "tmp-db-fix-placeholder",
+  "version": "1.0.0",
+  "description": "Placeholder cloud function kept only to satisfy stale local DevTools references.",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

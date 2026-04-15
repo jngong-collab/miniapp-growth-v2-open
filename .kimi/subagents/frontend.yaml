@@ -1,0 +1,5 @@
+version: 1
+agent:
+  extend: ../team-agent.yaml
+  name: frontend-dev
+  system_prompt_path: ../system-prompts/frontend.md

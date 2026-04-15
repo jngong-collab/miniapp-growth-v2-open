@@ -14,11 +14,12 @@
   </scroll-view>
 
   <view class="empty-block" wx:if="{{!loading && !orders.length}}">
+    <text class="empty-icon">🍃</text>
     <text class="empty-title">当前没有符合条件的订单</text>
   </view>
 
   <view class="list-wrap" wx:else>
-    <view class="list-card" wx:for="{{orders}}" wx:key="_id">
+    <view class="list-card animate-fade-up" wx:for="{{orders}}" wx:key="_id" style="animation-delay:{{index*0.05}}s">
       <view class="card-top">
         <view>
           <text class="card-title">{{item.productName || '门店订单'}}</text>
@@ -28,7 +29,7 @@
       </view>
       <view class="meta-row">
         <text>用户 {{item.userLabel}}</text>
-        <text>金额 ¥{{item.totalAmountYuan}}</text>
+        <text class="meta-highlight">金额 ¥{{item.totalAmountYuan}}</text>
       </view>
       <view class="meta-row">
         <text>数量 {{item.quantity || 1}}</text>
@@ -50,4 +51,6 @@
       </view>
     </view>
   </view>
+
+  <view class="safe-bottom"></view>
 </view>

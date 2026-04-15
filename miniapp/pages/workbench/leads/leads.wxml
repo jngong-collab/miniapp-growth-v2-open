@@ -13,7 +13,12 @@
     </view>
   </scroll-view>
 
-  <view class="lead-card" wx:for="{{leads}}" wx:key="_id">
+  <view class="empty-block" wx:if="{{!loading && !leads.length}}">
+    <text class="empty-icon">👥</text>
+    <text class="empty-title">暂无符合条件的线索</text>
+  </view>
+
+  <view class="lead-card animate-fade-up" wx:for="{{leads}}" wx:key="_id" style="animation-delay:{{index*0.05}}s">
     <view class="lead-top">
       <view>
         <text class="lead-name">{{item.nickName || '微信用户'}}</text>
@@ -21,7 +26,7 @@
       </view>
       <text class="lead-status">{{item.followupStatusLabel}}</text>
     </view>
-    <view class="lead-track">
+    <view class="lead-track" wx:if="{{item.tracks && item.tracks.length > 0}}">
       <text wx:for="{{item.tracks}}" wx:key="*this" class="track-pill">{{item}}</text>
     </view>
     <text class="lead-note" wx:if="{{item.followupNote}}">备注：{{item.followupNote}}</text>
@@ -35,4 +40,6 @@
       更新跟进
     </button>
   </view>
+
+  <view class="safe-bottom"></view>
 </view>

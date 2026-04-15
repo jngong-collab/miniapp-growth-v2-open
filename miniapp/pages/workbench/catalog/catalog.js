@@ -23,7 +23,9 @@ Page({
                 overview: {
                     products: (overview.products || []).map(item => ({
                         ...item,
-                        priceYuan: fenToYuan(item.price || 0)
+                        priceYuan: fenToYuan(item.price || 0),
+                        categoryLabel: item.category || (item.type === 'service' ? '到店服务' : item.type === 'package' ? '套餐模板' : '未分类'),
+                        mallVisibilityLabel: item.showInMall ? '商城可见' : '仅活动/后台'
                     })),
                     packages: overview.packages || []
                 }

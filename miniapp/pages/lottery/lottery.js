@@ -64,6 +64,11 @@ Page({
         return [0, 1, 2, 5, 8, 7, 6, 3]
     },
 
+    onGridCellTap(e) {
+        if (!e.currentTarget.dataset.center) return
+        this.startLottery()
+    },
+
     async startLottery() {
         if (this.data.isRunning) return
         if (this.data.remainChances <= 0) {

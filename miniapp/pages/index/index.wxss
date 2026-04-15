@@ -1,4 +1,4 @@
-/* pages/index/index.wxss — 奶油暖棕 v2 */
+/* pages/index/index.wxss — 现代东方母婴调理品牌首页 */
 
 .page-home {
   min-height: 100vh;
@@ -7,79 +7,85 @@
   background: var(--bg-page);
 }
 
-/* ─── 背景装饰：暖色光斑 ─── */
-.bg-decoration {
+.bg-deco {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100rpx);
-  opacity: 0.4;
+  filter: blur(120rpx);
+  opacity: 0.45;
   z-index: 0;
   pointer-events: none;
 }
-.shape-1 {
-  width: 480rpx; height: 480rpx;
+
+.bg-deco-1 {
+  width: 560rpx; height: 560rpx;
   background: var(--color-primary-bg);
-  top: -120rpx; right: -80rpx;
+  top: -180rpx; right: -120rpx;
 }
-.shape-2 {
-  width: 360rpx; height: 360rpx;
+
+.bg-deco-2 {
+  width: 400rpx; height: 400rpx;
   background: var(--color-ai-bg);
-  top: 500rpx; left: -140rpx;
+  top: 520rpx; left: -160rpx;
 }
 
 .home-content {
   position: relative;
   z-index: 1;
   padding: 0 var(--spacing-lg) var(--spacing-xl);
-  padding-top: 72rpx;
+  padding-top: 80rpx;
 }
 
 /* ====== 头部问候 ====== */
 .header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   margin-bottom: var(--spacing-lg);
 }
+
 .greeting-wrap {
   display: flex;
   flex-direction: column;
 }
+
 .greeting-time {
   font-size: var(--font-xl);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--color-text-title);
   letter-spacing: -0.5rpx;
 }
-.greeting-user {
-  font-size: var(--font-base);
+
+.store-name {
+  font-size: var(--font-sm);
   color: var(--color-text-sub);
-  margin-top: 6rpx;
+  margin-top: 8rpx;
 }
+
 .location-pill {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
   padding: var(--spacing-xs) var(--spacing-md);
-  margin-top: var(--spacing-xs);
-  background: rgba(192,139,92,0.08);
+  margin-top: var(--spacing-sm);
+  background: var(--bg-card);
   border-radius: var(--radius-capsule);
   font-size: var(--font-xs);
   color: var(--color-text-sub);
   gap: var(--spacing-xs);
+  box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
-.loc-pin { font-size: 20rpx; }
+
+.loc-icon { font-size: var(--font-xs); }
+
 .loc-addr {
   font-size: var(--font-sm);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  max-width: 480rpx;
+  max-width: 420rpx;
 }
+
 .loc-arrow {
   font-size: var(--font-sm);
   color: var(--color-text-muted);
-  margin-left: 2rpx;
 }
 
 /* ====== Bento Box ====== */
@@ -88,177 +94,242 @@
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
 }
-.bento-item {
-  position: relative;
+
+.bento-main {
+  flex: 1.45;
+  min-height: 220rpx;
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
-  overflow: hidden;
-  background: var(--bg-card);
-  border: 1rpx solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-}
-.bento-item:active { transform: scale(0.965); transition: transform 0.15s ease; }
-.bento-bg-icon {
-  position: absolute;
-  right: -8rpx; bottom: -24rpx;
-  font-size: 120rpx;
-  opacity: 0.12;
-  transform: rotate(-12deg);
-}
-.icon-muted { opacity: 0.07; }
-.bento-content {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
 }
-.bento-title {
-  font-size: var(--font-md);
+
+.bento-deco {
+  position: absolute;
+  right: -40rpx;
+  bottom: -40rpx;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+}
+
+.bento-main-content {
+  position: relative;
+  z-index: 1;
+}
+
+.bento-badge {
+  display: inline-flex;
+  padding: 4rpx 12rpx;
+  background: rgba(255,255,255,0.2);
+  border: 1rpx solid rgba(255,255,255,0.3);
+  border-radius: var(--radius-capsule);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: var(--spacing-sm);
+}
+
+.bento-main-title {
+  font-size: var(--font-lg);
   font-weight: 800;
+  color: #fff;
+  display: block;
   margin-bottom: var(--spacing-xs);
 }
-.title-dark { color: var(--color-text-title) !important; }
-.bento-desc {
-  font-size: var(--font-xs);
-  line-height: 1.5;
-  opacity: 0.85;
-  color: var(--color-text-sub);
-}
-.desc-sub { color: var(--color-text-sub) !important; opacity: 1; }
 
-/* AI 大卡按钮 */
-.btn-sm-glass {
+.bento-main-desc {
+  font-size: var(--font-xs);
+  color: rgba(255,255,255,0.85);
+  display: block;
+}
+
+.bento-main-action {
+  position: relative;
+  z-index: 1;
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-md);
-  background: rgba(255,255,255,0.22);
-  backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.18);
+  border: 1rpx solid rgba(255,255,255,0.3);
   border-radius: var(--radius-capsule);
   font-size: var(--font-sm);
   font-weight: 600;
   color: #fff;
-  border: 1rpx solid rgba(255,255,255,0.35);
   margin-top: var(--spacing-md);
 }
 
-.bento-large {
-  flex: 1.6;
-  min-height: 210rpx;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-.bento-right {
+.action-arrow { font-size: var(--font-sm); }
+
+.bento-side {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
 }
-.bento-small {
+
+.bento-sub {
   flex: 1;
+  background: var(--bg-card);
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.sub-icon-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sub-icon { font-size: var(--font-md); }
+
+.sub-text {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  min-width: 0;
 }
-.bento-small .bento-bg-icon { font-size: 80rpx; right: -4rpx; bottom: -12rpx; }
-.bento-small .bento-title { font-size: var(--font-sm); }
-.bento-small .bento-desc { font-size: 20rpx; }
+
+.sub-title {
+  font-size: var(--font-sm);
+  font-weight: 700;
+  color: var(--color-text-title);
+  margin-bottom: 4rpx;
+}
+
+.sub-desc {
+  font-size: var(--font-xs);
+  color: var(--color-text-sub);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* ====== 裂变活动横幅 ====== */
-.promo-banner {
+.promo-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.promo-card {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-lg);
-  margin-bottom: var(--spacing-lg);
   overflow: hidden;
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
   color: #fff;
 }
-.promo-bg-pattern {
-  position: absolute;
-  top: -50rpx; right: -30rpx;
-  width: 180rpx; height: 180rpx;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.06);
-}
+
 .promo-left {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
 }
+
 .promo-badge {
   align-self: flex-start;
-  padding: 4rpx var(--spacing-sm);
-  background: rgba(255,255,255,0.18);
+  padding: 4rpx 14rpx;
+  background: rgba(255,255,255,0.2);
+  border: 1rpx solid rgba(255,255,255,0.25);
   border-radius: var(--radius-capsule);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
   font-weight: 600;
-  letter-spacing: 1rpx;
 }
+
 .promo-title {
   font-size: var(--font-base);
   font-weight: 700;
   line-height: 1.5;
 }
+
 .promo-desc {
   font-size: var(--font-xs);
-  opacity: 0.78;
+  opacity: 0.85;
 }
+
 .promo-progress {
   height: 6rpx;
   background: rgba(255,255,255,0.2);
   border-radius: 3rpx;
   margin-top: var(--spacing-xs);
-  width: 280rpx;
+  width: 240rpx;
 }
+
 .promo-progress-bar {
   height: 100%;
-  background: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.9);
+  border-radius: 3rpx;
+  overflow: hidden;
+}
+
+.promo-progress-fill {
+  height: 100%;
+  background: #fff;
   border-radius: 3rpx;
   transition: width 0.6s ease;
 }
-.promo-action {
+
+.promo-right {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
   margin-left: var(--spacing-md);
 }
+
 .promo-price {
   font-size: var(--font-lg);
   font-weight: 800;
 }
+
 .promo-btn {
   padding: var(--spacing-xs) var(--spacing-md);
-  background: rgba(255,255,255,0.2);
-  backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.18);
+  border: 1rpx solid rgba(255,255,255,0.25);
   border-radius: var(--radius-capsule);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
   font-weight: 600;
-  border: 1rpx solid rgba(255,255,255,0.3);
 }
 
 /* ====== 推拿师 IP 卡片 ====== */
 .therapist-section {
   margin-bottom: var(--spacing-lg);
 }
+
 .therapist-card {
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
+
 .therapist-photo-wrap {
   width: 100%;
-  height: 380rpx;
+  height: 360rpx;
   position: relative;
   overflow: hidden;
 }
+
 .therapist-photo {
   width: 100%;
   height: 100%;
 }
+
 .therapist-photo-placeholder {
   width: 100%;
   height: 100%;
@@ -269,49 +340,47 @@
   background: var(--color-primary-bg);
   gap: var(--spacing-xs);
 }
+
 .therapist-placeholder-emoji {
-  font-size: 100rpx;
+  font-size: 96rpx;
 }
-.therapist-placeholder-hint {
-  font-size: var(--font-sm);
-  color: var(--color-text-muted);
-}
+
 .therapist-cert-badge {
   position: absolute;
   top: 20rpx;
   right: 20rpx;
   padding: var(--spacing-xs) var(--spacing-md);
-  background: rgba(255,252,248,0.88);
-  backdrop-filter: blur(8px);
-  border-radius: var(--radius-capsule);
   font-size: var(--font-xs);
   font-weight: 600;
   color: var(--color-primary-dark);
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
 }
+
 .therapist-info {
   padding: var(--spacing-md);
 }
+
 .therapist-name-row {
   display: flex;
   align-items: baseline;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
 }
+
 .therapist-name {
   font-size: var(--font-lg);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--color-text-title);
-  letter-spacing: 1rpx;
 }
+
 .therapist-title {
-  font-size: var(--font-sm);
-  color: var(--color-primary);
+  font-size: var(--font-xs);
+  color: var(--color-primary-dark);
   font-weight: 600;
-  padding: 4rpx var(--spacing-sm);
+  padding: 4rpx 12rpx;
   background: var(--color-primary-bg);
   border-radius: var(--radius-capsule);
 }
+
 .therapist-stats {
   display: flex;
   margin-bottom: var(--spacing-md);
@@ -319,6 +388,7 @@
   border-radius: var(--radius-md);
   padding: var(--spacing-md) 0;
 }
+
 .therapist-stat-item {
   flex: 1;
   display: flex;
@@ -327,6 +397,7 @@
   gap: 4rpx;
   position: relative;
 }
+
 .therapist-stat-item + .therapist-stat-item::before {
   content: '';
   position: absolute;
@@ -336,30 +407,35 @@
   width: 1rpx;
   background: var(--color-border);
 }
+
 .stat-value {
   font-size: var(--font-base);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--color-text-title);
 }
+
 .stat-label {
   font-size: var(--font-xs);
   color: var(--color-text-muted);
 }
+
 .therapist-bio {
-  font-size: var(--font-base);
+  font-size: var(--font-sm);
   color: var(--color-text-sub);
-  line-height: 1.7;
+  line-height: 1.8;
   margin-bottom: var(--spacing-md);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 .therapist-tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
 }
+
 .therapist-tag {
   padding: var(--spacing-xs) var(--spacing-md);
   background: var(--color-primary-bg);
@@ -375,20 +451,21 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: var(--spacing-lg);
-  border: 1rpx solid var(--color-border);
-  background: var(--bg-card);
 }
+
 .package-img-wrap {
-  width: 230rpx;
+  width: 220rpx;
   min-height: 200rpx;
   position: relative;
   flex-shrink: 0;
   background: var(--bg-page);
 }
+
 .package-img {
   width: 100%;
   height: 100%;
 }
+
 .package-img-placeholder {
   width: 100%;
   height: 100%;
@@ -397,36 +474,45 @@
   justify-content: center;
   background: var(--color-primary-bg);
 }
+
 .package-img-placeholder .placeholder-emoji {
-  font-size: 72rpx;
+  font-size: 64rpx;
 }
+
 .package-tag {
   position: absolute;
   top: var(--spacing-sm);
   left: var(--spacing-sm);
 }
+
 .package-info {
   flex: 1;
   padding: var(--spacing-md);
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
+
 .package-name {
   font-size: var(--font-md);
-  font-weight: 800;
+  font-weight: 700;
   color: var(--color-text-title);
   margin-bottom: var(--spacing-xs);
 }
+
 .package-desc {
   font-size: var(--font-sm);
   color: var(--color-text-sub);
   margin-bottom: var(--spacing-xs);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
+
 .package-action {
   display: inline-flex;
   align-self: flex-start;
-  margin-top: var(--spacing-sm);
+  margin-top: auto;
   padding: var(--spacing-xs) var(--spacing-md);
   font-size: var(--font-xs);
   color: #fff;
@@ -442,27 +528,29 @@
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
 }
+
 .grid-product-card {
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--bg-card);
-  border: 1rpx solid var(--color-border);
-  box-shadow: var(--shadow-sm);
 }
+
 .grid-product-img-wrap {
   width: 100%;
-  height: 210rpx;
+  height: 200rpx;
   background: var(--bg-page);
 }
+
 .grid-product-img {
   width: 100%;
   height: 100%;
 }
+
 .grid-product-info {
   padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
 }
+
 .grid-product-info .product-name {
-  font-size: var(--font-base);
+  font-size: var(--font-sm);
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
@@ -479,9 +567,11 @@
   background: var(--color-primary-bg);
   gap: var(--spacing-xs);
 }
+
 .placeholder-emoji {
-  font-size: 56rpx;
+  font-size: 48rpx;
 }
+
 .placeholder-text {
   font-size: var(--font-xs);
   color: var(--color-text-muted);
@@ -492,33 +582,15 @@
   white-space: nowrap;
   max-width: 100%;
 }
+
 .product-name {
-  font-size: var(--font-base);
+  font-size: var(--font-sm);
   font-weight: 600;
   color: var(--color-text-main);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   display: block;
-}
-
-/* ====== 空状态 ====== */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80rpx var(--spacing-xl);
-  text-align: center;
-}
-.empty-icon {
-  font-size: 72rpx;
-  margin-bottom: var(--spacing-sm);
-}
-.empty-text {
-  font-size: var(--font-base);
-  color: var(--color-text-sub);
-  font-weight: 600;
 }
 
 /* ====== 骨架屏 ====== */
@@ -528,57 +600,58 @@
   padding: var(--spacing-lg);
   padding-top: 96rpx;
 }
+
 .skeleton-header {
   margin-bottom: var(--spacing-xl);
 }
+
 .skeleton-line {
   height: 36rpx;
   border-radius: var(--radius-sm);
   background: var(--color-primary-bg);
 }
+
 .skeleton-w60 { width: 55%; }
 .skeleton-w40 { width: 38%; height: 26rpx; }
+
 .skeleton-bento {
   display: flex;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
 }
+
 .skeleton-block {
   border-radius: var(--radius-lg);
   background: var(--color-primary-bg);
 }
+
 .skeleton-large {
-  flex: 1.6;
+  flex: 1.45;
   height: 280rpx;
 }
+
 .skeleton-col {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
 }
+
 .skeleton-small { flex: 1; }
+
 .skeleton-banner {
   width: 100%;
-  height: 110rpx;
+  height: 120rpx;
   margin-bottom: var(--spacing-lg);
 }
+
 .skeleton-products {
   display: flex;
   gap: var(--spacing-sm);
 }
+
 .skeleton-product {
   width: 240rpx;
   height: 300rpx;
   border-radius: var(--radius-lg);
-}
-
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.skeleton-shimmer {
-  background: linear-gradient(90deg, var(--bg-card) 25%, var(--color-primary-bg) 50%, var(--bg-card) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
 }

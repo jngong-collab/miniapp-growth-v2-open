@@ -1,0 +1,5 @@
+version: 1
+agent:
+  extend: ../team-agent.yaml
+  name: backend-dev
+  system_prompt_path: ../system-prompts/backend.md

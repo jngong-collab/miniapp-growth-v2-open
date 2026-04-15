@@ -6,7 +6,7 @@
   </view>
 
   <view class="summary-grid">
-    <view class="summary-card" wx:for="{{summaryCards}}" wx:key="label">
+    <view class="summary-card animate-fade-up" wx:for="{{summaryCards}}" wx:key="label" style="animation-delay:{{index*0.05}}s">
       <text class="summary-value">{{item.value}}</text>
       <text class="summary-label">{{item.label}}</text>
     </view>
@@ -17,7 +17,8 @@
     <text class="section-subtitle">WORKBENCH</text>
   </view>
   <view class="module-grid">
-    <view class="module-card" wx:for="{{modules}}" wx:key="key" data-url="{{item.url}}" bindtap="openModule">
+    <view class="module-card animate-fade-up card-press" wx:for="{{modules}}" wx:key="key" data-url="{{item.url}}" bindtap="openModule" style="animation-delay:{{index*0.05}}s">
+      <text class="module-icon">{{item.icon}}</text>
       <text class="module-title">{{item.title}}</text>
       <text class="module-desc">{{item.desc}}</text>
     </view>

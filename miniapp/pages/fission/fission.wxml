@@ -1,4 +1,4 @@
-<!-- pages/fission/fission.wxml - 裂变活动页 -->
+<!-- pages/fission/fission.wxml -->
 <view class="page-fission">
 
   <view wx:if="{{campaigns.length > 0}}">
@@ -9,7 +9,7 @@
         <image class="cover-img" src="{{item.productDetail.images[0] || '/assets/images/baby-massage.png'}}" mode="aspectFill"></image>
         <view class="cover-gradient"></view>
         <view class="cover-info">
-          <view class="cover-badge">限时活动</view>
+          <view class="cover-badge">限时裂变活动</view>
           <text class="cover-name">{{item.productName}}</text>
         </view>
       </view>
@@ -48,37 +48,37 @@
         </view>
 
         <!-- 购买按钮 -->
-        <view class="buy-btn" bindtap="buyNow" data-product-id="{{item.productId}}">
-          🔥 ¥{{item.activityPriceYuan}} 立即购买
+        <view class="buy-btn card-press" bindtap="buyNow" data-product-id="{{item.productId}}">
+          ¥{{item.activityPriceYuan}} 立即购买
         </view>
 
         <!-- 产品介绍 -->
         <view class="info-card" wx:if="{{item.productDetail}}">
-          <view class="info-head">📋 产品介绍</view>
+          <view class="info-head">产品介绍</view>
           <view class="info-tags">
-            <text class="tag tag-green" wx:if="{{item.productDetail.efficacy}}">✨ {{item.productDetail.efficacy}}</text>
-            <text class="tag tag-blue" wx:if="{{item.productDetail.type === 'service'}}">🏥 到店服务</text>
-            <text class="tag tag-blue" wx:elif="{{item.productDetail.type === 'physical'}}">📦 实物商品</text>
+            <text class="tag tag-eco" wx:if="{{item.productDetail.efficacy}}">{{item.productDetail.efficacy}}</text>
+            <text class="tag tag-ai" wx:if="{{item.productDetail.type === 'service'}}">到店服务</text>
+            <text class="tag tag-ai" wx:elif="{{item.productDetail.type === 'physical'}}">实物商品</text>
           </view>
           <text class="info-text" wx:if="{{item.productDetail.detail}}">{{item.productDetail.detail}}</text>
         </view>
 
         <!-- 推荐三步 -->
         <view class="info-card">
-          <view class="info-head">💡 推荐好友三步赚现金</view>
+          <view class="info-head">推荐好友三步赚现金</view>
           <view class="steps">
             <view class="step">
               <view class="step-num">1</view>
               <text class="step-emoji">🛒</text>
               <text class="step-text">购买活动产品</text>
             </view>
-            <text class="step-arrow">→</text>
+            <view class="step-line-h"></view>
             <view class="step">
               <view class="step-num">2</view>
               <text class="step-emoji">📤</text>
               <text class="step-text">分享给好友</text>
             </view>
-            <text class="step-arrow">→</text>
+            <view class="step-line-h"></view>
             <view class="step">
               <view class="step-num">3</view>
               <text class="step-emoji">💰</text>
@@ -89,14 +89,14 @@
 
         <!-- 我的收益 -->
         <view class="info-card" wx:if="{{earnings}}">
-          <view class="info-head">💰 我的收益</view>
+          <view class="info-head">我的收益</view>
           <view class="earn-row">
             <view class="earn-cell">
               <text class="earn-val">{{earnings.totalInvited}}</text>
               <text class="earn-label">邀请好友</text>
             </view>
             <view class="earn-cell">
-              <text class="earn-val coral">¥{{totalEarnedYuan}}</text>
+              <text class="earn-val earn-gold">¥{{totalEarnedYuan}}</text>
               <text class="earn-label">累计赚到</text>
             </view>
             <view class="earn-cell">
@@ -108,7 +108,7 @@
 
         <!-- 邀请记录 -->
         <view class="info-card" wx:if="{{records.length > 0}}">
-          <view class="info-head">📋 邀请记录</view>
+          <view class="info-head">邀请记录</view>
           <view class="record" wx:for="{{records}}" wx:key="_id">
             <view class="record-left">
               <image class="record-avatar" src="{{item.inviteeAvatar}}" mode="aspectFill" wx:if="{{item.inviteeAvatar}}"></image>
@@ -124,7 +124,7 @@
 
         <!-- 活动规则 -->
         <view class="rules-card">
-          <view class="rules-head">📜 活动规则</view>
+          <view class="rules-head">活动规则</view>
           <text class="rules-item">1. 推荐好友购买活动产品，好友成功下单即返现</text>
           <text class="rules-item">2. 返现自动到账余额，可用于购买门店商品</text>
           <text class="rules-item">3. 每人限购活动产品一份</text>
@@ -137,8 +137,8 @@
 
   <!-- 空状态 -->
   <view class="empty-state" wx:if="{{campaigns.length === 0 && !loading}}">
-    <text class="empty-emoji">🎉</text>
-    <text class="empty-title">暂无进行中的活动</text>
+    <text class="empty-icon">🍃</text>
+    <text class="empty-text">暂无进行中的活动</text>
     <text class="empty-hint">请等待门店开启裂变活动</text>
   </view>
 </view>

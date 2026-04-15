@@ -4,6 +4,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const _ = db.command
+const MALL_CATEGORIES = ['五行泡浴', '百草元气灸', '靶向敷贴', '精油系列', '超值套餐']
 
 exports.main = async (event) => {
     const { action } = event
@@ -23,7 +24,7 @@ async function getHomeContent() {
 
     const [storeInfo, featuredProducts, fissionCampaigns, lotteryCampaigns] = await Promise.all([
         safeGetFirst('stores', {}),
-        safeList('products', { status: 'on' }, { orderBy: ['sortOrder', 'asc'], limit: 6 }),
+        safeList('products', { status: 'on', showInMall: true }, { orderBy: ['sortOrder', 'asc'], limit: 6 }),
         safeList('fission_campaigns', {
             status: 'active',
             startTime: _.lte(now),
@@ -48,9 +49,10 @@ async function getHomeContent() {
 }
 
 async function getMallContent(event) {
-    const { type = 'all', keyword = '', page = 1, pageSize = 10 } = event
-    const productCondition = { status: 'on' }
-    if (type && type !== 'all') productCondition.type = type
+    const { category = '', type = '', keyword = '', page = 1, pageSize = 10 } = event
+    const productCondition = { status: 'on', showInMall: true }
+    const resolvedCategory = resolveMallCategory(category, type)
+    if (resolvedCategory) productCondition.category = resolvedCategory
     if (keyword && keyword.trim()) {
         productCondition.name = db.RegExp({
             regexp: keyword.trim(),
@@ -117,4 +119,14 @@ async function safeList(collectionName, condition = {}, options = {}) {
 function sanitizeStore(store) {
     const { adminOpenids, staff, ...rest } = store
     return rest
+}
+
+function resolveMallCategory(category, legacyType) {
+    const normalizedCategory = (category || '').trim()
+    if (MALL_CATEGORIES.includes(normalizedCategory)) return normalizedCategory
+
+    const normalizedLegacyType = (legacyType || '').trim()
+    if (MALL_CATEGORIES.includes(normalizedLegacyType)) return normalizedLegacyType
+
+    return ''
 }

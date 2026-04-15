@@ -1,3 +1,5 @@
+/* pages/workbench/campaigns/campaigns.wxss */
+
 .simple-page {
   min-height: 100vh;
   background: var(--bg-page);
@@ -10,19 +12,75 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
   box-shadow: var(--shadow-sm);
-  margin-bottom: var(--spacing-md);
+  border: 1rpx solid var(--color-border);
+  margin-bottom: var(--spacing-sm);
+}
+
+.list-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xs);
 }
 
 .list-title {
   display: block;
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   color: var(--color-text-title);
   font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
+
+.list-tag {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  padding: 4rpx 10rpx;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  margin-left: var(--spacing-sm);
+}
+
+.tag-primary { background: var(--color-primary-bg); color: var(--color-primary-dark); }
+.tag-ai { background: var(--color-ai-bg); color: var(--color-ai); }
 
 .list-desc {
   display: block;
-  margin-top: var(--spacing-xs);
-  font-size: var(--font-sm);
+  margin-top: 4rpx;
+  font-size: var(--font-xs);
   color: var(--color-text-sub);
+}
+
+.section-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--spacing-sm);
+}
+
+.section-title {
+  font-size: var(--font-base);
+  font-weight: 700;
+  color: var(--color-text-title);
+}
+
+.section-subtitle {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 2rpx;
+  margin-top: 2rpx;
+}
+
+.empty-block {
+  padding: 160rpx var(--spacing-lg);
+  text-align: center;
+}
+
+.empty-title {
+  color: var(--color-text-sub);
+  font-size: var(--font-base);
+  font-weight: 600;
 }

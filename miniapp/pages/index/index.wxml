@@ -1,10 +1,10 @@
 <!--pages/index/index.wxml-->
 <view class="page-home">
-  <!-- 背景装饰 -->
-  <view class="bg-decoration shape-1"></view>
-  <view class="bg-decoration shape-2"></view>
+  <!-- 温润背景装饰 -->
+  <view class="bg-deco bg-deco-1"></view>
+  <view class="bg-deco bg-deco-2"></view>
 
-  <!-- ====== Loading 骨架屏 ====== -->
+  <!-- Loading 骨架屏 -->
   <view class="skeleton-wrap" wx:if="{{loading}}">
     <view class="skeleton-header">
       <view class="skeleton-line skeleton-w60 skeleton-shimmer"></view>
@@ -23,89 +23,93 @@
     </view>
   </view>
 
-  <!-- ====== 主内容 ====== -->
+  <!-- 主内容 -->
   <view class="home-content" wx:if="{{!loading}}">
-    <!-- 头部问候 -->
+    <!-- 品牌头部 -->
     <view class="header-section animate-fade-up">
       <view class="greeting-wrap">
         <text class="greeting-time">{{greeting}} {{greetingEmoji}}</text>
-        <text class="greeting-user">欢迎来到{{storeInfo.name || '浴小主小儿推拿'}}</text>
+        <text class="store-name">{{storeInfo.name || '浴小主小儿推拿'}}</text>
       </view>
-      <view class="location-pill" bindtap="openLocation" wx:if="{{storeInfo.address}}">
-        <text class="loc-pin">📍</text>
+      <view class="location-pill card-press" bindtap="openLocation" wx:if="{{storeInfo.address}}">
+        <text class="loc-icon">📍</text>
         <text class="loc-addr">{{storeInfo.address}}</text>
         <text class="loc-arrow">›</text>
       </view>
     </view>
 
-    <!-- Bento Box 功能入口 -->
-    <view class="bento-box animate-fade-up" style="animation-delay: 0.12s">
-      <!-- 左大卡 - AI 看舌象 -->
-      <view class="bento-item bento-large bg-grad-ai" bindtap="goToTongue">
-        <text class="bento-bg-icon">🔮</text>
-        <view class="bento-content">
-          <text class="bento-title">AI看舌象</text>
-          <text class="bento-desc">拍舌识别体质 · 获取调理方案</text>
-          <view class="btn-sm-glass">立即体验 →</view>
+    <!-- Bento 功能入口 -->
+    <view class="bento-box animate-fade-up" style="animation-delay: 0.1s">
+      <view class="bento-main card-press bg-grad-ai" bindtap="goToTongue">
+        <view class="bento-main-content">
+          <view class="bento-badge">AI 智能诊断</view>
+          <text class="bento-main-title">拍舌识体质</text>
+          <text class="bento-main-desc">黄帝内经 · 现代 AI 辅助</text>
         </view>
+        <view class="bento-main-action">
+          <text>立即体验</text>
+          <text class="action-arrow">→</text>
+        </view>
+        <view class="bento-deco"></view>
       </view>
-      <!-- 右侧两小卡 -->
-      <view class="bento-right">
-        <view class="bento-item bento-small card-float" bindtap="goToPackage">
-          <text class="bento-bg-icon icon-muted">📋</text>
-          <view class="bento-content">
-            <text class="bento-title title-dark">套餐查询</text>
-            <text class="bento-desc desc-sub">查看套餐使用进度</text>
+      <view class="bento-side">
+        <view class="bento-sub card-press" bindtap="goToPackage">
+          <view class="sub-icon-wrap" style="background:#F5EFE8">
+            <text class="sub-icon">📋</text>
+          </view>
+          <view class="sub-text">
+            <text class="sub-title">套餐查询</text>
+            <text class="sub-desc">查看使用进度</text>
           </view>
         </view>
-        <view class="bento-item bento-small card-float" bindtap="goToLottery">
-          <text class="bento-bg-icon icon-muted">🎰</text>
-          <view class="bento-content">
-            <text class="bento-title title-dark">幸运大抽奖</text>
-            <text class="bento-desc desc-sub">{{lotteryCampaign ? (lotteryCampaign.name || '每日好礼等你来抽') : '每日好礼等你来抽'}}</text>
+        <view class="bento-sub card-press" bindtap="goToLottery">
+          <view class="sub-icon-wrap" style="background:#F0F5F1">
+            <text class="sub-icon">🎁</text>
+          </view>
+          <view class="sub-text">
+            <text class="sub-title">幸运抽奖</text>
+            <text class="sub-desc">{{lotteryCampaign ? (lotteryCampaign.name || '每日好礼') : '每日好礼'}}</text>
           </view>
         </view>
       </view>
     </view>
 
     <!-- 裂变活动横幅 -->
-    <view class="promo-banner animate-fade-up" style="animation-delay: 0.2s" wx:if="{{fissionCampaigns.length > 0}}" bindtap="goToFission">
-      <view class="promo-bg-pattern"></view>
-      <view class="promo-left">
-        <view class="promo-badge">限时活动</view>
-        <text class="promo-title">推荐好友购买【{{fissionCampaigns[0].productName}}】每单返 ¥{{fissionCampaigns[0].cashbackAmountYuan}}</text>
-        <text class="promo-desc">推荐一位好友成功下单即返现 · 已有 {{fissionCampaigns[0].soldCount || 0}} 人参与</text>
-        <!-- 进度条 -->
-        <view class="promo-progress" wx:if="{{fissionCampaigns[0].soldPercent > 0}}">
-          <view class="promo-progress-bar" style="width: {{fissionCampaigns[0].soldPercent}}%"></view>
+    <view class="promo-section animate-fade-up" style="animation-delay: 0.18s" wx:if="{{fissionCampaigns.length > 0}}" bindtap="goToFission">
+      <view class="promo-card card-press">
+        <view class="promo-left">
+          <view class="promo-badge">限时活动</view>
+          <text class="promo-title">推荐好友购买【{{fissionCampaigns[0].productName}}】</text>
+          <text class="promo-desc">每单返 ¥{{fissionCampaigns[0].cashbackAmountYuan}} · 已有 {{fissionCampaigns[0].soldCount || 0}} 人参与</text>
+          <view class="promo-progress" wx:if="{{fissionCampaigns[0].soldPercent > 0}}">
+            <view class="promo-progress-bar">
+              <view class="promo-progress-fill" style="width: {{fissionCampaigns[0].soldPercent}}%"></view>
+            </view>
+          </view>
         </view>
-      </view>
-      <view class="promo-action">
-        <text class="promo-price">¥{{fissionCampaigns[0].activityPriceYuan}}</text>
-        <text class="promo-btn">立即参与</text>
+        <view class="promo-right">
+          <text class="promo-price">¥{{fissionCampaigns[0].activityPriceYuan}}</text>
+          <view class="promo-btn">立即参与</view>
+        </view>
       </view>
     </view>
 
-    <!-- 推拿师推荐 - IP 形象 -->
-    <view class="therapist-section animate-fade-up" style="animation-delay: 0.16s" wx:if="{{therapist}}">
+    <!-- 推拿师推荐 -->
+    <view class="therapist-section animate-fade-up" style="animation-delay: 0.22s" wx:if="{{therapist}}">
       <view class="section-header">
         <text class="section-title">儿童健康管理师</text>
         <text class="section-subtitle">Expert Therapist</text>
       </view>
-      <view class="therapist-card card-float">
-        <!-- 形象照区域 -->
+      <view class="therapist-card card-float card-press">
         <view class="therapist-photo-wrap">
           <image class="therapist-photo" src="{{therapist.photo}}" mode="aspectFill" wx:if="{{therapist.photo}}"></image>
           <view class="therapist-photo-placeholder" wx:else>
             <text class="therapist-placeholder-emoji">👩‍⚕️</text>
-            <text class="therapist-placeholder-hint">推拿师形象照</text>
           </view>
-          <!-- 认证徽章 -->
-          <view class="therapist-cert-badge" wx:if="{{therapist.certTitle}}">
-            <text>🏅 {{therapist.certTitle}}</text>
+          <view class="therapist-cert-badge glass-panel" wx:if="{{therapist.certTitle}}">
+            <text>{{therapist.certTitle}}</text>
           </view>
         </view>
-        <!-- 底部介绍模块 -->
         <view class="therapist-info">
           <view class="therapist-name-row">
             <text class="therapist-name">{{therapist.name}}</text>
@@ -134,22 +138,22 @@
     </view>
 
     <!-- 套餐推荐 -->
-    <view class="section-header animate-fade-up" style="animation-delay: 0.24s" wx:if="{{hotPackages.length > 0}}">
-      <text class="section-title">套餐推荐</text>
+    <view class="section-header animate-fade-up" style="animation-delay: 0.28s" wx:if="{{hotPackages.length > 0}}">
+      <text class="section-title">调理套餐</text>
       <text class="section-subtitle">Recommended Packages</text>
     </view>
-    <view class="package-card card-float animate-fade-up" style="animation-delay: 0.3s" wx:for="{{hotPackages}}" wx:key="_id" wx:if="{{index < 1}}" bindtap="goToProduct" data-id="{{item._id}}">
+    <view class="package-card card-float card-press animate-fade-up" style="animation-delay: 0.32s" wx:for="{{hotPackages}}" wx:key="_id" wx:if="{{index < 1}}" bindtap="goToProduct" data-id="{{item._id}}">
       <view class="package-img-wrap">
         <image class="package-img" src="{{item.images[0]}}" mode="aspectFill" wx:if="{{item.images && item.images.length > 0 && item.images[0]}}"></image>
         <view class="package-img-placeholder" wx:else>
           <text class="placeholder-emoji">🎁</text>
         </view>
-        <text class="micro-tag tag-purple package-tag">套餐</text>
+        <text class="tag tag-ai package-tag">套餐</text>
       </view>
       <view class="package-info">
         <text class="package-name">{{item.name}}</text>
         <text class="package-desc" wx:if="{{item.efficacy}}">{{item.efficacy}}</text>
-        <view class="currency-box" style="margin-top:12rpx">
+        <view class="currency-box" style="margin-top:auto;padding-top:12rpx">
           <text class="currency-symbol">¥</text>
           <text class="currency-value">{{item.priceYuan}}</text>
           <text class="currency-original" wx:if="{{item.originalPriceYuan && item.originalPriceYuan !== '0.0'}}">¥{{item.originalPriceYuan}}</text>
@@ -158,19 +162,18 @@
       </view>
     </view>
 
-    <!-- 产品优选 - 2x2 网格 -->
+    <!-- 产品优选 -->
     <view class="section-header animate-fade-up" style="animation-delay: 0.36s">
-      <text class="section-title">产品优选</text>
+      <text class="section-title">甄选产品</text>
       <text class="section-subtitle">Premium Products</text>
     </view>
 
-    <view class="products-grid animate-fade-up" style="animation-delay: 0.42s" wx:if="{{hotProducts.length > 0}}">
-      <view class="grid-product-card card-float" wx:for="{{hotProducts}}" wx:key="_id" wx:if="{{index < 4}}" bindtap="goToProduct" data-id="{{item._id}}">
+    <view class="products-grid animate-fade-up" style="animation-delay: 0.4s" wx:if="{{hotProducts.length > 0}}">
+      <view class="grid-product-card card-float card-press" wx:for="{{hotProducts}}" wx:key="_id" wx:if="{{index < 4}}" bindtap="goToProduct" data-id="{{item._id}}">
         <view class="grid-product-img-wrap">
           <image class="grid-product-img" src="{{item.images[0]}}" mode="aspectFill" wx:if="{{item.images && item.images.length > 0 && item.images[0]}}"></image>
           <view class="product-img-placeholder" wx:else>
             <text class="placeholder-emoji">🧴</text>
-            <text class="placeholder-text">{{item.name}}</text>
           </view>
         </view>
         <view class="grid-product-info">
@@ -184,12 +187,11 @@
       </view>
     </view>
 
-    <view class="empty-state animate-fade-up" style="animation-delay: 0.42s" wx:if="{{hotProducts.length === 0 && hotPackages.length === 0}}">
-      <text class="empty-icon">🏪</text>
+    <view class="empty-state animate-fade-up" style="animation-delay: 0.4s" wx:if="{{hotProducts.length === 0 && hotPackages.length === 0}}">
+      <text class="empty-icon">🍃</text>
       <text class="empty-text">商品即将上架，敬请期待</text>
     </view>
 
-    <!-- 底部安全区 -->
-    <view style="height: 40rpx"></view>
+    <view class="safe-bottom"></view>
   </view>
 </view>

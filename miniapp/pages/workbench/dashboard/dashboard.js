@@ -3,12 +3,12 @@ const { ensureWorkbenchAccess } = require('../../../utils/workbench')
 const { showToast } = require('../../../utils/util')
 
 const MODULES = [
-    { key: 'orders', title: '订单与退款', desc: '查看订单、处理退款', url: '/pages/workbench/orders/orders', permission: 'viewOrders' },
-    { key: 'verify', title: '核销中心', desc: '到店服务核销', url: '/pages/workbench/verify/verify', permission: 'verify' },
-    { key: 'campaigns', title: '活动管理', desc: '裂变和抽奖活动', url: '/pages/workbench/campaigns/campaigns', permission: 'manageCampaigns' },
-    { key: 'catalog', title: '商品与套餐', desc: '管理售卖内容', url: '/pages/workbench/catalog/catalog', permission: 'manageProducts' },
-    { key: 'leads', title: '客户与跟进', desc: '查看线索与备注', url: '/pages/workbench/leads/leads', permission: 'viewLeads' },
-    { key: 'settings', title: '门店设置', desc: '门店、AI、员工配置', url: '/pages/workbench/settings/settings', permission: 'manageSettings' }
+    { key: 'orders', title: '订单与退款', desc: '查看订单、处理退款', url: '/pages/workbench/orders/orders', permission: 'viewOrders', icon: '📋' },
+    { key: 'verify', title: '核销中心', desc: '到店服务核销', url: '/pages/workbench/verify/verify', permission: 'verify', icon: '🔑' },
+    { key: 'campaigns', title: '活动管理', desc: '裂变和抽奖活动', url: '/pages/workbench/campaigns/campaigns', permission: 'manageCampaigns', icon: '🎁' },
+    { key: 'catalog', title: '商品与套餐', desc: '管理售卖内容', url: '/pages/workbench/catalog/catalog', permission: 'manageProducts', icon: '📦' },
+    { key: 'leads', title: '客户与跟进', desc: '查看线索与备注', url: '/pages/workbench/leads/leads', permission: 'viewLeads', icon: '👥' },
+    { key: 'settings', title: '门店设置', desc: '门店、AI、员工配置', url: '/pages/workbench/settings/settings', permission: 'manageSettings', icon: '⚙️' }
 ]
 
 Page({

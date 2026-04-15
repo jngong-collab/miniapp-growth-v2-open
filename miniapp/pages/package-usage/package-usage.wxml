@@ -1,7 +1,7 @@
-<!-- pages/package-usage/package-usage.wxml - 套餐核销页 -->
+<!-- pages/package-usage/package-usage.wxml -->
 <view class="page-package">
 
-  <!-- Tab：我的套餐 / 核销二维码 -->
+  <!-- Tab -->
   <view class="pkg-tabs">
     <view class="pkg-tab {{activeTab === 'list' ? 'active' : ''}}" bindtap="switchTab" data-tab="list">我的套餐</view>
     <view class="pkg-tab {{activeTab === 'qr' ? 'active' : ''}}" bindtap="switchTab" data-tab="qr">出示核销码</view>
@@ -13,11 +13,11 @@
           wx:for="{{packages}}"
           wx:key="_id"
           bindtap="selectPackage"
-          data-item="{{item}}">
+          data-id="{{item._id}}">
 
       <view class="pkg-item-header">
         <view class="pkg-item-type tag-{{item.productType}}">
-          {{item.productType === 'service' ? '单次服务' : '套餐'}}
+          {{item.productType === 'service' ? '单次服务' : '调理套餐'}}
         </view>
         <view class="pkg-status {{item.isUsed ? 'used' : 'valid'}}">
           {{item.isUsed ? '已核销' : '有效'}}
@@ -39,8 +39,8 @@
       </view>
 
       <view class="pkg-item-footer">
-        <text class="pkg-code">核销码：{{item.verifyCode}}</text>
-        <view class="btn btn-sm btn-primary show-qr-btn" catchtap="showQrCode" data-item="{{item}}">
+        <text class="pkg-code">核销码 {{item.verifyCode}}</text>
+        <view class="btn btn-sm btn-primary show-qr-btn" catchtap="showQrCode" data-id="{{item._id}}">
           出示核销码
         </view>
       </view>
@@ -55,21 +55,22 @@
 
   <!-- 核销码展示 -->
   <view class="qr-display" wx:if="{{activeTab === 'qr' && selectedPackage}}">
-    <view class="qr-header">
-      <text class="qr-product-name">{{selectedPackage.productName}}</text>
-      <text class="qr-status-tag {{selectedPackage.isUsed ? 'used' : 'valid'}}">{{selectedPackage.isUsed ? '已核销' : '有效'}}</text>
-    </view>
+    <view class="qr-card">
+      <view class="qr-header">
+        <text class="qr-product-name">{{selectedPackage.productName}}</text>
+        <view class="qr-status-tag {{selectedPackage.isUsed ? 'used' : 'valid'}}">{{selectedPackage.isUsed ? '已核销' : '有效'}}</view>
+      </view>
 
-    <!-- Canvas 条形码 -->
-    <view class="qr-code-wrap">
-      <canvas canvas-id="verifyCanvas" class="verify-canvas" style="width:300px;height:300px;"></canvas>
+      <view class="qr-code-wrap">
+        <canvas canvas-id="verifyCanvas" class="verify-canvas" style="width:300px;height:300px;"></canvas>
+      </view>
     </view>
 
     <!-- 套餐：服务选择 -->
     <view class="service-selector" wx:if="{{selectedPackage.productType === 'package' && selectedPackage.remainingItems}}">
       <view class="selector-header">
         <text class="selector-title">核销服务项</text>
-        <view class="selector-btn" bindtap="openServicePicker">
+        <view class="selector-btn card-press" bindtap="openServicePicker">
           {{selectedService || '请选择要核销的服务'}} ›
         </view>
       </view>
@@ -78,7 +79,7 @@
     <!-- 套餐剩余 -->
     <view class="qr-remaining" wx:if="{{selectedPackage.remainingItems}}">
       <view class="remaining-item" wx:for="{{selectedPackage.remainingItems}}" wx:key="name" wx:for-item="ri">
-        <text>{{ri.name}}</text>
+        <text class="ri-name">{{ri.name}}</text>
         <text class="remaining-count-highlight {{ri.remaining === 0 ? 'exhausted' : ''}}">
           {{ri.remaining === 0 ? '已用完' : '剩余 ' + ri.remaining + ' 次'}}
         </text>
@@ -86,15 +87,15 @@
     </view>
 
     <view class="qr-tip">
-      <text>⚠️ 核销后本次记录将扣减，请确认后交由工作人员操作</text>
+      <text>核销后本次记录将扣减，请确认后交由工作人员操作</text>
     </view>
   </view>
 
   <!-- 未选中套餐时的提示 -->
-  <view class="qr-empty" wx:if="{{activeTab === 'qr' && !selectedPackage}}">
+  <view class="empty-state" wx:if="{{activeTab === 'qr' && !selectedPackage}}">
     <text class="empty-icon">📱</text>
     <text class="empty-text">请先从"我的套餐"选择要核销的套餐</text>
-    <view class="btn btn-outline" bindtap="switchToList">查看我的套餐</view>
+    <view class="btn btn-ghost" bindtap="switchToList">查看我的套餐</view>
   </view>
 
   <!-- 服务选择弹窗 -->
@@ -106,8 +107,9 @@
               wx:for="{{selectedPackage.remainingItems}}"
               wx:key="name"
               wx:for-item="ri"
-              bindtap="{{ri.remaining > 0 ? 'selectService' : ''}}"
-              data-name="{{ri.name}}">
+              bindtap="selectService"
+              data-name="{{ri.name}}"
+              data-remaining="{{ri.remaining}}">
           <text class="picker-item-name">{{ri.name}}</text>
           <text class="picker-item-count">{{ri.remaining > 0 ? '剩余 ' + ri.remaining + ' 次' : '已用完'}}</text>
         </view>

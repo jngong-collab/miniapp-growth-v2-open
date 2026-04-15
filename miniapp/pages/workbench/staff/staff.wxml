@@ -1,21 +1,21 @@
 <view class="page-workbench-staff">
   <view class="staff-header">
-    <text class="staff-title">👥 员工管理</text>
+    <text class="staff-title">员工管理</text>
     <text class="staff-count">共 {{staffList.length}} 名员工</text>
   </view>
 
-  <view class="add-btn" bindtap="showAddStaff">
+  <view class="add-btn card-press" bindtap="showAddStaff">
     <text class="add-btn-icon">+</text>
     <text class="add-btn-text">添加员工</text>
   </view>
 
   <view class="staff-list">
-    <view class="staff-card" wx:for="{{staffList}}" wx:key="openid">
+    <view class="staff-card animate-fade-up" wx:for="{{staffList}}" wx:key="openid" style="animation-delay:{{index*0.05}}s">
       <view class="staff-card-header">
         <view class="staff-avatar">👤</view>
         <view class="staff-info">
           <text class="staff-name">{{item.name}}</text>
-          <text class="staff-phone" wx:if="{{item.phone}}">📱 {{item.phone}}</text>
+          <text class="staff-phone" wx:if="{{item.phone}}">{{item.phone}}</text>
         </view>
       </view>
 
@@ -29,8 +29,8 @@
       </view>
 
       <view class="staff-actions">
-        <view class="action-btn action-edit" bindtap="editStaff" data-staff="{{item}}">✏️ 编辑权限</view>
-        <view class="action-btn action-remove" bindtap="removeStaff" data-staff="{{item}}">🗑️ 移除</view>
+        <view class="action-btn action-edit card-press" bindtap="editStaff" data-staff="{{item}}">编辑权限</view>
+        <view class="action-btn action-remove card-press" bindtap="removeStaff" data-staff="{{item}}">移除</view>
       </view>
     </view>
   </view>
@@ -42,9 +42,10 @@
   </view>
 
   <view class="loading-state" wx:if="{{loading}}">
-    <text>加载中...</text>
+    <text>加载中…</text>
   </view>
 
+  <!-- Add Modal -->
   <view class="modal-mask" wx:if="{{showAddModal}}" bindtap="closeAddModal">
     <view class="modal-body" catchtap="">
       <view class="modal-title">添加员工</view>
@@ -63,7 +64,7 @@
       <view class="form-group">
         <text class="form-label">权限设置</text>
         <view class="perm-checkbox-list">
-          <view class="perm-checkbox-item" wx:for="{{permOptions}}" wx:key="key" bindtap="toggleNewPerm" data-key="{{item.key}}">
+          <view class="perm-checkbox-item card-press" wx:for="{{permOptions}}" wx:key="key" bindtap="toggleNewPerm" data-key="{{item.key}}">
             <view class="checkbox {{newStaffPerms.indexOf(item.key) !== -1 ? 'checked' : ''}}">
               <text wx:if="{{newStaffPerms.indexOf(item.key) !== -1}}">✓</text>
             </view>
@@ -75,17 +76,18 @@
         </view>
       </view>
       <view class="modal-actions">
-        <view class="modal-btn modal-btn-cancel" bindtap="closeAddModal">取消</view>
-        <view class="modal-btn modal-btn-confirm" bindtap="confirmAddStaff">确认添加</view>
+        <view class="modal-btn modal-btn-cancel card-press" bindtap="closeAddModal">取消</view>
+        <view class="modal-btn modal-btn-confirm card-press" bindtap="confirmAddStaff">确认添加</view>
       </view>
     </view>
   </view>
 
+  <!-- Edit Modal -->
   <view class="modal-mask" wx:if="{{showEditModal}}" bindtap="closeEditModal">
     <view class="modal-body" catchtap="">
       <view class="modal-title">编辑权限 - {{editingStaff.name}}</view>
       <view class="perm-checkbox-list">
-        <view class="perm-checkbox-item" wx:for="{{permOptions}}" wx:key="key"
+        <view class="perm-checkbox-item card-press" wx:for="{{permOptions}}" wx:key="key"
               bindtap="toggleEditPerm" data-key="{{item.key}}">
           <view class="checkbox {{editingPerms.indexOf(item.key) !== -1 ? 'checked' : ''}}">
             <text wx:if="{{editingPerms.indexOf(item.key) !== -1}}">✓</text>
@@ -97,8 +99,8 @@
         </view>
       </view>
       <view class="modal-actions">
-        <view class="modal-btn modal-btn-cancel" bindtap="closeEditModal">取消</view>
-        <view class="modal-btn modal-btn-confirm" bindtap="confirmEditPerms">保存权限</view>
+        <view class="modal-btn modal-btn-cancel card-press" bindtap="closeEditModal">取消</view>
+        <view class="modal-btn modal-btn-confirm card-press" bindtap="confirmEditPerms">保存权限</view>
       </view>
     </view>
   </view>

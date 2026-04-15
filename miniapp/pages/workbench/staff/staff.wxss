@@ -1,19 +1,21 @@
+/* pages/workbench/staff/staff.wxss */
+
 .page-workbench-staff {
-  background: #FAF6F1;
+  background: var(--bg-page);
   min-height: 100vh;
   padding: var(--spacing-lg);
 }
 
 .staff-header { margin-bottom: var(--spacing-lg); }
-.staff-title { font-size: var(--font-xl); font-weight: 700; color: var(--color-text); display: block; margin-bottom: var(--spacing-xs); }
-.staff-count { font-size: var(--font-sm); color: var(--color-text-light); }
+.staff-title { font-size: var(--font-xl); font-weight: 700; color: var(--color-text-title); display: block; margin-bottom: var(--spacing-xs); }
+.staff-count { font-size: var(--font-sm); color: var(--color-text-sub); }
 
 .add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xs);
-  background: var(--color-bg-white);
+  background: var(--bg-card);
   border: 2rpx dashed var(--color-primary);
   border-radius: var(--radius-xl);
   padding: var(--spacing-md);
@@ -26,11 +28,12 @@
 .staff-list { margin-bottom: var(--spacing-md); }
 
 .staff-card {
-  background: var(--color-bg-white);
+  background: var(--bg-card);
   border-radius: var(--radius-xl);
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-md);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 
 .staff-card-header {
@@ -43,17 +46,18 @@
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: #F0F0F0;
+  background: var(--bg-page);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 40rpx;
   flex-shrink: 0;
+  border: 1rpx solid var(--color-border);
 }
 
 .staff-info { margin-left: var(--spacing-md); flex: 1; }
-.staff-name { font-size: var(--font-md); font-weight: 700; color: var(--color-text); display: block; }
-.staff-phone { font-size: var(--font-xs); color: var(--color-text-light); display: block; margin-top: var(--spacing-xs); }
+.staff-name { font-size: var(--font-md); font-weight: 700; color: var(--color-text-title); display: block; }
+.staff-phone { font-size: var(--font-xs); color: var(--color-text-sub); display: block; margin-top: 4rpx; }
 
 .staff-perms {
   display: flex;
@@ -64,14 +68,14 @@
 
 .perm-tag {
   font-size: var(--font-xs);
-  font-weight: 600;
-  padding: var(--spacing-xs) var(--spacing-sm);
+  font-weight: 500;
+  padding: 4rpx 10rpx;
   border-radius: var(--radius-sm);
-  background: #F0F4F6;
-  color: #6B8A99;
+  background: var(--color-ai-bg);
+  color: var(--color-ai);
 }
 
-.perm-tag.perm-empty { background: #F5F5F5; color: #999; }
+.perm-tag.perm-empty { background: var(--bg-page); color: var(--color-text-muted); border: 1rpx solid var(--color-border); }
 
 .staff-actions {
   display: flex;
@@ -89,8 +93,8 @@
   border-radius: var(--radius-lg);
 }
 
-.action-edit { background: #F0F4F6; color: #6B8A99; }
-.action-remove { background: #FFF5EB; color: #C75C5C; }
+.action-edit { background: var(--color-ai-bg); color: var(--color-ai); }
+.action-remove { background: rgba(199,92,92,0.08); color: var(--color-danger); }
 
 .modal-mask {
   position: fixed;
@@ -104,30 +108,31 @@
 }
 
 .modal-body {
-  background: var(--color-bg-white);
+  background: var(--bg-card);
   border-radius: var(--radius-xl);
   padding: var(--spacing-lg);
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-title {
   font-size: var(--font-lg);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-title);
   text-align: center;
   margin-bottom: var(--spacing-lg);
 }
 
 .form-group { margin-bottom: var(--spacing-md); }
-.form-label { font-size: var(--font-sm); font-weight: 600; color: var(--color-text); display: block; margin-bottom: var(--spacing-xs); }
+.form-label { font-size: var(--font-sm); font-weight: 600; color: var(--color-text-title); display: block; margin-bottom: var(--spacing-xs); }
 .form-input {
   width: 100%;
   height: 80rpx;
   padding: 0 var(--spacing-md);
   font-size: var(--font-sm);
-  background: #FAF6F1;
+  background: var(--bg-page);
   border-radius: var(--radius-lg);
   border: 1rpx solid var(--color-border);
   box-sizing: border-box;
@@ -143,15 +148,16 @@
   display: flex;
   align-items: center;
   padding: var(--spacing-md);
-  background: #FAF6F1;
+  background: var(--bg-page);
   border-radius: var(--radius-lg);
+  border: 1rpx solid var(--color-border);
 }
 
 .checkbox {
   width: 44rpx;
   height: 44rpx;
   border-radius: var(--radius-sm);
-  border: 2rpx solid #D9D9D9;
+  border: 2rpx solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -164,8 +170,8 @@
 .checkbox.checked { background: var(--color-primary); border-color: var(--color-primary); }
 
 .perm-checkbox-info { flex: 1; }
-.perm-checkbox-label { font-size: var(--font-sm); font-weight: 600; color: var(--color-text); display: block; }
-.perm-checkbox-desc { font-size: var(--font-xs); color: var(--color-text-light); display: block; margin-top: var(--spacing-xs); }
+.perm-checkbox-label { font-size: var(--font-sm); font-weight: 600; color: var(--color-text-title); display: block; }
+.perm-checkbox-desc { font-size: var(--font-xs); color: var(--color-text-sub); display: block; margin-top: 4rpx; }
 
 .modal-actions {
   display: flex;
@@ -184,7 +190,7 @@
   font-weight: 700;
 }
 
-.modal-btn-cancel { background: #F5F5F5; color: var(--color-text-light); }
+.modal-btn-cancel { background: var(--bg-page); color: var(--color-text-sub); border: 1rpx solid var(--color-border); }
 .modal-btn-confirm { background: var(--color-primary); color: #FFFFFF; }
 
 .empty-state,
@@ -195,7 +201,7 @@
   padding: 120rpx var(--spacing-xl);
 }
 
-.empty-icon { font-size: 100rpx; margin-bottom: var(--spacing-md); }
-.empty-text { font-size: var(--font-base); color: var(--color-text); margin-bottom: var(--spacing-xs); }
-.empty-hint { font-size: var(--font-sm); color: var(--color-text-light); }
-.loading-state { color: var(--color-text-light); font-size: var(--font-sm); }
+.empty-icon { font-size: 80rpx; margin-bottom: var(--spacing-md); }
+.empty-text { font-size: var(--font-base); color: var(--color-text-title); margin-bottom: var(--spacing-xs); font-weight: 600; }
+.empty-hint { font-size: var(--font-sm); color: var(--color-text-sub); }
+.loading-state { color: var(--color-text-sub); font-size: var(--font-sm); }

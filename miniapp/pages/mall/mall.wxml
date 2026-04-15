@@ -1,38 +1,21 @@
 <!--pages/mall/mall.wxml-->
-<view class="page-container">
-  <!-- 顶部背景装饰 (同首页/舌诊) -->
-  <view class="bg-decoration">
-    <view class="shape-1"></view>
-    <view class="shape-2"></view>
-  </view>
+<view class="page-mall">
+  <view class="bg-deco bg-deco-1"></view>
+  <view class="bg-deco bg-deco-2"></view>
 
-  <!-- 吸顶导航区 -->
+  <!-- 吸顶导航 -->
   <view class="mall-sticky-header">
-    <!-- 高级搜索栏 -->
     <view class="search-box">
       <view class="search-inner">
         <text class="search-icon">🔍</text>
-        <input class="search-input" placeholder="搜索服务、调理套餐..." placeholder-class="search-ph" bindinput="onSearch" value="{{keyword}}" />
+        <input class="search-input" placeholder="搜索服务、调理套餐…" placeholder-class="search-ph" bindinput="onSearch" value="{{keyword}}" />
       </view>
     </view>
 
-    <!-- 顶级质感分类标签 (Scroll View) -->
     <scroll-view class="category-scroll" scroll-x enable-flex enhanced show-scrollbar="{{false}}">
       <view class="category-capsule">
-        <view class="cat-item {{activeTab === 'all' ? 'active' : ''}}" bindtap="switchTab" data-tab="all">
-          <text class="cat-text">全部推荐</text>
-          <view class="cat-line"></view>
-        </view>
-        <view class="cat-item {{activeTab === 'service' ? 'active' : ''}}" bindtap="switchTab" data-tab="service">
-          <text class="cat-text">推拿服务</text>
-          <view class="cat-line"></view>
-        </view>
-        <view class="cat-item {{activeTab === 'package' ? 'active' : ''}}" bindtap="switchTab" data-tab="package">
-          <text class="cat-text">周期套餐</text>
-          <view class="cat-line"></view>
-        </view>
-        <view class="cat-item {{activeTab === 'physical' ? 'active' : ''}}" bindtap="switchTab" data-tab="physical">
-          <text class="cat-text">甄选产品</text>
+        <view class="cat-item {{activeTab === item ? 'active' : ''}}" wx:for="{{categories}}" wx:key="*this" bindtap="switchTab" data-tab="{{item}}">
+          <text class="cat-text">{{item}}</text>
           <view class="cat-line"></view>
         </view>
       </view>
@@ -40,18 +23,15 @@
   </view>
 
   <view class="mall-body">
-    <!-- 限时活动焦点图轮播 -->
+    <!-- 限时活动轮播 -->
     <view class="hero-section animate-fade-up" style="animation-delay: 0.05s" wx:if="{{fissionCampaigns.length > 0}}">
       <swiper class="hero-swiper" indicator-dots="{{fissionCampaigns.length > 1}}" indicator-color="rgba(255,255,255,0.4)" indicator-active-color="#fff" autoplay circular interval="{{4000}}">
         <swiper-item wx:for="{{fissionCampaigns}}" wx:key="_id">
-          <view class="hero-card" bindtap="goToFission">
-            <!-- 背景渐变层 -->
+          <view class="hero-card card-press" bindtap="goToFission">
             <view class="hero-gradient"></view>
-            <!-- 产品图片 -->
             <image class="hero-prod-img" src="{{item.productImage}}" mode="aspectFill" wx:if="{{item.productImage}}"></image>
-            <!-- 浮层信息 -->
             <view class="hero-overlay">
-              <view class="hero-badge">🔥 限时活动</view>
+              <view class="hero-badge">限时活动</view>
               <text class="hero-prod-name">{{item.productName}}</text>
               <view class="hero-price-row">
                 <view class="hero-current-price">
@@ -62,12 +42,11 @@
                   <text>推荐返 ¥{{item.cashbackAmountYuan}}/单</text>
                 </view>
               </view>
-              <!-- 进度条 -->
               <view class="hero-progress-wrap" wx:if="{{item.soldPercent > 0}}">
                 <view class="hero-progress-bar">
                   <view class="hero-progress-fill" style="width: {{item.soldPercent}}%"></view>
                 </view>
-                <text class="hero-sold-text">已有 {{item.soldCount || 0}} 人参与</text>
+                <text class="hero-sold-text">已参与 {{item.soldCount || 0}} 人</text>
               </view>
             </view>
           </view>
@@ -75,25 +54,22 @@
       </swiper>
     </view>
 
-    <!-- 瀑布流/列表商品卡片 -->
+    <!-- 商品列表 -->
     <view class="prod-list">
-      <view class="premium-card prod-card animate-fade-up" wx:for="{{products}}" wx:key="_id" bindtap="goToProduct" data-id="{{item._id}}" style="animation-delay: {{index * 0.08}}s">
-        <!-- 图片区 -->
+      <view class="prod-card animate-fade-up" wx:for="{{products}}" wx:key="_id" bindtap="goToProduct" data-id="{{item._id}}" style="animation-delay: {{index * 0.06}}s">
         <view class="prod-image-zone">
           <image class="prod-img" src="{{item.images[0]}}" mode="aspectFill"></image>
-          <!-- 左上角微便签 -->
           <view class="type-badge {{item.type === 'service' ? 'badge-eco' : item.type === 'package' ? 'badge-ai' : 'badge-primary'}}">
             {{item.type === 'service' ? '服务' : item.type === 'package' ? '套餐' : '产品'}}
           </view>
         </view>
 
-        <!-- 内容信息区 -->
         <view class="prod-info-zone">
           <view class="info-top">
             <text class="prod-title">{{item.name}}</text>
             <text class="prod-efficacy" wx:if="{{item.efficacy}}">{{item.efficacy}}</text>
           </view>
-          
+
           <view class="info-bottom">
             <view class="price-wrap">
               <view class="current-price">
@@ -102,10 +78,9 @@
               </view>
               <text class="origin-price" wx:if="{{item.originalPriceYuan && item.originalPriceYuan !== '0.0'}}">¥{{item.originalPriceYuan}}</text>
             </view>
-            <view class="action-btn">＋</view>
+            <view class="action-btn card-press">＋</view>
           </view>
 
-          <!-- 返现条/浮窗 -->
           <view class="cashback-strip" wx:if="{{item.hasCashback}}">
             <text class="cb-icon">🧧</text>
             <text class="cb-text">返 ¥{{item.cashbackAmountYuan}}</text>
@@ -120,7 +95,7 @@
       <text class="tips-txt">已经到底啦</text>
       <text class="line"></text>
     </view>
-    
+
     <!-- 空状态 -->
     <view class="empty-state" wx:if="{{!loading && products.length === 0}}">
       <view class="empty-icon">🍃</view>
@@ -128,4 +103,3 @@
     </view>
   </view>
 </view>
-

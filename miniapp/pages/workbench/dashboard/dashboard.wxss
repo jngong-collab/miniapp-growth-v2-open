@@ -1,3 +1,5 @@
+/* pages/workbench/dashboard/dashboard.wxss */
+
 .dashboard-page {
   min-height: 100vh;
   background: var(--bg-page);
@@ -8,13 +10,13 @@
 .hero-card {
   border-radius: var(--radius-xl);
   padding: var(--spacing-lg);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-lg);
 }
 
 .hero-kicker,
 .hero-subtitle {
   display: block;
-  color: rgba(255, 255, 255, 0.76);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .hero-kicker {
@@ -40,7 +42,7 @@
 .module-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .summary-grid {
@@ -53,6 +55,7 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 
 .summary-value {
@@ -66,7 +69,7 @@
 .module-desc {
   display: block;
   margin-top: var(--spacing-xs);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
   color: var(--color-text-sub);
 }
 
@@ -74,9 +77,23 @@
   margin-top: var(--spacing-xs);
 }
 
+.module-card {
+  transition: transform 0.2s ease;
+}
+
+.module-card:active {
+  transform: scale(0.97);
+}
+
+.module-icon {
+  font-size: 40rpx;
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
 .module-title {
   display: block;
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   color: var(--color-text-title);
   font-weight: 700;
 }

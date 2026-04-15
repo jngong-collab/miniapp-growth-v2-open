@@ -1,0 +1,18 @@
+version: 1
+agent:
+  extend: default
+  name: fission-team
+  system_prompt_path: ./system-prompts/team-lead.md
+  subagents:
+    frontend:
+      path: ./subagents/frontend.yaml
+      description: "小程序前端开发专家（WXML/WXSS/JS/CloudBase）"
+    backend:
+      path: ./subagents/backend.yaml
+      description: "云函数与后端开发专家（Node.js/微信支付/CloudBase）"
+    explorer:
+      path: ./subagents/explorer.yaml
+      description: "快速代码库探索与架构分析"
+    reviewer:
+      path: ./subagents/reviewer.yaml
+      description: "代码审查与质量把关"

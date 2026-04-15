@@ -1,3 +1,5 @@
+/* pages/workbench/orders/orders.wxss */
+
 .workbench-page {
   min-height: 100vh;
   background: var(--bg-page);
@@ -16,16 +18,18 @@
 }
 
 .filter-chip {
-  padding: 14rpx 28rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.72);
+  padding: 12rpx 24rpx;
+  border-radius: var(--radius-capsule);
+  background: var(--bg-card);
   color: var(--color-text-sub);
   font-size: var(--font-sm);
+  border: 1rpx solid var(--color-border);
 }
 
 .filter-chip-active {
   background: var(--color-text-title);
   color: #fff;
+  border-color: var(--color-text-title);
 }
 
 .list-wrap {
@@ -39,6 +43,7 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 
 .card-top,
@@ -50,7 +55,7 @@
 
 .card-title {
   display: block;
-  font-size: var(--font-md);
+  font-size: var(--font-base);
   color: var(--color-text-title);
   font-weight: 700;
 }
@@ -58,44 +63,57 @@
 .card-sub,
 .meta-row,
 .refund-sub {
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
   color: var(--color-text-sub);
 }
 
 .card-sub,
 .meta-row {
   display: block;
-  margin-top: var(--spacing-xs);
+  margin-top: 4rpx;
+}
+
+.meta-highlight {
+  color: var(--color-primary-dark);
+  font-weight: 600;
 }
 
 .tag {
   height: fit-content;
-  padding: 10rpx 16rpx;
+  padding: 6rpx 12rpx;
   background: var(--color-primary-bg);
-  border-radius: 999rpx;
+  border-radius: var(--radius-capsule);
   color: var(--color-primary-dark);
-  font-size: 22rpx;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .refund-box {
   margin-top: var(--spacing-md);
   padding: var(--spacing-md);
   border-radius: var(--radius-md);
-  background: rgba(192, 139, 92, 0.08);
+  background: var(--bg-page);
+  border: 1rpx solid var(--color-border);
 }
 
 .refund-title {
   display: block;
   color: var(--color-text-title);
-  font-size: 26rpx;
+  font-size: var(--font-sm);
   font-weight: 600;
 }
 
 .action-btn {
   margin: var(--spacing-sm) 0 0;
-  border-radius: 999rpx;
+  border-radius: var(--radius-capsule);
   background: var(--color-text-title);
   color: #fff;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  padding: 0 16rpx;
+  height: 48rpx;
+  line-height: 46rpx;
 }
 
 .empty-block {
@@ -103,7 +121,14 @@
   text-align: center;
 }
 
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
 .empty-title {
   color: var(--color-text-sub);
-  font-size: 28rpx;
+  font-size: var(--font-base);
+  font-weight: 600;
 }

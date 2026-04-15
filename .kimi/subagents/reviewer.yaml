@@ -1,0 +1,5 @@
+version: 1
+agent:
+  extend: ../team-agent.yaml
+  name: code-reviewer
+  system_prompt_path: ../system-prompts/reviewer.md

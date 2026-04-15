@@ -1,5 +1,7 @@
+/* pages/workbench/verify/verify.wxss */
+
 .page-workbench-verify {
-  background: #FAF6F1;
+  background: var(--bg-page);
   min-height: 100vh;
   padding: var(--spacing-lg);
 }
@@ -12,14 +14,14 @@
 .verify-title {
   font-size: var(--font-xl);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-title);
   display: block;
   margin-bottom: var(--spacing-xs);
 }
 
 .verify-subtitle {
   font-size: var(--font-sm);
-  color: var(--color-text-light);
+  color: var(--color-text-sub);
 }
 
 .code-input-section {
@@ -29,46 +31,50 @@
 .code-input-wrap {
   display: flex;
   align-items: center;
-  background: var(--color-bg-white);
-  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  border-radius: var(--radius-capsule);
   padding: var(--spacing-xs);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 
 .code-input {
   flex: 1;
-  height: 88rpx;
+  height: 84rpx;
   padding: 0 var(--spacing-md);
   font-size: var(--font-lg);
   font-weight: 600;
   letter-spacing: 8rpx;
-  color: var(--color-text);
+  color: var(--color-text-title);
 }
 
 .code-query-btn {
   flex-shrink: 0;
   padding: 0 var(--spacing-xl);
-  height: 80rpx;
-  line-height: 80rpx;
+  height: 76rpx;
+  line-height: 76rpx;
   border-radius: var(--radius-lg);
-  background: #E8E8E8;
-  color: #999;
+  background: var(--bg-page);
+  color: var(--color-text-muted);
   font-size: var(--font-sm);
   font-weight: 600;
   text-align: center;
+  border: 1rpx solid var(--color-border);
 }
 
 .code-query-btn.active {
   background: var(--color-primary);
   color: #FFFFFF;
+  border-color: var(--color-primary);
 }
 
 .order-info-card {
-  background: var(--color-bg-white);
+  background: var(--bg-card);
   border-radius: var(--radius-xl);
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-md);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 
 .order-info-header {
@@ -83,7 +89,7 @@
 .order-info-title {
   font-size: var(--font-lg);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-title);
 }
 
 .order-type-tag {
@@ -93,8 +99,8 @@
   border-radius: var(--radius-sm);
 }
 
-.tag-service { background: #F6FFED; color: #52C41A; }
-.tag-package { background: #FFF7E6; color: #FA8C16; }
+.tag-service { background: var(--color-eco-bg); color: var(--color-eco-dark); }
+.tag-package { background: var(--color-primary-bg); color: var(--color-primary-dark); }
 
 .service-select-section {
   margin-bottom: var(--spacing-md);
@@ -102,9 +108,10 @@
 
 .service-select-label {
   font-size: var(--font-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-sub);
   display: block;
   margin-bottom: var(--spacing-sm);
+  font-weight: 600;
 }
 
 .service-options {
@@ -118,7 +125,7 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-sm);
-  background: #FAF6F1;
+  background: var(--bg-page);
   border-radius: var(--radius-lg);
   border: 2rpx solid transparent;
 }
@@ -131,12 +138,12 @@
 .service-option-name {
   font-size: var(--font-base);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-title);
 }
 
 .service-option-count {
   font-size: var(--font-sm);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
   font-weight: 600;
 }
 
@@ -157,13 +164,14 @@
 }
 
 .verify-btn-confirm {
-  background: linear-gradient(90deg, #52C41A, #73D13D);
+  background: var(--color-eco);
   color: #FFFFFF;
 }
 
 .verify-btn-cancel {
-  background: #F5F5F5;
-  color: var(--color-text-light);
+  background: var(--bg-page);
+  color: var(--color-text-sub);
+  border: 1rpx solid var(--color-border);
 }
 
 .verify-btn-reset {
@@ -179,30 +187,44 @@
   padding: 60rpx var(--spacing-lg);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
+  border: 1rpx solid var(--color-border);
 }
 
-.result-card.success { background: #F6FFED; }
-.result-card.error { background: #FFF5EB; }
+.result-card.success { background: var(--color-eco-bg); }
+.result-card.error { background: rgba(199,92,92,0.08); }
 
 .result-icon {
-  font-size: 100rpx;
+  font-size: 80rpx;
   margin-bottom: var(--spacing-md);
 }
 
 .result-msg {
   font-size: var(--font-lg);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-text-title);
 }
 
 .loading-mask {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.85);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 100;
   font-size: var(--font-md);
-  color: var(--color-text-light);
+  color: var(--color-text-sub);
+  gap: var(--spacing-md);
 }
+
+.loader-spinner {
+  width: 48rpx;
+  height: 48rpx;
+  border: 4rpx solid rgba(0,0,0,0.05);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -21,17 +21,17 @@
     "pages/workbench/settings/settings"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#F3F7FF",
+    "navigationBarBackgroundColor": "#FAF7F2",
     "navigationBarTitleText": "浴小主",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F3F7FF",
+    "backgroundColor": "#FAF7F2",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#9CA3AF",
-    "selectedColor": "#5E7CE2",
+    "color": "#9C9088",
+    "selectedColor": "#B8916B",
     "backgroundColor": "#FFFFFF",
-    "borderStyle": "black",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/index/index",

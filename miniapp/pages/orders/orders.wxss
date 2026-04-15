@@ -1,3 +1,5 @@
+/* pages/orders/orders.wxss */
+
 .orders-page {
   min-height: 100vh;
   background: var(--bg-page);
@@ -16,17 +18,19 @@
 }
 
 .filter-chip {
-  padding: 14rpx 28rpx;
-  border-radius: 999rpx;
-  background: var(--color-bg-white);
+  padding: 12rpx 24rpx;
+  border-radius: var(--radius-capsule);
+  background: var(--bg-card);
   color: var(--color-text-sub);
   font-size: var(--font-sm);
+  border: 1rpx solid var(--color-border);
+  font-weight: 500;
 }
 
 .filter-chip-active {
-  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+  background: var(--color-text-title);
   color: #fff;
-  box-shadow: var(--shadow-float);
+  border-color: var(--color-text-title);
 }
 
 .order-list {
@@ -36,10 +40,10 @@
 }
 
 .order-card {
-  background: linear-gradient(165deg, var(--bg-card) 0%, #FFFFFF 84%, var(--color-bg-white) 100%);
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   border: 1rpx solid var(--color-border);
 }
 
@@ -53,12 +57,15 @@
 
 .card-head {
   align-items: flex-start;
+  margin-bottom: var(--spacing-xs);
 }
 
 .card-meta {
   margin-top: var(--spacing-sm);
   color: var(--color-text-sub);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1rpx solid var(--color-border);
 }
 
 .card-bottom {
@@ -68,26 +75,26 @@
 
 .order-title {
   display: block;
-  font-size: var(--font-md);
+  font-size: var(--font-base);
   color: var(--color-text-title);
   font-weight: 700;
 }
 
 .order-no {
   display: block;
-  margin-top: var(--spacing-xs);
+  margin-top: 4rpx;
   color: var(--color-text-muted);
   font-size: var(--font-xs);
 }
 
 .status-tag {
-  padding: 10rpx 18rpx;
-  border-radius: 999rpx;
+  padding: 6rpx 14rpx;
+  border-radius: var(--radius-capsule);
   background: var(--color-primary-bg);
   color: var(--color-primary-dark);
   font-size: var(--font-xs);
   font-weight: 600;
-  border: 1rpx solid var(--color-primary-bg);
+  flex-shrink: 0;
 }
 
 .price-box {
@@ -98,7 +105,7 @@
 
 .price-label {
   color: var(--color-text-sub);
-  font-size: var(--font-sm);
+  font-size: var(--font-xs);
 }
 
 .price-value {
@@ -109,11 +116,15 @@
 
 .ghost-btn {
   margin: 0;
-  border-radius: 999rpx;
-  border: 1rpx solid var(--color-primary-bg);
-  background: linear-gradient(180deg, var(--bg-card) 0%, #FFFFFF 100%);
-  color: var(--color-primary-dark);
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-capsule);
+  border: 1rpx solid var(--color-border);
+  background: var(--bg-page);
+  color: var(--color-text-main);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  padding: 0 20rpx;
+  height: 52rpx;
+  line-height: 50rpx;
 }
 
 .empty-block {
@@ -122,15 +133,22 @@
   color: var(--color-text-sub);
 }
 
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
 .empty-title {
   display: block;
-  font-size: var(--font-md);
+  font-size: var(--font-base);
   color: var(--color-text-title);
   font-weight: 700;
+  margin-bottom: var(--spacing-xs);
 }
 
 .empty-desc {
   display: block;
-  margin-top: var(--spacing-sm);
   font-size: var(--font-sm);
+  color: var(--color-text-sub);
 }

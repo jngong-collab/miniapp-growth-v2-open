@@ -2,6 +2,5 @@
     "usingComponents": {},
     "navigationBarTitleText": "AI 看舌象",
     "navigationBarBackgroundColor": "#FAF6F1",
-    "navigationBarTextStyle": "black",
-    "enableShareAppMessage": true
+    "navigationBarTextStyle": "black"
 }

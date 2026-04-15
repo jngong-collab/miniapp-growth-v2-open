@@ -1,19 +1,18 @@
-<!--pages/product-detail/product-detail.wxml — V2 沉浸式设计-->
+<!--pages/product-detail/product-detail.wxml-->
 <view class="page-detail">
 
-  <!-- 背景装饰 -->
   <view class="bg-deco deco-1"></view>
   <view class="bg-deco deco-2"></view>
 
   <!-- 加载状态 -->
   <view class="loader-wrap" wx:if="{{loading}}">
     <view class="loader-spinner"></view>
-    <text class="loader-text">加载中...</text>
+    <text class="loader-text">加载中…</text>
   </view>
 
   <block wx:if="{{!loading && product}}">
 
-    <!-- ========== 1. 商品图片 Hero ========== -->
+    <!-- 商品图片 Hero -->
     <view class="hero-gallery animate-fade-up">
       <swiper class="gallery-swiper"
               indicator-dots="{{product.images.length > 1}}"
@@ -32,7 +31,7 @@
       </swiper>
     </view>
 
-    <!-- ========== 2. 价格信息卡片 ========== -->
+    <!-- 价格信息卡片 -->
     <view class="content-wrap">
       <view class="price-card card-float animate-fade-up" style="animation-delay:.06s">
         <view class="price-main-row">
@@ -48,41 +47,40 @@
         </view>
       </view>
 
-      <!-- ========== 3. 产品名称 & 描述 ========== -->
+      <!-- 产品名称 & 描述 -->
       <view class="info-card card-float animate-fade-up" style="animation-delay:.12s">
         <view class="info-header">
           <view class="type-badge type-{{product.type}}">
-            {{product.type === 'physical' ? '产品' : product.type === 'service' ? '服务' : '套餐'}}
+            {{product.type === 'physical' ? '甄选产品' : product.type === 'service' ? '推拿服务' : '调理套餐'}}
           </view>
           <text class="product-name">{{product.name}}</text>
         </view>
         <text class="product-desc" wx:if="{{product.description}}">{{product.description}}</text>
 
-        <!-- 功效标签 -->
         <view class="efficacy-strip" wx:if="{{product.efficacy}}">
           <text class="efficacy-icon">✨</text>
           <text class="efficacy-text">{{product.efficacy}}</text>
         </view>
       </view>
 
-      <!-- ========== 4. 裂变活动 ========== -->
-      <view class="fission-card card-float animate-fade-up" style="animation-delay:.18s"
+      <!-- 裂变活动 -->
+      <view class="fission-card card-float animate-fade-up card-press" style="animation-delay:.18s"
             wx:if="{{campaign}}" bindtap="goToFissionDetail">
         <view class="fission-left">
           <view class="fission-title-row">
-            <text class="fission-fire">🔥</text>
+            <text class="fission-icon">🔥</text>
             <text class="fission-title">裂变返现活动</text>
           </view>
-          <text class="fission-desc">购买此商品，分享给好友，好友购买后返现</text>
+          <text class="fission-desc">购买后分享给好友，好友购买即返现</text>
         </view>
         <view class="fission-right">
           <text class="fission-amount">+¥{{campaign.cashbackAmountYuan}}</text>
           <text class="fission-label">返现</text>
         </view>
-        <view class="fission-arrow">›</view>
+        <text class="fission-arrow">›</text>
       </view>
 
-      <!-- ========== 5. 套餐明细 ========== -->
+      <!-- 套餐明细 -->
       <view class="package-card card-float animate-fade-up" style="animation-delay:.24s"
             wx:if="{{product.type === 'package' && packageItems}}">
         <view class="package-header">
@@ -98,7 +96,7 @@
         <text class="package-valid">有效期：购买后 {{packageValidDays}} 天内使用</text>
       </view>
 
-      <!-- ========== 6. 服务保障 ========== -->
+      <!-- 服务保障 -->
       <view class="service-card card-float animate-fade-up" style="animation-delay:.30s">
         <view class="service-row">
           <view class="service-item">
@@ -119,24 +117,24 @@
 
   </block>
 
-  <!-- ========== 底部操作栏 ========== -->
+  <!-- 底部操作栏 -->
   <view class="bottom-bar animate-fade-up" style="animation-delay:.36s" wx:if="{{!loading && product}}">
     <view class="bar-actions">
-      <view class="bar-action-item" bindtap="onShare">
+      <button class="bar-action-item share-action card-press" open-type="share">
         <text class="bar-action-icon">📤</text>
         <text class="bar-action-text">分享</text>
-      </view>
-      <view class="bar-action-item" bindtap="goToMall">
+      </button>
+      <view class="bar-action-item card-press" bindtap="goToMall">
         <text class="bar-action-icon">🏪</text>
         <text class="bar-action-text">商城</text>
       </view>
     </view>
-    <view class="bar-buy-btn" bindtap="onBuy">
-      {{campaign ? '🔥 ¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
+    <view class="bar-buy-btn card-press" bindtap="onBuy">
+      {{campaign ? '¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
     </view>
   </view>
 
-  <!-- ========== 购买确认弹窗 ========== -->
+  <!-- 购买确认弹窗 -->
   <view class="modal-mask" wx:if="{{showBuyModal}}" bindtap="closeBuyModal">
     <view class="modal-sheet" catchtap="noop">
       <view class="modal-handle"></view>
@@ -173,7 +171,7 @@
         </view>
       </view>
 
-      <view class="modal-confirm-btn" bindtap="confirmBuy">确认购买</view>
+      <view class="modal-confirm-btn card-press" bindtap="confirmBuy">确认购买</view>
     </view>
   </view>
 

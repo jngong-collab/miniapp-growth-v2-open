@@ -13,7 +13,7 @@
              value="{{verifyCode}}"
              bindinput="onCodeInput"
              focus="{{!orderItem}}" />
-      <view class="code-query-btn {{verifyCode.length >= 6 ? 'active' : ''}}" bindtap="queryCode">
+      <view class="code-query-btn {{verifyCode.length >= 6 ? 'active' : ''}} card-press" bindtap="queryCode">
         查询
       </view>
     </view>
@@ -23,14 +23,14 @@
     <view class="order-info-header">
       <text class="order-info-title">{{orderItem.productName}}</text>
       <view class="order-type-tag tag-{{orderItem.productType}}">
-        {{orderItem.productType === 'service' ? '单次服务' : '套餐'}}
+        {{orderItem.productType === 'service' ? '单次服务' : '调理套餐'}}
       </view>
     </view>
 
     <view class="service-select-section" wx:if="{{serviceList.length > 0}}">
-      <text class="service-select-label">选择核销服务项：</text>
+      <text class="service-select-label">选择核销服务项</text>
       <view class="service-options">
-        <view class="service-option {{serviceName === item.name ? 'selected' : ''}}"
+        <view class="service-option {{serviceName === item.name ? 'selected' : ''}} card-press"
               wx:for="{{serviceList}}"
               wx:key="name"
               bindtap="selectService"
@@ -42,10 +42,10 @@
     </view>
 
     <view class="verify-action-section">
-      <view class="verify-btn verify-btn-confirm" bindtap="doVerify">
+      <view class="verify-btn verify-btn-confirm card-press" bindtap="doVerify">
         确认核销
       </view>
-      <view class="verify-btn verify-btn-cancel" bindtap="resetForm">
+      <view class="verify-btn verify-btn-cancel card-press" bindtap="resetForm">
         重新输入
       </view>
     </view>
@@ -54,10 +54,11 @@
   <view class="result-card {{result.success ? 'success' : 'error'}}" wx:if="{{result}}">
     <text class="result-icon">{{result.success ? '✅' : '❌'}}</text>
     <text class="result-msg">{{result.msg}}</text>
-    <view class="verify-btn verify-btn-reset" bindtap="resetForm" wx:if="{{result.success}}">继续核销</view>
+    <view class="verify-btn verify-btn-reset card-press" bindtap="resetForm" wx:if="{{result.success}}">继续核销</view>
   </view>
 
   <view class="loading-mask" wx:if="{{loading}}">
-    <text>处理中...</text>
+    <view class="loader-spinner"></view>
+    <text>处理中…</text>
   </view>
 </view>

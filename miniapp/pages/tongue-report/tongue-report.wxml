@@ -1,25 +1,23 @@
-<!--pages/tongue-report/tongue-report.wxml — V3 统一首页风格-->
+<!--pages/tongue-report/tongue-report.wxml-->
 <view class="page-report">
-  <!-- 背景装饰（与首页一致） -->
   <view class="bg-deco deco-1"></view>
   <view class="bg-deco deco-2"></view>
 
   <!-- 加载状态 -->
   <view class="loader-wrap" wx:if="{{loading}}">
     <view class="loader-spinner"></view>
-    <text class="loader-text">正在加载报告...</text>
+    <text class="loader-text">正在加载报告…</text>
   </view>
 
   <block wx:if="{{!loading && mode === 'report' && report}}">
     <view class="report-content">
 
-      <!-- ========== 1. 顶部信息区 ========== -->
+      <!-- 顶部信息区 -->
       <view class="hero-section animate-fade-up">
         <view class="hero-greeting">
-          <text class="hero-title">🔮 舌象分析报告</text>
+          <text class="hero-title">舌象分析报告</text>
           <text class="hero-date">{{createdAtStr}}</text>
         </view>
-        <!-- 舌象照片 + 结论 -->
         <view class="hero-card card-float">
           <view class="hero-top">
             <view class="hero-photo-wrap">
@@ -36,10 +34,10 @@
         </view>
       </view>
 
-      <!-- ========== 2. 四维舌象特征 ========== -->
+      <!-- 四维舌象特征 -->
       <view class="section animate-fade-up" style="animation-delay:.08s">
         <view class="section-header">
-          <text class="section-title">👅 舌象特征</text>
+          <text class="section-title">舌象特征</text>
           <text class="section-subtitle">Tongue Features</text>
         </view>
         <view class="feat-grid">
@@ -54,7 +52,7 @@
             <text class="feat-value">{{report.result.tongueCoating || report.result.features.coating || '正常'}}</text>
           </view>
           <view class="feat-card card-float">
-            <view class="feat-dot" style="background:#9D50BB"></view>
+            <view class="feat-dot" style="background:var(--color-accent)"></view>
             <text class="feat-label">舌形</text>
             <text class="feat-value">{{report.result.tongueShape || report.result.features.shape || '正常'}}</text>
           </view>
@@ -66,10 +64,10 @@
         </view>
       </view>
 
-      <!-- ========== 3. 分析详情 ========== -->
-      <view class="section animate-fade-up" style="animation-delay:.16s" wx:if="{{report.result.analysis_details}}">
+      <!-- 分析详情 -->
+      <view class="section animate-fade-up" style="animation-delay:.14s" wx:if="{{report.result.analysis_details}}">
         <view class="section-header">
-          <text class="section-title">🔬 分析详情</text>
+          <text class="section-title">分析详情</text>
           <text class="section-subtitle">Analysis</text>
         </view>
         <view class="analysis-card">
@@ -78,23 +76,21 @@
         </view>
       </view>
 
-      <!-- ========== 4. 产品推荐 ========== -->
-      <view class="section animate-fade-up" style="animation-delay:.24s" wx:if="{{recommendGroups.length > 0}}">
+      <!-- 产品推荐 -->
+      <view class="section animate-fade-up" style="animation-delay:.20s" wx:if="{{recommendGroups.length > 0}}">
         <view class="section-header">
-          <text class="section-title">🔥 为您甄选</text>
+          <text class="section-title">为您甄选</text>
           <text class="section-subtitle">Personalized Picks</text>
         </view>
         <text class="rx-intro">根据您的体质分析，AI 为您精准匹配以下调理方案</text>
 
-        <!-- 产品卡片列表 -->
         <view class="rx-product-list">
           <block wx:for="{{recommendGroups}}" wx:key="category">
-            <view class="rx-product-card animate-fade-up"
+            <view class="rx-product-card animate-fade-up card-press"
                   wx:for="{{item.items}}" wx:for-item="prod" wx:key="product_name"
-                  style="animation-delay:{{0.28 + index * 0.06}}s"
+                  style="animation-delay:{{0.24 + index * 0.04}}s"
                   bindtap="goToProduct" data-id="{{prod.productId}}">
 
-              <!-- 顶部：产品图 + 推荐理由 -->
               <view class="rx-card-visual">
                 <view class="rx-card-img-wrap">
                   <image class="rx-card-img" src="{{prod.image}}" mode="aspectFit" wx:if="{{prod.image}}"></image>
@@ -107,9 +103,7 @@
                 </view>
               </view>
 
-              <!-- 下方信息区 -->
               <view class="rx-card-bottom">
-                <!-- 第一行：产品名(左) + 体质匹配标签(右) -->
                 <view class="rx-card-name-row">
                   <text class="rx-card-name">{{prod.product_name}}</text>
                   <view class="rx-match-badge">
@@ -117,7 +111,6 @@
                     <text class="rx-match-text">体质匹配</text>
                   </view>
                 </view>
-                <!-- 第二行：价格(左) + 了解详情(右) -->
                 <view class="rx-card-footer">
                   <view class="rx-card-price-group">
                     <text class="rx-card-price-symbol">¥</text>
@@ -136,10 +129,10 @@
       </view>
 
 
-      <!-- ========== 5. 调理建议（兼容） ========== -->
-      <view class="section animate-fade-up" style="animation-delay:.32s" wx:if="{{report.result.suggestions.length > 0}}">
+      <!-- 调理建议 -->
+      <view class="section animate-fade-up" style="animation-delay:.28s" wx:if="{{report.result.suggestions.length > 0}}">
         <view class="section-header">
-          <text class="section-title">💡 调理建议</text>
+          <text class="section-title">调理建议</text>
           <text class="section-subtitle">Suggestions</text>
         </view>
         <view class="tip-list">
@@ -150,39 +143,39 @@
         </view>
       </view>
 
-      <!-- ========== 免责声明 ========== -->
-      <view class="disclaimer animate-fade-up" style="animation-delay:.38s">
+      <!-- 免责声明 -->
+      <view class="disclaimer animate-fade-up" style="animation-delay:.32s">
         <text>本报告由 AI 辅助分析，仅供参考，不作为医疗诊断依据。如有不适请及时就医。</text>
       </view>
 
     </view>
   </block>
 
-  <!-- ========== 底部操作栏 ========== -->
-  <view class="bottom-bar animate-fade-up" style="animation-delay:.42s" wx:if="{{!loading && mode === 'report' && report}}">
-    <view class="btn-retry" bindtap="goAnalyzeAgain">
-      <text>🔄 重新分析</text>
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar animate-fade-up" style="animation-delay:.36s" wx:if="{{!loading && mode === 'report' && report}}">
+    <view class="btn-retry card-press" bindtap="goAnalyzeAgain">
+      <text>重新分析</text>
     </view>
-    <button class="btn-share" open-type="share">
-      <text>📤 分享给好友</text>
+    <button class="btn-share card-press" open-type="share">
+      <text>分享给好友</text>
     </button>
   </view>
 
-  <!-- ========== 历史列表 ========== -->
+  <!-- 历史列表 -->
   <block wx:if="{{!loading && mode === 'history'}}">
     <view class="report-content">
       <view class="section-header animate-fade-up" style="margin-top:40rpx">
-        <text class="section-title">📋 分析记录</text>
+        <text class="section-title">分析记录</text>
         <text class="section-subtitle">History</text>
       </view>
       <view class="hist-list">
-        <view class="hist-item card-float animate-fade-up" wx:for="{{historyList}}" wx:key="_id" bindtap="viewHistoryReport" data-id="{{item._id}}" style="animation-delay:{{index*0.06}}s">
+        <view class="hist-item card-float card-press animate-fade-up" wx:for="{{historyList}}" wx:key="_id" bindtap="viewHistoryReport" data-id="{{item._id}}" style="animation-delay:{{index*0.05}}s">
           <image class="hist-img" src="{{item.imageFileId}}" mode="aspectFill"></image>
           <view class="hist-info">
             <text class="hist-name">舌象分析报告</text>
             <text class="hist-date">{{item.createdAtStr}}</text>
           </view>
-          <view class="hist-arrow">›</view>
+          <text class="hist-arrow">›</text>
         </view>
         <view class="hist-empty" wx:if="{{historyList.length === 0}}">
           <text>暂无分析记录</text>

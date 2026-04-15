@@ -1,3 +1,4 @@
+<!--pages/orders/orders.wxml-->
 <view class="orders-page">
   <scroll-view class="filter-scroll" scroll-x="true" show-scrollbar="false">
     <view class="filter-row">
@@ -14,12 +15,13 @@
   </scroll-view>
 
   <view class="empty-block" wx:if="{{!loading && !orders.length}}">
+    <text class="empty-icon">🍃</text>
     <text class="empty-title">还没有符合条件的订单</text>
     <text class="empty-desc">参与活动、购买体验项目后会显示在这里</text>
   </view>
 
   <view class="order-list" wx:else>
-    <view class="order-card" wx:for="{{orders}}" wx:key="_id">
+    <view class="order-card animate-fade-up" wx:for="{{orders}}" wx:key="_id" style="animation-delay: {{index * 0.05}}s">
       <view class="card-head">
         <view>
           <text class="order-title">{{item.productName || '门店订单'}}</text>
@@ -48,4 +50,6 @@
       </view>
     </view>
   </view>
+
+  <view class="safe-bottom"></view>
 </view>

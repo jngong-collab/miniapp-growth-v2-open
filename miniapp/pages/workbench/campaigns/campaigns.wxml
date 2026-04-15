@@ -3,19 +3,31 @@
     <text class="section-title">裂变活动</text>
     <text class="section-subtitle">FISSION</text>
   </view>
-  <view class="list-card" wx:for="{{fissionCampaigns}}" wx:key="_id">
-    <text class="list-title">{{item.productName}}</text>
+  <view class="list-card animate-fade-up" wx:for="{{fissionCampaigns}}" wx:key="_id" style="animation-delay:{{index*0.04}}s">
+    <view class="list-top">
+      <text class="list-title">{{item.productName}}</text>
+      <text class="list-tag tag-primary">裂变</text>
+    </view>
     <text class="list-desc">活动价 ¥{{item.activityPriceYuan}} · 已售 {{item.soldCount || 0}}</text>
     <text class="list-desc">{{item.periodText}}</text>
   </view>
 
-  <view class="section-header">
+  <view class="section-header" style="margin-top:var(--spacing-md)">
     <text class="section-title">抽奖活动</text>
     <text class="section-subtitle">LOTTERY</text>
   </view>
-  <view class="list-card" wx:for="{{lotteryCampaigns}}" wx:key="_id">
-    <text class="list-title">{{item.name}}</text>
+  <view class="list-card animate-fade-up" wx:for="{{lotteryCampaigns}}" wx:key="_id" style="animation-delay:{{index*0.04}}s">
+    <view class="list-top">
+      <text class="list-title">{{item.name}}</text>
+      <text class="list-tag tag-ai">抽奖</text>
+    </view>
     <text class="list-desc">{{item.periodText}}</text>
     <text class="list-desc">参与 {{item.entryCount || 0}} · 中奖 {{item.winCount || 0}}</text>
   </view>
+
+  <view class="empty-block" wx:if="{{!fissionCampaigns.length && !lotteryCampaigns.length}}">
+    <text class="empty-title">暂无活动数据</text>
+  </view>
+
+  <view class="safe-bottom"></view>
 </view>

@@ -1,9 +1,12 @@
 // pages/mall/mall.js
 const { callCloud } = require('../../utils/cloud-api')
 
+const MALL_CATEGORIES = ['五行泡浴', '百草元气灸', '靶向敷贴', '精油系列', '超值套餐']
+
 Page({
     data: {
-        activeTab: 'all',
+        categories: MALL_CATEGORIES,
+        activeTab: MALL_CATEGORIES[0],
         keyword: '',
         products: [],
         campaignMap: {},  // productId -> campaign 映射
@@ -15,6 +18,7 @@ Page({
     },
 
     onLoad: function () {
+        this._productsRequestSeq = 0
         this._loadData()
     },
 
@@ -27,19 +31,16 @@ Page({
     switchTab: function (e) {
         const tab = e.currentTarget.dataset.tab
         if (tab === this.data.activeTab) return
-        this.setData({ activeTab: tab, products: [], page: 1, hasMore: false })
+        this.setData({ activeTab: tab, page: 1, hasMore: false })
         this._loadProducts(true)
     },
 
     // 搜索
     onSearch: function (e) {
         const keyword = e.detail.value || ''
-        this.setData({ keyword, products: [], page: 1 })
+        this.setData({ keyword, page: 1 })
         if (this._searchTimer) clearTimeout(this._searchTimer)
-        // 至少输入 2 个字符才触发搜索，空字符显示全部
-        if (keyword.length === 0 || keyword.length >= 2) {
-            this._searchTimer = setTimeout(() => this._loadProducts(true), 400)
-        }
+        this._searchTimer = setTimeout(() => this._loadProducts(true), 400)
     },
 
     // 加载所有数据
@@ -99,17 +100,23 @@ Page({
 
     // 加载商品列表
     _loadProducts: async function (reset = false) {
-        if (this.data.loading) return
+        if (this.data.loading && !reset) return
+        const requestId = ++this._productsRequestSeq
         const page = reset ? 1 : this.data.page
+        const category = this.data.activeTab
+        const trimmedKeyword = (this.data.keyword || '').trim()
+        const effectiveKeyword = trimmedKeyword.length >= 2 ? trimmedKeyword : ''
+
         this.setData({ loading: true })
         try {
             const data = await callCloud('contentApi', {
                 action: 'getMallContent',
-                type: this.data.activeTab,
+                category,
                 page,
                 pageSize: this.data.pageSize,
-                keyword: this.data.keyword
+                keyword: effectiveKeyword
             })
+            if (requestId !== this._productsRequestSeq) return
             if (data) {
                 const campaignMap = this.data.campaignMap
                 const mergedCampaignMap = { ...campaignMap }
@@ -132,7 +139,7 @@ Page({
                         cashbackAmountYuan: campaign ? campaign.cashbackAmountYuan : ''
                     }
                 })
-                const products = reset ? newProducts : [...this.data.products, ...newProducts]
+                const products = reset ? newProducts : this.data.products.concat(newProducts)
                 this.setData({
                     campaignMap: mergedCampaignMap,
                     products,
@@ -143,12 +150,15 @@ Page({
         } catch (e) {
             wx.showToast({ title: '加载失败', icon: 'none' })
         } finally {
-            this.setData({ loading: false })
+            if (requestId === this._productsRequestSeq) {
+                this.setData({ loading: false })
+            }
         }
     },
 
     // 加载更多
     loadMore: function () {
+        if (this.data.loading || !this.data.hasMore) return
         this._loadProducts(false)
     },
 

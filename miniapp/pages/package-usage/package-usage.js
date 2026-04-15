@@ -16,6 +16,10 @@ Page({
     onLoad: function () { /* 首次由 onShow 触发 */ },
     onShow: function () { this._loadPackages() },
 
+    _findPackageById: function (packageId) {
+        return (this.data.packages || []).find(item => item._id === packageId) || null
+    },
+
     _loadPackages: async function () {
         this.setData({ loading: true })
         try {
@@ -44,14 +48,16 @@ Page({
     },
 
     selectPackage: function (e) {
-        const item = e.currentTarget.dataset.item
+        const item = this._findPackageById(e.currentTarget.dataset.id)
+        if (!item) return
         this.setData({ selectedPackage: item, activeTab: 'qr' })
         // 延迟绘制二维码
         setTimeout(() => this._drawQrCode(item.verifyCode), 100)
     },
 
     showQrCode: function (e) {
-        const item = e.currentTarget.dataset.item
+        const item = this._findPackageById(e.currentTarget.dataset.id)
+        if (!item) return
         this.setData({ selectedPackage: item, activeTab: 'qr' })
         setTimeout(() => this._drawQrCode(item.verifyCode), 100)
     },
@@ -122,6 +128,7 @@ Page({
     },
 
     selectService: function (e) {
+        if (Number(e.currentTarget.dataset.remaining) <= 0) return
         const serviceName = e.currentTarget.dataset.name
         this.setData({ selectedService: serviceName, showServicePicker: false })
         wx.showToast({ title: `已选择：${serviceName}`, icon: 'none' })
