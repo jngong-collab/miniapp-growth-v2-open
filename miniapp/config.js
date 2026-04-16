@@ -23,7 +23,9 @@ module.exports = {
      * 在微信开发者工具中创建云开发环境后获取
      * 格式一般为：xxx-yyy 或 cloud1-xxxxxxxx
      */
-    cloudEnv: 'yuxiaozhu111-4ga6qic990d1eb4e',
+    // 部署到生产环境前在此处填写门店自己的 CloudBase 环境 ID。
+    // 不要在仓库中提交真实环境 ID。
+    cloudEnv: 'your-production-env-id',
 
     // ============================================================
     // 📱 应用配置

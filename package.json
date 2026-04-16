@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "deploy:cloud": "tcb fn deploy",
+    "deploy:cloud:ordered": "bash ./scripts/deploy-cloudfunctions.sh"
+  },
   "dependencies": {
     "word-extractor": "^1.0.4"
   }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
-  "envId": "yuxiaozhu111-4ga6qic990d1eb4e",
-  "appid": "wxba6e3fac1e1d285d",
+  "envId": "your-production-env-id",
+  "appid": "your-miniapp-appid",
   "miniprogramRoot": "miniapp/",
   "cloudfunctionRoot": "miniapp/cloudfunctions/",
   "functionRoot": "miniapp/cloudfunctions/",
@@ -9,6 +9,47 @@
     {
       "name": "adminApi",
       "timeout": 20,
+      "memorySize": 512,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "envVariables": {}
+    },
+    {
+      "name": "contentApi",
+      "timeout": 20,
+      "memorySize": 256,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "envVariables": {}
+    },
+    {
+      "name": "growthApi",
+      "timeout": 60,
+      "memorySize": 512,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "envVariables": {}
+    },
+    {
+      "name": "commerceApi",
+      "timeout": 20,
+      "memorySize": 256,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "envVariables": {}
+    },
+    {
+      "name": "opsApi",
+      "timeout": 20,
+      "memorySize": 256,
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "envVariables": {}
+    },
+    {
+      "name": "payApi",
+      "timeout": 30,
+      "memorySize": 512,
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "envVariables": {}
