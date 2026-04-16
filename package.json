@@ -1,9 +1,12 @@
 {
   "scripts": {
+    "db:init": "node scripts/init-db.js",
     "deploy:cloud": "tcb fn deploy",
     "deploy:cloud:ordered": "bash ./scripts/deploy-cloudfunctions.sh"
   },
   "dependencies": {
+    "@cloudbase/manager-node": "^5.1.1",
+    "@cloudbase/node-sdk": "^3.18.1",
     "word-extractor": "^1.0.4"
   }
 }
