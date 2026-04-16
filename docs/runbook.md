@@ -80,6 +80,33 @@ VITE_CLOUDBASE_REGION=ap-shanghai
 VITE_CLOUDBASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
+### 微信支付生产配置
+
+生产环境中，支付敏感信息必须和普通业务配置分层管理：
+
+- `pay_config` 集合：
+  - `storeId`
+  - `mchId`
+  - `notifyUrl`
+  - `enabled`
+- `payApi` 云函数环境变量：
+  - `API_V3_KEY`
+  - `CERT_SERIAL_NO`
+  - `PRIVATE_KEY`
+  - `PAY_CALLBACK_SECRET`
+
+核心要求：
+
+- `MCH_ID` 可按门店写入 `pay_config.mchId`，便于后台读取与门店隔离。
+- `API_V3_KEY`、`CERT_SERIAL_NO`、`PRIVATE_KEY` 不得写入仓库、前端环境变量或普通集合文档。
+- `PRIVATE_KEY` / `apiclient_key.pem` 是退款和分账签名的关键材料，必须只存在于服务端受控环境。
+
+支付架构告警：
+
+- 多门店独立收款不要走单商户二清代收模式。
+- 若门店主体独立，应优先采用微信支付服务商模式。
+- 若是直营体系统一主体，应评估并启用官方分账接口，而不是在仓库外做非官方二清。
+
 ## 4. 数据与初始化准备
 
 ### 基础集合
@@ -150,6 +177,7 @@ VITE_CLOUDBASE_PUBLISHABLE_KEY=your-publishable-key
 
 - 运行时版本与依赖安装正常
 - 环境变量齐全
+- `payApi` 已注入真实商户凭证：`API_V3_KEY`、`CERT_SERIAL_NO`、`PRIVATE_KEY`
 - 支付回调密钥显式配置，禁止依赖默认值
 - `tmpDbFix` 在生产环境保持禁用，除非受控运维场景临时开启
 
@@ -237,7 +265,7 @@ npm run build
 
 - 目标门店的 `cloudEnv`、`appid`、Web 环境变量全部确认无误
 - 所有核心云函数已部署到正确环境
-- 支付商户号、证书、回调地址、回调密钥联调通过
+- 支付商户号、API v3 密钥、证书序列号、私钥、回调地址、回调密钥联调通过
 - `admin_accounts` 已准备首个可登录账号，且绑定正确 `storeId`
 - 数据库中的门店、商品、套餐、支付配置、AI 配置、角色模板已初始化
 
@@ -246,6 +274,7 @@ npm run build
 - 小程序真机链路验收完成
 - 网页后台登录和关键操作验收完成
 - 裂变、退款、核销、权限隔离已做一轮门店场景验证
+- 真实微信账号已完成一笔小额支付与一笔真实退款验证
 - 文档与当前版本一致，不再依赖旧的初始化部署描述
 
 ### P2
@@ -272,7 +301,7 @@ npm run build
 node --test tests/*.test.js
 ```
 
-结果：`108/108` 通过。
+结果：`111/111` 通过。
 
 解释：
 
