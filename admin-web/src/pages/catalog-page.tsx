@@ -3,6 +3,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Card, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd'
 import { adminApi } from '../lib/admin-api'
 
+function formatListText(value: unknown) {
+  if (!Array.isArray(value)) return ''
+  return value
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
+function parseListText(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(item => String(item || '').trim()).filter(Boolean)
+  }
+  return String(value || '')
+    .split(/[\n,，]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
 export function CatalogPage() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
@@ -93,8 +111,8 @@ export function CatalogPage() {
                             onClick={() => {
                               productForm.setFieldsValue({
                                 ...record,
-                                tags: (record.tags || []).join('\n'),
-                                images: (record.images || []).join('\n')
+                                tags: formatListText(record.tags),
+                                images: formatListText(record.images)
                               })
                               setProductModalOpen(true)
                             }}
@@ -164,7 +182,14 @@ export function CatalogPage() {
         <Form
           form={productForm}
           layout="vertical"
-          onFinish={values => saveProductMutation.mutate(values)}
+          onFinish={values => {
+            const payload = {
+              ...values,
+              tags: parseListText(values.tags),
+              images: parseListText(values.images)
+            }
+            saveProductMutation.mutate(payload)
+          }}
         >
           <Form.Item name="_id" hidden><Input /></Form.Item>
           <Form.Item name="name" label="商品名称" rules={[{ required: true }]}>

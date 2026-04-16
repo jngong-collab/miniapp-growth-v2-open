@@ -23,6 +23,16 @@ function buildDisplayPrizes(prizes = []) {
     return display
 }
 
+function resolveWinningIndex(displayPrizes, prize) {
+    if (!Array.isArray(displayPrizes) || !prize) return 0
+    const prizeId = prize.id ?? prize.prizeId ?? ''
+    let matchIndex = prizeId ? displayPrizes.findIndex(item => item.id === prizeId) : -1
+    if (matchIndex < 0 && prize.name) {
+        matchIndex = displayPrizes.findIndex(item => item.name === prize.name)
+    }
+    return matchIndex >= 0 ? matchIndex : 0
+}
+
 Page({
     data: {
         campaign: null,
@@ -82,9 +92,10 @@ Page({
             const data = await callCloud('growthApi', { action: 'drawLottery' })
             const prize = data.prize
             const seq = this._getSequence()
-            const displayIndex = this.data.prizes.findIndex(item => item.id === prize.id)
-            const targetPos = Math.max(0, seq.indexOf(displayIndex))
-            const totalSteps = seq.length * 3 + targetPos + Math.floor(Math.random() * 8)
+            const displayIndex = resolveWinningIndex(this.data.prizes, prize)
+            const targetPos = displayIndex >= 0 ? seq.indexOf(displayIndex) : -1
+            const safeTargetPos = targetPos >= 0 ? targetPos : 0
+            const totalSteps = seq.length * 3 + safeTargetPos + Math.floor(Math.random() * 8)
             this._spin(0, totalSteps, seq, displayIndex, 50, prize, data.remainChances)
         } catch (error) {
             this.setData({ isRunning: false })

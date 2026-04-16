@@ -19,7 +19,7 @@ function normalizePositiveInteger(value, fallback = 1) {
 }
 
 function normalizeStockValue(value) {
-    if (value === -1) return -1
+    if (Number(value) === -1 || String(value) === '-1') return -1
     const nextValue = Number.parseInt(value, 10)
     if (!Number.isFinite(nextValue)) return 9999
     if (nextValue <= 0) return 0

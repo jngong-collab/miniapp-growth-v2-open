@@ -3,6 +3,47 @@ const config = require('./config')
 const { callCloud } = require('./utils/cloud-api')
 
 App({
+  _buildCustomerAccess() {
+    return {
+      role: 'customer',
+      permissions: [],
+      storeId: '',
+      storeName: '',
+      staffName: ''
+    }
+  },
+
+  _snapshotSessionState() {
+    return {
+      openid: this.globalData.openid,
+      userInfo: this.globalData.userInfo || {},
+      workbenchAccess: this.globalData.workbenchAccess || this._buildCustomerAccess()
+    }
+  },
+
+  _applyWorkbenchAccess(access) {
+    const nextAccess = access || this._buildCustomerAccess()
+    this.globalData.role = nextAccess.role || 'customer'
+    this.globalData.permissions = Array.isArray(nextAccess.permissions) ? nextAccess.permissions : []
+    this.globalData.workbenchAccess = {
+      ...this._buildCustomerAccess(),
+      ...nextAccess,
+      permissions: Array.isArray(nextAccess.permissions) ? nextAccess.permissions : []
+    }
+    return this.globalData.workbenchAccess
+  },
+
+  _restoreSessionState(snapshot) {
+    if (!snapshot) return
+    this.globalData.openid = snapshot.openid || null
+    this.globalData.userInfo = snapshot.userInfo || {}
+    this._applyWorkbenchAccess(snapshot.workbenchAccess)
+  },
+
+  _setRoleReady(ready) {
+    this.globalData._roleReady = ready !== false
+  },
+
   _getCloudActionFallbacks() {
     return [
       { name: 'opsApi', action: 'ensureUser' },
@@ -63,7 +104,10 @@ App({
     if (!access) return null
     return {
       role: access.role === 'user' ? 'customer' : (access.role || 'customer'),
-      permissions: access.permissions || []
+      permissions: Array.isArray(access.permissions) ? access.permissions : [],
+      storeId: access.storeId || '',
+      storeName: access.storeName || '',
+      staffName: access.staffName || ''
     }
   },
 
@@ -91,12 +135,22 @@ App({
     storeInfo: null,
     role: 'customer',      // customer / staff / admin
     permissions: [],       // ['verify', 'viewOrders', ...]
-    workbenchAccess: null
+    workbenchAccess: null,
+    _roleReady: false,
+    _rolePromise: null,
+    _pendingInviter: '',
+    _loginPromise: null
   },
 
   _login: function () {
     const payload = { invitedBy: this.globalData._pendingInviter || '' }
-    this._callCloudWithFallback(this._getCloudActionFallbacks(), payload)
+    const previousState = this._snapshotSessionState()
+    const hadSession = Boolean(previousState.openid)
+    if (!hadSession) {
+      this._setRoleReady(false)
+    }
+
+    const promise = this._callCloudWithFallback(this._getCloudActionFallbacks(), payload)
       .then(res => {
         const normalized = this._normalizeLoginResult(res)
         if (!normalized || !normalized.openid) {
@@ -108,7 +162,7 @@ App({
         this.globalData.userInfo = normalized.userInfo || {}
         console.log('登录成功，openid:', normalized.openid, '来源:', res._sourceFunction)
         // 登录成功后获取角色和权限
-        this._loadRole()
+        return this._loadRole({ preserveExistingOnError: hadSession, fallbackState: previousState })
       })
       .catch(err => {
         console.error('登录失败:', {
@@ -117,37 +171,80 @@ App({
           actionPayload: payload,
           stack: err?.stack
         })
-        // 兼容环境仍无效时，不阻塞首页渲染；默认当做普通用户继续运行
-        this.globalData.openid = null
-        this.globalData.userInfo = {}
-        this.globalData.role = 'customer'
-        this.globalData.permissions = []
-        this.globalData.workbenchAccess = { role: 'customer', permissions: [] }
+        // 补绑邀请关系等瞬时失败不应降级已登录会话；仅冷启动失败时回退为 customer。
+        if (hadSession) {
+          this._restoreSessionState(previousState)
+        } else {
+          this.globalData.openid = null
+          this.globalData.userInfo = {}
+          this._applyWorkbenchAccess(this._buildCustomerAccess())
+        }
+        this._setRoleReady(true)
       })
+    this.globalData._loginPromise = promise
+    return promise
   },
 
-  _loadRole: function () {
-    this._callCloudWithFallback(this._getWorkbenchRoleFallbacks(), {})
+  _loadRole: function ({ preserveExistingOnError = false, fallbackState = null } = {}) {
+    this._setRoleReady(false)
+    const promise = this._callCloudWithFallback(this._getWorkbenchRoleFallbacks(), {})
       .then(access => {
         const normalized = this._normalizeRoleResult(access)
-        this.globalData.role = normalized?.role || 'customer'
-        this.globalData.permissions = normalized?.permissions || []
-        this.globalData.workbenchAccess = access
+        this._applyWorkbenchAccess(normalized || this._buildCustomerAccess())
         console.log('角色:', this.globalData.role, '权限:', this.globalData.permissions)
+        return this.globalData.workbenchAccess
       })
-      .catch(() => {
-        this.globalData.role = 'customer'
-        this.globalData.permissions = []
-        this.globalData.workbenchAccess = { role: 'customer', permissions: [] }
+      .catch((err) => {
+        console.error('角色加载失败:', {
+          errCode: err?.code,
+          msg: err?.message,
+          stack: err?.stack
+        })
+        if (preserveExistingOnError && fallbackState) {
+          this._restoreSessionState(fallbackState)
+        } else {
+          this._applyWorkbenchAccess(this._buildCustomerAccess())
+        }
+        return this.globalData.workbenchAccess
+      })
+      .finally(() => {
+        this.globalData._rolePromise = null
+        this._setRoleReady(true)
+      })
+    this.globalData._rolePromise = promise
+    return promise
+  },
+
+  _syncInviterBinding(inviterOpenid) {
+    const payload = { invitedBy: inviterOpenid || '' }
+    return this._callCloudWithFallback(this._getCloudActionFallbacks(), payload)
+      .then(res => {
+        const normalized = this._normalizeLoginResult(res)
+        if (normalized?.openid) {
+          this.globalData.openid = this.globalData.openid || normalized.openid
+        }
+        if (normalized?.userInfo) {
+          this.globalData.userInfo = normalized.userInfo
+        }
+        return normalized
+      })
+      .catch(err => {
+        console.error('补绑邀请关系失败:', {
+          errCode: err?.code,
+          msg: err?.message,
+          actionPayload: payload,
+          stack: err?.stack
+        })
+        return null
       })
   },
 
   setInviter: function (inviterOpenid) {
     if (this.globalData.config.inviteBindRule === 'first' && this.globalData._pendingInviter) return
     this.globalData._pendingInviter = inviterOpenid
-    // 修复时序竞争：如果已登录，重新调用 ensureUser 补绑邀请关系
+    // 已登录后只补绑邀请关系，不重新触发登录/角色刷新，避免瞬时失败降级会话。
     if (this.globalData.openid) {
-      this._login()
+      this._syncInviterBinding(inviterOpenid)
     }
   },
 

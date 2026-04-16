@@ -42,10 +42,10 @@ Page({
                 productId
             })
 
-            const product = detail.product
+            const product = { ...detail.product }
             product.priceYuan = (product.price / 100).toFixed(1)
             product.originalPriceYuan = product.originalPrice ? (product.originalPrice / 100).toFixed(1) : '0.0'
-            if (product.originalPrice > product.price) {
+            if (product.originalPrice > 0 && product.originalPrice > product.price) {
                 product.discountText = Math.round(product.price / product.originalPrice * 10) + '折'
             }
 
