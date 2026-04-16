@@ -7,7 +7,17 @@
 - C 端消费者流量页（首页 / AI 舌象 / 活动商城 / 个人中心）
 - 门店工作台（订单、核销、活动、商品、客户跟进、员工权限）
 
-> 技术基座：微信小程序 + CloudBase（单门店单环境），目前项目已完成端到端样式重构收口（Theme Token 化）与登录/权限关键安全修复。
+> 技术基座：微信小程序 + CloudBase（单门店单环境）。当前仓库已经进入联调、验收和部署收口阶段，不再是初始化或纯页面骨架阶段。
+
+## 文档导航
+
+- 当前进展：[docs/progress.md](C:/Users/Administrator/Desktop/裂变小程序/docs/progress.md)
+- 运行手册：[docs/runbook.md](C:/Users/Administrator/Desktop/裂变小程序/docs/runbook.md)
+- 部署指南：[docs/deployment_guide.md](C:/Users/Administrator/Desktop/裂变小程序/docs/deployment_guide.md)
+- 实施概览：[docs/implementation_plan.md](C:/Users/Administrator/Desktop/裂变小程序/docs/implementation_plan.md)
+- 上线清单：[docs/go-live-checklist.md](C:/Users/Administrator/Desktop/裂变小程序/docs/go-live-checklist.md)
+- 网页后台部署：[docs/admin-web-deploy.md](C:/Users/Administrator/Desktop/裂变小程序/docs/admin-web-deploy.md)
+- 数据结构：[docs/database_schema.md](C:/Users/Administrator/Desktop/裂变小程序/docs/database_schema.md)
 
 ## 一、已完成的重构范围（版本快照）
 
@@ -143,18 +153,27 @@ npm install
 - 样式系统：`app.wxss` Tokens + 工作台/C端非核心页面 token 规范完成。
 - 安全修复：内部回调 fail-closed、`adminApi` 退化路径清理、角色鉴权统一。
 - 视图契约：WXML/JS 结构未改造下完成样式重构，尽量降低回归风险。
+- 仓库级测试：`node --test tests/*.test.js` 当前为 `108/108` 通过。
 
 剩余工作：
 
-- 核心链路/商城页视觉收口（Phase 4 后续批次）；
-- 接口与页面行为的回归验收；
-- 退款状态机与实际对账接口的联调确认。
+- 真机与预发布环境下的全链路验收；
+- 真实支付、退款、通知、AI 服务的生产联调确认；
+- 云函数部署口径、后台账号初始化和回滚流程的最终固化。
 
 ## 十、版权与合规
 
 本仓库按现有业务授权范围使用第三方资源（图片/图标请确认版权归属）。  
 请勿在生产环境写入明文支付密钥与第三方服务密钥。
 
-## 十一、联系方式
+## 十一、交接说明
 
-如需交接完整运行文档、数据库索引清单和回归测试用例，我可以继续在当前分支补一版 `docs/runbook.md`。
+当前仓库的进度、部署、验收和上线资料已补齐到以下文档：
+
+- `docs/progress.md`
+- `docs/runbook.md`
+- `docs/deployment_guide.md`
+- `docs/implementation_plan.md`
+- `docs/go-live-checklist.md`
+
+上线前建议先按 `docs/go-live-checklist.md` 执行一轮完整验收，再推进提审或正式上线。

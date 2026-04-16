@@ -1,234 +1,184 @@
-# 🚀 拓客小程序 · 实施方案
+# 拓客小程序 2.0 实施概览
 
-> 自建订单 + 微信支付 API，不使用交易组件
+> 更新日期：2026-04-16
+> 本文档从“待实施方案”调整为“2.0 当前架构与交付概览”，用于帮助交接和部署，不再沿用早期 `tongueAnalysis` 等旧架构描述。
 
 ## 系统全景
 
 ```mermaid
 graph TB
-    subgraph C["📱 C 端小程序"]
+    subgraph MP["微信小程序"]
         direction TB
-        C1["首页"]
-        C2["AI 看舌象"]
-        C3["商城 & 下单"]
-        C4["我的"]
+        MP1["C 端用户页面"]
+        MP2["门店工作台页面"]
     end
 
-    subgraph CF["☁️ 云函数"]
+    subgraph CF["CloudBase 云函数"]
         direction TB
-        CF1["tongueAnalysis"]
+        CF1["contentApi"]
         CF2["growthApi"]
-        CF3["contentApi"]
-        CF4["commerceApi"]
-        CF5["opsApi"]
-        CF6["payApi"]
+        CF3["commerceApi"]
+        CF4["opsApi"]
+        CF5["payApi"]
+        CF6["adminApi"]
     end
 
-    subgraph DB["🗄 云数据库"]
+    subgraph DB["云数据库"]
         direction TB
-        DB1["stores / ai_config / pay_config"]
-        DB2["products / packages"]
-        DB3["orders / order_items"]
-        DB4["fission_campaigns / fission_records"]
-        DB5["tongue_reports / users"]
+        DB1["门店/用户/后台账号"]
+        DB2["商品/套餐/活动"]
+        DB2["订单/订单项/核销/退款"]
+        DB3["舌象/裂变/跟进/审计"]
     end
 
-    subgraph A["💻 管理后台"]
+    subgraph WEB["网页后台"]
         direction TB
-        A1["拓客大盘"]
-        A2["裂变 & 商品"]
-        A3["订单 & 核销"]
-        A4["配置"]
+        WEB1["admin-web"]
     end
 
-    C --> CF --> DB
-    A --> CF
+    MP --> CF --> DB
+    WEB --> CF
 ```
 
-## 裂变返现流程
+## 当前 2.0 结构
 
-```mermaid
-sequenceDiagram
-    participant A as 用户 A
-    participant MP as 小程序
-    participant CF as 云函数
-    participant WX as 微信支付
+### 1. 微信小程序
 
-    A->>MP: ¥19.9 购买裂变商品
-    MP->>CF: payApi 创建订单
-    CF->>WX: 统一下单 → 支付 → 回调
-    CF->>CF: 更新订单 → 生成专属分享链接
+#### C 端页面
 
-    Note over A: 多劳多得：邀请越多赚越多
+- `pages/index`
+- `pages/tongue`
+- `pages/tongue-report`
+- `pages/mall`
+- `pages/product-detail`
+- `pages/cart`
+- `pages/orders`
+- `pages/fission`
+- `pages/lottery`
+- `pages/package-usage`
+- `pages/profile`
 
-    rect rgb(230, 245, 230)
-        Note right of A: 好友 B 通过链接购买
-        CF->>A: 💰 返现 ¥15.9
-    end
-    rect rgb(230, 240, 250)
-        Note right of A: 好友 C 通过链接购买
-        CF->>A: 💰 再返 ¥15.9
-    end
-    rect rgb(250, 240, 230)
-        Note right of A: 好友 D 通过链接购买
-        CF->>A: 💰 再返 ¥15.9
-    end
+#### 工作台页面
 
-    Note over A: 邀请 N 人 = 赚 N × ¥15.9
+- `pages/workbench/dashboard`
+- `pages/workbench/orders`
+- `pages/workbench/verify`
+- `pages/workbench/campaigns`
+- `pages/workbench/catalog`
+- `pages/workbench/leads`
+- `pages/workbench/staff`
+- `pages/workbench/settings`
+
+#### 小程序基座
+
+- `miniapp/app.js`：云开发初始化、用户建档、邀请关系补绑、工作台权限入口
+- `miniapp/app.json`：页面注册与 Tab 栏
+- `miniapp/app.wxss`：全局 Token 与样式基座
+
+### 2. 云函数分工
+
+| 云函数 | 当前职责 |
+|---|---|
+| `contentApi` | 首页和商城内容、活动位、商品列表 |
+| `growthApi` | 舌象记录、裂变收入、抽奖、套餐相关增长能力 |
+| `commerceApi` | 商品详情、创建订单、我的订单、退款申请 |
+| `opsApi` | 工作台订单、核销、员工、线索、设置、工作台概览 |
+| `payApi` | 支付创建、支付回调、退款执行、内部回调鉴权 |
+| `adminApi` | 网页后台会话、订单、活动、商品、客户、财务、运维 |
+
+说明：
+
+- 早期的 `tongueAnalysis` 旧入口不再是当前 2.0 主结构的一部分。
+- 2.0 当前主线是聚合式云函数架构，而不是页面一一对应的分散函数架构。
+
+### 3. 网页后台
+
+当前 `admin-web` 已包含：
+
+- 登录页与权限路由守卫
+- 仪表盘
+- 订单与退款审核
+- 网页核销台
+- 商品与套餐
+- 裂变活动
+- 线索/客户
+- 员工与角色模板
+- 设置
+- 财务
+- 运维/审计
+
+## 关键业务链路
+
+### 1. 下单支付链路
+
+1. 用户在 `mall` / `product-detail` / `cart` 发起下单
+2. `commerceApi` 创建订单与订单项
+3. `payApi` 生成支付参数
+4. 小程序执行 `wx.requestPayment`
+5. `payApi` 处理支付回调并回写订单状态
+
+### 2. 退款链路
+
+1. 用户在订单页发起退款申请
+2. `commerceApi` 写入 `refund_requests` 并将订单置为 `refund_requested`
+3. 工作台或后台审核后，状态进入 `refunding`
+4. `payApi` 或后台退款流程执行退款
+5. 退款完成后订单进入 `refunded`
+
+### 3. 套餐核销链路
+
+1. 用户购买服务或套餐
+2. 订单项写入 `verifyCode`
+3. 工作台或网页核销台查询核销码
+4. `opsApi` 执行扣次并写入 `package_usage`
+5. 订单详情和履约记录可回看核销过程
+
+### 4. 裂变链路
+
+1. 用户通过分享进入小程序
+2. `app.js` 记录或补绑邀请关系
+3. 被邀请用户下单
+4. 裂变记录进入 `fission_records`
+5. 邀请收益在个人中心和相关运营视图中可见
+
+## 当前实施状态
+
+### 已落地
+
+- 小程序 C 端主链路
+- 门店工作台主链路
+- 网页后台主链路
+- 支付回调鉴权和退款状态机收口
+- 多门店隔离
+- 权限收敛与默认拒绝
+- 核销台与订单履约明细
+- 仓库级回归测试
+
+### 仍需继续确认
+
+- 真机全链路验收
+- 真实支付与退款联调
+- 环境变量与部署方式统一
+- 首个后台管理员初始化流程
+- 生产环境发布与回滚手册
+
+## 当前验证基线
+
+已执行仓库级测试：
+
+```bash
+node --test tests/*.test.js
 ```
 
----
+结果：`108/108` 通过。
 
-## Proposed Changes
+这代表代码基线稳定，但不代表生产环境已完成上线验收。
 
-### 📱 小程序 C 端
+## 推荐阅读顺序
 
-````carousel
-#### [NEW] [app.json](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/app.json) · [app.js](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/app.js) · [app.wxss](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/app.wxss)
-
-**应用基座**
-
-| 文件 | 职责 |
-|---|---|
-| `app.json` | 页面路由、云开发启用 |
-| `app.js` | 云开发初始化、登录态、分享来源追踪 |
-| `app.wxss` | 设计系统（主题色、字体、组件样式） |
-<!-- slide -->
-#### [NEW] [pages/index/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/index/)
-
-**首页** — 流量入口
-
-- 门店 Logo / 名称 / 地址导航
-- Banner 轮播（后台可配）
-- 🔥 裂变活动卡片（最醒目位置）
-- 🔮 AI 看舌象大按钮入口
-- 商品精选推荐
-<!-- slide -->
-#### [NEW] [pages/tongue/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/tongue/) · [pages/tongue-report/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/tongue-report/)
-
-**AI 看舌象**
-
-| 页面 | 功能 |
-|---|---|
-| `tongue/` | 拍照引导、上传、调用云函数 |
-| `tongue-report/` | 报告展示、产品推荐、分享卡片生成 |
-
-云函数读取 `ai_config` → 转发 AI API → 报告存入 `tongue_reports`
-<!-- slide -->
-#### [NEW] [pages/mall/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/mall/) · [pages/product-detail/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/product-detail/)
-
-**轻量商城** — 自建订单 + 微信支付 API
-
-| 页面 | 功能 |
-|---|---|
-| `mall/` | 商品列表（实物/服务/套餐 Tab），裂变商品标「返 ¥XX」 |
-| `product-detail/` | 图文详情、选规格、调用 `payApi` 云函数下单支付 |
-
-支付流程：`payApi` 云函数 → 微信统一下单 API → 返回支付参数 → `wx.requestPayment`
-<!-- slide -->
-#### [NEW] [pages/fission/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/fission/) · [pages/package-usage/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/package-usage/)
-
-**裂变 & 核销**
-
-| 页面 | 功能 |
-|---|---|
-| `fission/` | 专属分享码、返现进度、邀请记录、一键分享 |
-| `package-usage/` | 套餐列表、剩余次数、核销二维码、核销历史 |
-<!-- slide -->
-#### [NEW] [pages/profile/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/profile/)
-
-**个人中心**
-
-- 订单记录
-- 💰 返现余额 & 明细
-- 👥 邀请记录
-- 📋 舌象报告历史
-- 🎫 套餐剩余次数
-````
-
----
-
-### ☁️ 云函数
-
-| 云函数 | 核心逻辑 |
-|---|---|
-| [tongueAnalysis](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/cloudfunctions/tongueAnalysis/) | 读取 `ai_config` → 转发 AI API → 解析 JSON → 存报告 → 检查额度 |
-| [growthApi](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/cloudfunctions/growthApi/) | AI 报告读取、抽奖、核销清单、返现记录、裂变邀约来源 |
-| [contentApi](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/cloudfunctions/contentApi/) | 首页/商城内容获取、活动位配置、商品列表透传 |
-| [commerceApi](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/cloudfunctions/commerceApi/) | 商品详情、订单创建、下单支付发起、订单与退款申请 |
-| [opsApi](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/cloudfunctions/opsApi/) | 工作台角色/权限、订单与核销查询、客户跟进、员工管理、后台配置 |
-| [payApi](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/cloudfunctions/payApi/) | 读取 `pay_config` → 微信统一下单 → 返回支付参数 → 处理回调与退款 |
-
-> [!IMPORTANT]
-> [!IMPORTANT]
-> 本方案已完成到 2.0 聚合架构：旧版分散云函数已退出线上运行入口，仅保留为历史归档参考。
-
----
-
-### 💻 管理后台
-
-````carousel
-#### [NEW] [pages/dashboard/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/dashboard/)
-
-**🎯 拓客大盘（首页）**
-
-```
-╔══════════════════════════════════════════╗
-║         🚀 今日拓客数据                    ║
-╠═══════════╦═══════════╦══════════════════╣
-║ 新增客户    ║ 裂变订单    ║ 已返现金额       ║
-║   +23      ║   47      ║  ¥748.3         ║
-╠═══════════╩═══════════╩══════════════════╣
-║ 📈 7天客户增长趋势                         ║
-╠══════════════════════════════════════════╣
-║ 🔥 进行中的裂变活动                        ║
-║  祛湿体验装 ¥19.9 | 已售247 | 新客189人    ║
-╚══════════════════════════════════════════╝
-```
-<!-- slide -->
-#### [NEW] [pages/fission/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/campaigns/)
-
-**裂变活动管理**
-
-| 配置项 | 说明 |
-|---|---|
-| 关联商品 | 从商品库选择 |
-| 活动价 | 如 ¥19.9 |
-| 返现金额 | 如 ¥15.9 |
-| 限购数量 | 每人 1 份 |
-| 活动库存 / 时间 | 总量 & 起止 |
-| 返现方式 | 余额 |
-<!-- slide -->
-#### [NEW] [pages/products/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/catalog/) · [pages/packages/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/catalog/)
-
-**商品 & 套餐**
-
-| 模块 | 功能 |
-|---|---|
-| 商品管理 | CRUD、分类（实物/服务/套餐）、上下架 |
-| 套餐配置 | 服务项 × 次数 |
-| 核销记录 | 查看使用进度 |
-<!-- slide -->
-#### [NEW] [pages/ai-config/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/settings/) · [pages/pay-config/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/settings/) · [pages/orders/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/orders/) · [pages/settings/](file:///Users/gongyaming/Desktop/裂变小程序/miniapp/pages/workbench/settings/)
-
-**配置 & 管理**
-
-| 模块 | 功能 |
-|---|---|
-| AI 舌象配置 | API 地址/密钥/模型、提示词、额度、测试连接 |
-| 支付配置 | 微信支付商户号、商户密钥、证书上传 |
-| 订单管理 | 订单列表、状态流转、退款处理 |
-| 门店设置 | 名称、Logo、地址、Banner |
-````
-
----
-
-## Verification Plan
-
-| 验证项 | 方法 |
-|---|---|
-| 微信支付 | 沙箱环境测试：下单 → 支付 → 回调 → 订单状态更新 |
-| 裂变流程 | 模拟：A 购买 → 分享 → B 购买 → A 返现到账 |
-| AI 流程 | 拍照 → 云函数转发 → 报告渲染 → 分享卡片 |
-| 核销流程 | 套餐购买 → 核销码 → 扫码扣次 |
-| 管理后台 | 浏览器验证所有页面 CRUD 和数据展示 |
+1. `docs/progress.md`
+2. `docs/runbook.md`
+3. `docs/deployment_guide.md`
+4. `docs/admin-web-deploy.md`
+5. `docs/database_schema.md`
+6. `docs/go-live-checklist.md`
