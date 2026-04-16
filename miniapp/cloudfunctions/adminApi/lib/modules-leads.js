@@ -1,5 +1,12 @@
 const { db, _cmd } = require('./context')
-const { safeList, fetchUsersMap, writeAuditLog } = require('./data')
+const {
+  getAccessStoreId,
+  safeGetFirst,
+  safeList,
+  safeListByStore,
+  fetchUsersMap,
+  writeAuditLog
+} = require('./data')
 const {
   leadSourceLabel,
   followupStatusLabel,
@@ -26,13 +33,31 @@ function mergeLeadTrack(leadMap, openid, source, timestamp) {
 
 async function listLeads(access, event) {
   const { source = 'all', followupStatus = 'all', keyword = '', page = 1, pageSize = 20 } = event
+  const storeId = getAccessStoreId(access)
+  const users = await safeListByStore('users', storeId, {}, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const openids = users.map(item => item._openid).filter(Boolean)
+  const campaignIds = (await safeList('fission_campaigns', { storeId }, {
+    orderBy: ['createdAt', 'desc'],
+    limit: 100
+  })).map(item => item._id).filter(Boolean)
 
   const [tongueReports, lotteryRecords, orders, fissionRecords, followups] = await Promise.all([
-    safeList('tongue_reports', {}, { orderBy: ['createdAt', 'desc'], limit: 200 }),
-    safeList('lottery_records', {}, { orderBy: ['createdAt', 'desc'], limit: 200 }),
-    safeList('orders', { status: _cmd.in(['paid', 'completed', 'refund_requested', 'refunding', 'refunded']) }, { orderBy: ['createdAt', 'desc'], limit: 300 }),
-    safeList('fission_records', {}, { orderBy: ['createdAt', 'desc'], limit: 300 }),
-    safeList('customer_followups', {}, { orderBy: ['updatedAt', 'desc'], limit: 300 })
+    openids.length
+      ? safeList('tongue_reports', { _openid: _cmd.in(openids) }, { orderBy: ['createdAt', 'desc'], limit: 200 })
+      : [],
+    openids.length
+      ? safeList('lottery_records', { _openid: _cmd.in(openids) }, { orderBy: ['createdAt', 'desc'], limit: 200 })
+      : [],
+    safeList('orders', {
+      storeId,
+      status: _cmd.in(['paid', 'completed', 'refund_requested', 'refunding', 'refunded'])
+    }, { orderBy: ['createdAt', 'desc'], limit: 300 }),
+    campaignIds.length
+      ? safeList('fission_records', { campaignId: _cmd.in(campaignIds) }, { orderBy: ['createdAt', 'desc'], limit: 300 })
+      : [],
+    openids.length
+      ? safeList('customer_followups', { storeId, leadOpenid: _cmd.in(openids) }, { orderBy: ['updatedAt', 'desc'], limit: 300 })
+      : []
   ])
 
   const leadMap = {}
@@ -43,13 +68,13 @@ async function listLeads(access, event) {
   orders.forEach(item => mergeLeadTrack(leadMap, item._openid, 'order', item.createdAt))
   fissionRecords.forEach(item => mergeLeadTrack(leadMap, item.inviteeOpenid, 'fission', item.createdAt))
 
-  const users = await fetchUsersMap(Object.keys(leadMap))
+  const usersMap = await fetchUsersMap(Object.keys(leadMap))
   const keywordText = String(keyword || '').trim().toLowerCase()
 
   const records = Object.keys(leadMap).map(openid => {
     const lead = leadMap[openid]
     const followup = followupMap[openid] || {}
-    const user = users[openid] || {}
+    const user = usersMap[openid] || {}
     return {
       _openid: openid,
       nickName: user.nickName || '',
@@ -80,9 +105,13 @@ async function listLeads(access, event) {
 async function saveFollowup(access, event) {
   const { leadOpenid = '', status = 'pending', note = '' } = event
   if (!leadOpenid) return { code: -1, msg: '缺少线索用户' }
+  const storeId = getAccessStoreId(access)
+  const user = await safeGetFirst('users', { _openid: leadOpenid, storeId })
+  if (!user) return { code: -1, msg: '无权限操作该门店客户' }
 
-  const existing = await db.collection('customer_followups').where({ leadOpenid }).limit(1).get().then(res => res.data[0] || null).catch(() => null)
+  const existing = await db.collection('customer_followups').where({ leadOpenid, storeId }).limit(1).get().then(res => res.data[0] || null).catch(() => null)
   const payload = {
+    storeId,
     leadOpenid,
     status,
     note,
@@ -148,9 +177,10 @@ function normalizeCustomerRecord(user) {
 
 async function listCustomers(access, event) {
   const { keyword = '', page = 1, pageSize = 20 } = event || {}
+  const storeId = getAccessStoreId(access)
   const keywordText = String(keyword || '').trim().toLowerCase()
 
-  const users = await safeList('users', {}, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const users = await safeList('users', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 500 })
   const rows = users.map(normalizeCustomerRecord).filter(user => {
     if (!keywordText) return true
     const haystack = [user.nickName, user.phone, user._openid].join(' ').toLowerCase()
@@ -163,13 +193,14 @@ async function listCustomers(access, event) {
 async function getCustomerDetail(access, event) {
   const openid = String((event && event.openid) || '').trim()
   if (!openid) return { code: -1, msg: '缺少用户标识' }
+  const storeId = getAccessStoreId(access)
 
-  const user = await safeGetFirst('users', { _openid: openid })
+  const user = await safeGetFirst('users', { _openid: openid, storeId })
   if (!user) return { code: -1, msg: '用户不存在' }
 
   const [orders, followups] = await Promise.all([
-    safeList('orders', { _openid: openid }, { orderBy: ['createdAt', 'desc'], limit: 20 }),
-    safeList('customer_followups', { leadOpenid: openid }, { orderBy: ['updatedAt', 'desc'], limit: 50 })
+    safeList('orders', { _openid: openid, storeId }, { orderBy: ['createdAt', 'desc'], limit: 20 }),
+    safeList('customer_followups', { leadOpenid: openid, storeId }, { orderBy: ['updatedAt', 'desc'], limit: 50 })
   ])
 
   const recentOrders = orders.map(order => ({
@@ -203,8 +234,9 @@ async function getCustomerDetail(access, event) {
 async function listFollowupEvents(access, event) {
   const openid = String((event && event.openid) || '').trim()
   if (!openid) return { code: -1, msg: '缺少用户标识' }
+  const storeId = getAccessStoreId(access)
 
-  const followups = await safeList('customer_followups', { leadOpenid: openid }, { orderBy: ['updatedAt', 'desc'], limit: 50 })
+  const followups = await safeList('customer_followups', { leadOpenid: openid, storeId }, { orderBy: ['updatedAt', 'desc'], limit: 50 })
   const rows = followups.map(item => ({
     status: item.status || 'pending',
     statusLabel: followupStatusLabel(item.status || 'pending'),

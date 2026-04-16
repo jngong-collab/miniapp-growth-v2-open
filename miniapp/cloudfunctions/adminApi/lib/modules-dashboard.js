@@ -1,4 +1,4 @@
-const { safeList, safeCount, fetchOrdersMap, _cmd } = require('./data')
+const { getAccessStoreId, safeList, safeCount, fetchOrdersMap, fetchUsersMap, _cmd } = require('./data')
 const {
   startOfDay,
   shiftDays,
@@ -14,8 +14,13 @@ function hasPackageRemaining(packageRemaining) {
   })
 }
 
-async function getPendingVerifyCount() {
+async function getPendingVerifyCount(storeId) {
+  const orders = await safeList('orders', { storeId }, { limit: 500 })
+  const orderIds = orders.map(o => o._id).filter(Boolean)
+  if (!orderIds.length) return 0
+
   const items = await safeList('order_items', {
+    orderId: _cmd.in(orderIds),
     productType: _cmd.in(['service', 'package'])
   }, { limit: 400 })
   if (!items.length) return 0
@@ -31,11 +36,22 @@ async function getPendingVerifyCount() {
   }).length
 }
 
-async function countLeadEvents(sinceDate) {
+async function getRefundPendingCount(storeId) {
+  const orders = await safeList('orders', { storeId }, { limit: 500 })
+  const orderIds = orders.map(o => o._id).filter(Boolean)
+  if (!orderIds.length) return 0
+  return safeCount('refund_requests', { orderId: _cmd.in(orderIds), status: 'pending' })
+}
+
+async function countLeadEvents(storeId, sinceDate) {
+  const users = await safeList('users', { storeId }, { limit: 500 })
+  const openids = users.map(u => u._openid).filter(Boolean)
+  const campaignIds = (await safeList('fission_campaigns', { storeId }, { limit: 100 })).map(c => c._id).filter(Boolean)
+
   const [tongueCount, lotteryCount, fissionCount] = await Promise.all([
-    safeCount('tongue_reports', { createdAt: _cmd.gte(sinceDate) }),
-    safeCount('lottery_records', { createdAt: _cmd.gte(sinceDate) }),
-    safeCount('fission_records', { createdAt: _cmd.gte(sinceDate) })
+    openids.length ? safeCount('tongue_reports', { _openid: _cmd.in(openids), createdAt: _cmd.gte(sinceDate) }) : 0,
+    openids.length ? safeCount('lottery_records', { _openid: _cmd.in(openids), createdAt: _cmd.gte(sinceDate) }) : 0,
+    campaignIds.length ? safeCount('fission_records', { campaignId: _cmd.in(campaignIds), createdAt: _cmd.gte(sinceDate) }) : 0
   ])
   return tongueCount + lotteryCount + fissionCount
 }
@@ -44,22 +60,31 @@ function sumAmount(orders) {
   return orders.reduce((sum, item) => sum + Number(item.payAmount || item.totalAmount || 0), 0)
 }
 
-async function getOverview() {
+async function getOverview(access) {
+  const storeId = getAccessStoreId(access)
   const today = startOfDay(new Date())
   const sevenDaysAgo = shiftDays(today, -6)
   const thirtyDaysAgo = shiftDays(today, -29)
 
-  const [orders30, items30, followups, users, pendingVerifyCount, refundPending] = await Promise.all([
-    safeList('orders', { createdAt: _cmd.gte(thirtyDaysAgo) }, {
+  const [orders30, users, pendingVerifyCount, refundPending] = await Promise.all([
+    safeList('orders', { storeId, createdAt: _cmd.gte(thirtyDaysAgo) }, {
       orderBy: ['createdAt', 'desc'],
       limit: 400
     }),
-    safeList('order_items', {}, { orderBy: ['createdAt', 'desc'], limit: 500 }),
-    safeList('customer_followups', {}, { orderBy: ['updatedAt', 'desc'], limit: 200 }),
-    safeList('users', {}, { orderBy: ['createdAt', 'desc'], limit: 200 }),
-    getPendingVerifyCount(),
-    safeCount('refund_requests', { status: 'pending' })
+    safeList('users', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 200 }),
+    getPendingVerifyCount(storeId),
+    getRefundPendingCount(storeId)
   ])
+
+  const orderIds30 = orders30.map(o => o._id).filter(Boolean)
+  const items30 = orderIds30.length
+    ? await safeList('order_items', { orderId: _cmd.in(orderIds30) }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+    : []
+
+  const userOpenids = users.map(u => u._openid).filter(Boolean)
+  const followups = userOpenids.length
+    ? await safeList('customer_followups', { leadOpenid: _cmd.in(userOpenids) }, { orderBy: ['updatedAt', 'desc'], limit: 200 })
+    : []
 
   const paidStatuses = new Set(['paid', 'completed'])
   const ordersToday = orders30.filter(item => toTimestamp(item.createdAt) >= today.getTime())
@@ -70,7 +95,7 @@ async function getOverview() {
   const paid30 = orders30.filter(item => paidStatuses.has(item.status))
   const refundingCount = orders30.filter(item => ['refund_requested', 'refunding'].includes(item.status)).length
   const fissionPaid7 = paid7.filter(item => item.fissionCampaignId).length
-  const leadEvents7 = await countLeadEvents(sevenDaysAgo)
+  const leadEvents7 = await countLeadEvents(storeId, sevenDaysAgo)
   const conversionRate7 = leadEvents7 ? Math.round((paid7.length / leadEvents7) * 100) : 0
 
   const productStats = {}
@@ -92,7 +117,7 @@ async function getOverview() {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 6)
 
-  const fissionCampaigns = await safeList('fission_campaigns', {}, { orderBy: ['soldCount', 'desc'], limit: 6 })
+  const fissionCampaigns = await safeList('fission_campaigns', { storeId }, { orderBy: ['soldCount', 'desc'], limit: 6 })
   const hotCampaigns = fissionCampaigns.map(item => ({
     _id: item._id,
     name: item.productName || '裂变活动',
@@ -127,14 +152,21 @@ async function getOverview() {
 }
 
 async function getTrends(access, event) {
+  const storeId = getAccessStoreId(access)
   const range = event.range === '7d' ? 7 : 30
   const today = startOfDay(new Date())
   const since = shiftDays(today, -(range - 1))
-  const [orders, tongueReports, lotteryRecords, fissionRecords] = await Promise.all([
-    safeList('orders', { createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 500 }),
-    safeList('tongue_reports', { createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 300 }),
-    safeList('lottery_records', { createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 300 }),
-    safeList('fission_records', { createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 300 })
+
+  const orders = await safeList('orders', { storeId, createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 500 })
+
+  const users = await safeList('users', { storeId }, { limit: 500 })
+  const openids = users.map(u => u._openid).filter(Boolean)
+  const campaignIds = (await safeList('fission_campaigns', { storeId }, { limit: 100 })).map(c => c._id).filter(Boolean)
+
+  const [tongueReports, lotteryRecords, fissionRecords] = await Promise.all([
+    openids.length ? safeList('tongue_reports', { _openid: _cmd.in(openids), createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 300 }) : [],
+    openids.length ? safeList('lottery_records', { _openid: _cmd.in(openids), createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 300 }) : [],
+    campaignIds.length ? safeList('fission_records', { campaignId: _cmd.in(campaignIds), createdAt: _cmd.gte(since) }, { orderBy: ['createdAt', 'asc'], limit: 300 }) : []
   ])
 
   const buckets = new Map()

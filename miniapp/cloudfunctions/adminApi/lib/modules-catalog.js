@@ -1,4 +1,4 @@
-const { db } = require('./context')
+const { db, _cmd } = require('./context')
 const { getAccessStoreId, safeGetById, safeList, writeAuditLog } = require('./data')
 const { fenToYuan, splitPlainList } = require('./helpers')
 
@@ -65,10 +65,11 @@ async function listProducts(access) {
 
 async function listPackages(access) {
   const storeId = getAccessStoreId(access)
-  const [packages, products] = await Promise.all([
-    safeList('packages', {}, { orderBy: ['createdAt', 'desc'], limit: 200 }),
-    safeList('products', { storeId, type: 'package' }, { orderBy: ['updatedAt', 'desc'], limit: 100 })
-  ])
+  const products = await safeList('products', { storeId, type: 'package' }, { orderBy: ['updatedAt', 'desc'], limit: 100 })
+  const productIds = products.map(p => p._id).filter(Boolean)
+  const packages = productIds.length
+    ? await safeList('packages', { storeId, productId: _cmd.in(productIds) }, { orderBy: ['createdAt', 'desc'], limit: 200 })
+    : []
   const productMap = products.reduce((acc, item) => {
     acc[item._id] = item
     return acc
@@ -156,11 +157,24 @@ async function toggleProductStatus(access, event) {
 }
 
 async function savePackage(access, event) {
+  const storeId = getAccessStoreId(access)
   const payload = normalizePackagePayload(event.payload || {})
   if (!payload.productId) return { code: -1, msg: '请选择套餐商品' }
   if (!payload.items.length) return { code: -1, msg: '请至少配置一项套餐内容' }
 
+  const product = await safeGetById('products', payload.productId)
+  if (!product) return { code: -1, msg: '关联商品不存在' }
+  if (product.storeId && product.storeId !== storeId) {
+    return { code: -1, msg: '无权限使用该商品' }
+  }
+  if (product.type !== 'package') {
+    return { code: -1, msg: '套餐只能绑定 type=package 的商品' }
+  }
+
   const existing = payload._id ? await safeGetById('packages', payload._id) : null
+  if (existing && existing.storeId && existing.storeId !== storeId) {
+    return { code: -1, msg: '无权限编辑该套餐' }
+  }
   const now = db.serverDate()
 
   if (existing) {
@@ -183,7 +197,7 @@ async function savePackage(access, event) {
 
   delete payload._id
   const addRes = await db.collection('packages').add({
-    data: { ...payload, createdAt: now, updatedAt: now }
+    data: { storeId, ...payload, createdAt: now, updatedAt: now }
   })
   const created = await safeGetById('packages', addRes._id)
   await writeAuditLog(access, {
@@ -208,7 +222,7 @@ async function getProductDetail(access, event) {
     return { code: -1, msg: '无权限查看该商品' }
   }
 
-  const packages = await safeList('packages', { productId }, { limit: 10 })
+  const packages = await safeList('packages', { storeId, productId }, { limit: 10 })
   return {
     code: 0,
     data: {

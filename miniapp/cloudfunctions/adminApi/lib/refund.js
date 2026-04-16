@@ -1,5 +1,5 @@
 const { cloud, db, _cmd } = require('./context')
-const { safeGetFirst, safeGetById, safeList } = require('./data')
+const { safeGetFirstByStore, safeGetById, safeList } = require('./data')
 const {
   planEnterRefunding,
   planFinalizeRefund
@@ -62,7 +62,7 @@ function generateRefundNo() {
 }
 
 async function approveRefundRequest({ request, order, reviewerUid }) {
-  const payConfig = await safeGetFirst('pay_config', {})
+  const payConfig = await safeGetFirstByStore('pay_config', String(order && order.storeId || '').trim())
   if (!payConfig || !payConfig.mchId) {
     return { code: -1, msg: '支付商户号未配置，无法处理退款' }
   }

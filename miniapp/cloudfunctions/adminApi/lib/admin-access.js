@@ -3,12 +3,23 @@ const { ADMIN_PERMISSION_KEYS } = require('./admin-contract')
 const ADMIN_WEB_PERMISSIONS = ADMIN_PERMISSION_KEYS
 
 function normalizeAdminPermissions(permissions) {
-  if (!Array.isArray(permissions) || permissions.length === 0) {
+  if (permissions == null) {
     return []
   }
-  return Array.from(new Set(
-    permissions.filter(permission => ADMIN_PERMISSION_KEYS.includes(permission))
-  ))
+  if (!Array.isArray(permissions)) {
+    return []
+  }
+  if (permissions.length === 0) {
+    return []
+  }
+
+  const normalized = []
+  for (const permission of permissions) {
+    if (ADMIN_PERMISSION_KEYS.includes(permission) && !normalized.includes(permission)) {
+      normalized.push(permission)
+    }
+  }
+  return normalized
 }
 
 function buildAdminAccountRecord(input, serverDate) {

@@ -28,6 +28,8 @@ const STAFF_DEFAULT_PERMISSIONS = [
     'viewLeads'
 ]
 
+const STAFF_PERMISSION_WHITELIST = Array.from(new Set(ADMIN_PERMISSIONS))
+
 exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext()
     const { action } = event
@@ -41,7 +43,7 @@ exports.main = async (event) => {
         case '':
             return ensureUser(OPENID, event)
         case 'getStoreInfo':
-            return getStoreInfo()
+            return getStoreInfo(OPENID)
         case 'getWorkbenchAccess':
             return getWorkbenchAccess(OPENID)
         case 'getWorkbenchSummary':
@@ -81,10 +83,13 @@ async function ensureUser(openid, event) {
     if (!openid) return { code: -1, msg: '缺少用户身份' }
 
     const invitedBy = (event || {}).invitedBy || ''
-    const store = await safeGetFirst('stores', {})
-    const storeId = store ? store._id : ''
 
     let user = await safeGetFirst('users', { _openid: openid })
+    const storeId = await resolveUserStoreId({
+        openid,
+        invitedBy,
+        currentUser: user
+    })
     if (!user) {
         const payload = {
             _openid: openid,
@@ -121,8 +126,10 @@ async function ensureUser(openid, event) {
     return { code: 0, openid, data: user }
 }
 
-async function getStoreInfo() {
-    const storeRes = await safeGetFirst('stores', {})
+async function getStoreInfo(openid) {
+    const storeId = await resolveUserStoreId({ openid })
+    if (!storeId) return { code: 0, data: null }
+    const storeRes = await safeGetFirst('stores', { _id: storeId })
     if (!storeRes) return { code: 0, data: null }
     return { code: 0, data: sanitizeStore(storeRes) }
 }
@@ -226,6 +233,8 @@ async function queryVerifyCode(event, openid) {
     }
     if (!order) return { code: -1, msg: '订单不存在' }
     if (order.status !== 'paid') return { code: -1, msg: '订单未支付' }
+    const storeGuard = ensureStoreOwnership(access.storeId, [item.storeId, order.storeId], '无权限核销该订单')
+    if (storeGuard) return storeGuard
 
     const { _openid, ...safeItem } = item
     return { code: 0, data: safeItem }
@@ -253,6 +262,8 @@ async function verifyPackage(event, openid) {
     }
     if (!order) return { code: -1, msg: '订单不存在' }
     if (order.status !== 'paid') return { code: -1, msg: '订单未支付' }
+    const storeGuard = ensureStoreOwnership(access.storeId, [item.storeId, order.storeId], '无权限核销该订单')
+    if (storeGuard) return storeGuard
 
     if (item.productType === 'package') {
         if (!serviceName) return { code: -1, msg: '请指定要核销的服务项目' }
@@ -332,8 +343,12 @@ async function getWorkbenchSummary(openid) {
     const access = await requireWorkbench(openid, 'viewDashboard')
     if (access.code) return access
 
+    const storeId = access.storeId
     const today = startOfToday()
     const sevenDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
+
+    const storeUsers = await safeList('users', { storeId }, { limit: 500 })
+    const storeOpenids = storeUsers.map(u => u._openid).filter(Boolean)
 
     const [
         newLeads,
@@ -346,15 +361,15 @@ async function getWorkbenchSummary(openid) {
         leads7,
         orders7
     ] = await Promise.all([
-        safeCount('users', { createdAt: _.gte(today) }),
-        safeCount('tongue_reports', { createdAt: _.gte(today) }),
-        safeCount('lottery_records', { createdAt: _.gte(today) }),
-        safeCount('orders', { createdAt: _.gte(today), status: _.neq('cancelled') }),
-        safeCount('orders', { status: _.in(['refund_requested', 'refunding']) }),
-        safeCount('orders', { createdAt: _.gte(today), fissionCampaignId: _.neq(''), status: _.in(['paid', 'completed']) }),
-        getPendingVerifyCount(),
-        countLeadEvents(sevenDaysAgo),
-        safeCount('orders', { createdAt: _.gte(sevenDaysAgo), status: _.in(['paid', 'completed']) })
+        safeCount('users', { storeId, createdAt: _.gte(today) }),
+        storeOpenids.length ? safeCount('tongue_reports', { _openid: _.in(storeOpenids), createdAt: _.gte(today) }) : 0,
+        storeOpenids.length ? safeCount('lottery_records', { _openid: _.in(storeOpenids), createdAt: _.gte(today) }) : 0,
+        safeCount('orders', { storeId, createdAt: _.gte(today), status: _.neq('cancelled') }),
+        safeCount('orders', { storeId, status: _.in(['refund_requested', 'refunding']) }),
+        safeCount('orders', { storeId, createdAt: _.gte(today), fissionCampaignId: _.neq(''), status: _.in(['paid', 'completed']) }),
+        getPendingVerifyCount(storeId),
+        countLeadEvents(storeId, sevenDaysAgo),
+        safeCount('orders', { storeId, createdAt: _.gte(sevenDaysAgo), status: _.in(['paid', 'completed']) })
     ])
 
     const sevenDayConversionRate = leads7 === 0 ? 0 : Math.round((orders7 / leads7) * 100)
@@ -381,14 +396,14 @@ async function getWorkbenchOrders(event, openid) {
     if (access.code) return access
 
     const { status = 'all', page = 1, pageSize = 50 } = event
-    const condition = {}
+    const condition = { storeId: access.storeId }
     if (status && status !== 'all') condition.status = status
 
-    const orders = await safeList('orders', condition, {
+    const orders = (await safeList('orders', condition, {
         orderBy: ['createdAt', 'desc'],
         skip: (page - 1) * pageSize,
         limit: pageSize
-    })
+    })).filter(item => !item.storeId || item.storeId === access.storeId)
 
     const userIds = uniqueValues(orders.map(item => item._openid))
     const refundRequests = await safeList('refund_requests', {
@@ -420,14 +435,22 @@ async function getLeadList(event, openid) {
     const access = await requireWorkbench(openid, 'viewLeads')
     if (access.code) return access
 
+    const storeId = access.storeId
     const { source = 'all' } = event
 
+    const storeUsers = (await safeList('users', { storeId }, { limit: 500 }))
+        .filter(item => !item.storeId || item.storeId === storeId)
+    const storeOpenids = storeUsers.map(u => u._openid).filter(Boolean)
+    const storeCampaigns = (await safeList('fission_campaigns', { storeId }, { limit: 100 }))
+        .filter(item => !item.storeId || item.storeId === storeId)
+    const storeCampaignIds = storeCampaigns.map(c => c._id).filter(Boolean)
+
     const [tongueReports, lotteryRecords, orders, fissionRecords, followups] = await Promise.all([
-        safeList('tongue_reports', {}, { orderBy: ['createdAt', 'desc'], limit: 120 }),
-        safeList('lottery_records', {}, { orderBy: ['createdAt', 'desc'], limit: 120 }),
-        safeList('orders', { status: _.in(['paid', 'completed', 'refund_requested', 'refunding']) }, { orderBy: ['createdAt', 'desc'], limit: 120 }),
-        safeList('fission_records', {}, { orderBy: ['createdAt', 'desc'], limit: 120 }),
-        safeList('customer_followups', {}, { orderBy: ['updatedAt', 'desc'], limit: 200 })
+        storeOpenids.length ? safeList('tongue_reports', { _openid: _.in(storeOpenids) }, { orderBy: ['createdAt', 'desc'], limit: 120 }) : [],
+        storeOpenids.length ? safeList('lottery_records', { _openid: _.in(storeOpenids) }, { orderBy: ['createdAt', 'desc'], limit: 120 }) : [],
+        safeList('orders', { storeId, status: _.in(['paid', 'completed', 'refund_requested', 'refunding']) }, { orderBy: ['createdAt', 'desc'], limit: 120 }),
+        storeCampaignIds.length ? safeList('fission_records', { campaignId: _.in(storeCampaignIds) }, { orderBy: ['createdAt', 'desc'], limit: 120 }) : [],
+        storeOpenids.length ? safeList('customer_followups', { leadOpenid: _.in(storeOpenids) }, { orderBy: ['updatedAt', 'desc'], limit: 200 }) : []
     ])
 
     const leadMap = {}
@@ -503,10 +526,11 @@ async function getWorkbenchSettings(openid) {
     const access = await requireWorkbench(openid, 'manageSettings')
     if (access.code) return access
 
+    const storeId = access.storeId
     const [storeInfo, aiConfig, payConfig] = await Promise.all([
-        safeGetFirst('stores', {}),
-        safeGetFirst('ai_config', {}),
-        safeGetFirst('pay_config', {})
+        safeGetFirst('stores', { _id: storeId }),
+        safeGetFirst('ai_config', { storeId }),
+        safeGetFirst('pay_config', { storeId })
     ])
 
     const safeAiConfig = aiConfig ? {
@@ -538,8 +562,8 @@ async function getCatalogOverview(openid) {
     if (access.code) return access
 
     const [products, packages] = await Promise.all([
-        safeList('products', {}, { orderBy: ['updatedAt', 'desc'], limit: 60 }),
-        safeList('packages', {}, { orderBy: ['createdAt', 'desc'], limit: 60 })
+        safeList('products', { storeId: access.storeId }, { orderBy: ['updatedAt', 'desc'], limit: 60 }),
+        safeList('packages', { storeId: access.storeId }, { orderBy: ['createdAt', 'desc'], limit: 60 })
     ])
 
     const productMap = {}
@@ -565,8 +589,8 @@ async function getCampaignOverview(openid) {
     if (access.code) return access
 
     const [fissionCampaigns, lotteryCampaigns] = await Promise.all([
-        safeList('fission_campaigns', {}, { orderBy: ['createdAt', 'desc'], limit: 30 }),
-        safeList('lottery_campaigns', {}, { orderBy: ['createdAt', 'desc'], limit: 30 })
+        safeList('fission_campaigns', { storeId: access.storeId }, { orderBy: ['createdAt', 'desc'], limit: 30 }),
+        safeList('lottery_campaigns', { storeId: access.storeId }, { orderBy: ['createdAt', 'desc'], limit: 30 })
     ])
 
     return { code: 0, data: { fissionCampaigns, lotteryCampaigns } }
@@ -585,6 +609,8 @@ async function updateRefundRequest(event, openid) {
 
     const order = await safeGetById('orders', orderId)
     if (!order) return { code: -1, msg: '订单不存在' }
+    const storeGuard = ensureStoreOwnership(access.storeId, [request.storeId, order.storeId], '无权限处理该退款')
+    if (storeGuard) return storeGuard
 
     const requestStatus = status === 'approved' ? 'approved' : 'rejected'
     const fallbackOrderStatus = request.previousStatus || order.status || 'paid'
@@ -596,7 +622,7 @@ async function updateRefundRequest(event, openid) {
     }
 
     if (requestStatus === 'approved') {
-        return approveRefundRequest({ request, order, reviewerOpenid: openid })
+        return approveRefundRequest({ request, order, reviewerOpenid: openid, storeId: access.storeId })
     }
 
     await db.runTransaction(async transaction => {
@@ -620,8 +646,8 @@ async function updateRefundRequest(event, openid) {
     return { code: 0, msg: '退款申请已驳回' }
 }
 
-async function approveRefundRequest({ request, order, reviewerOpenid }) {
-    const payConfig = await safeGetFirst('pay_config', {})
+async function approveRefundRequest({ request, order, reviewerOpenid, storeId }) {
+    const payConfig = await safeGetFirst('pay_config', storeId ? { storeId } : {})
     if (!payConfig || !payConfig.mchId) {
         return { code: -1, msg: '支付商户号未配置，无法处理退款' }
     }
@@ -811,7 +837,43 @@ async function requireWorkbench(openid, requiredPermission = '') {
 }
 
 function mergePermissions(permissions = []) {
-    return Array.from(new Set([].concat(STAFF_DEFAULT_PERMISSIONS, permissions || [])))
+    const filtered = [].concat(permissions || []).filter(item => STAFF_PERMISSION_WHITELIST.includes(item))
+    return Array.from(new Set([].concat(STAFF_DEFAULT_PERMISSIONS, filtered)))
+}
+
+async function resolveUserStoreId({ openid, invitedBy = '', currentUser = null } = {}) {
+    const directUser = currentUser || await safeGetFirst('users', { _openid: openid })
+    if (directUser && directUser.storeId) return directUser.storeId
+
+    const adminStore = await safeGetFirst('stores', { adminOpenids: openid })
+    if (adminStore && adminStore._id) return adminStore._id
+
+    const staffStore = await safeGetFirst('stores', { 'staff.openid': openid })
+    if (staffStore && staffStore._id) return staffStore._id
+
+    if (invitedBy && invitedBy !== openid) {
+        const inviterUser = await safeGetFirst('users', { _openid: invitedBy })
+        if (inviterUser && inviterUser.storeId) return inviterUser.storeId
+
+        const inviterAdminStore = await safeGetFirst('stores', { adminOpenids: invitedBy })
+        if (inviterAdminStore && inviterAdminStore._id) return inviterAdminStore._id
+
+        const inviterStaffStore = await safeGetFirst('stores', { 'staff.openid': invitedBy })
+        if (inviterStaffStore && inviterStaffStore._id) return inviterStaffStore._id
+    }
+
+    const stores = await safeList('stores', {}, { limit: 2 })
+    if (stores.length === 1) return stores[0]._id || ''
+
+    return ''
+}
+
+function ensureStoreOwnership(expectedStoreId, candidateStoreIds, message) {
+    const normalizedStoreIds = uniqueValues((candidateStoreIds || []).map(item => String(item || '').trim()).filter(Boolean))
+    if (normalizedStoreIds.length !== 1 || normalizedStoreIds[0] !== expectedStoreId) {
+        return { code: 403, msg: message || '无门店权限' }
+    }
+    return null
 }
 
 function sanitizeStore(store) {
@@ -819,13 +881,18 @@ function sanitizeStore(store) {
     return rest
 }
 
-async function getPendingVerifyCount() {
+async function getPendingVerifyCount(storeId) {
+    const orders = await safeList('orders', { storeId, status: _.in(['paid', 'completed']) }, { limit: 200 })
+    const orderIds = orders.map(o => o._id).filter(Boolean)
+    if (!orderIds.length) return 0
+
     const items = await safeList('order_items', {
+        orderId: _.in(orderIds),
         productType: _.in(['service', 'package'])
     }, { limit: 200 })
     if (!items.length) return 0
 
-    const orderMap = await fetchOrdersMap(uniqueValues(items.map(item => item.orderId)))
+    const orderMap = await fetchOrdersMap(orderIds)
     return items.filter(item => {
         const order = orderMap[item.orderId]
         if (!order || !['paid', 'completed'].includes(order.status)) return false
@@ -836,11 +903,18 @@ async function getPendingVerifyCount() {
     }).length
 }
 
-async function countLeadEvents(sinceDate) {
+async function countLeadEvents(storeId, sinceDate) {
+    const [users, campaigns] = await Promise.all([
+        safeList('users', { storeId }, { limit: 500 }),
+        safeList('fission_campaigns', { storeId }, { limit: 100 })
+    ])
+    const openids = users.map(u => u._openid).filter(Boolean)
+    const campaignIds = campaigns.map(c => c._id).filter(Boolean)
+
     const [tongueCount, lotteryCount, fissionCount] = await Promise.all([
-        safeCount('tongue_reports', { createdAt: _.gte(sinceDate) }),
-        safeCount('lottery_records', { createdAt: _.gte(sinceDate) }),
-        safeCount('fission_records', { createdAt: _.gte(sinceDate) })
+        openids.length ? safeCount('tongue_reports', { _openid: _.in(openids), createdAt: _.gte(sinceDate) }) : 0,
+        openids.length ? safeCount('lottery_records', { _openid: _.in(openids), createdAt: _.gte(sinceDate) }) : 0,
+        campaignIds.length ? safeCount('fission_records', { campaignId: _.in(campaignIds), createdAt: _.gte(sinceDate) }) : 0
     ])
     return tongueCount + lotteryCount + fissionCount
 }

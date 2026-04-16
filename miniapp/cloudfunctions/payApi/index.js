@@ -7,6 +7,24 @@ const { isAuthorizedInternalCall } = require('./internal-auth')
 const { buildRefundRequestPlan } = require('./refund-flow')
 const { summarizeCartOrderItems } = require('./order-helpers')
 
+function normalizeEventString(value) {
+    return typeof value === 'string' ? value.trim() : ''
+}
+
+function isLikelyCloudPayNotify(event, wxContext) {
+    const callerOpenid = normalizeEventString(wxContext && wxContext.OPENID)
+    if (callerOpenid) return false
+    if (!event || typeof event !== 'object') return false
+
+    const outTradeNo = normalizeEventString(event.outTradeNo)
+    const resultCode = normalizeEventString(event.resultCode)
+    const transactionId = normalizeEventString(event.transactionId)
+
+    if (!outTradeNo || !resultCode) return false
+    if (resultCode === 'SUCCESS' && !transactionId) return false
+    return true
+}
+
 exports.main = async (event, context) => {
     const wxContext = cloud.getWXContext()
     const openid = wxContext.OPENID
@@ -28,6 +46,10 @@ exports.main = async (event, context) => {
             return await handlePayCallback(event)
         }
         case 'wxpayNotify': {
+            const trustedCallback = isAuthorizedInternalCall(event) || isLikelyCloudPayNotify(event, wxContext)
+            if (!trustedCallback) {
+                return { code: 403, msg: '无权访问' }
+            }
             return await handleWxpayNotify(event)
         }
         case 'getOrder':       return await getOrder(event, openid)
@@ -110,6 +132,9 @@ function generateVerifyCode() {
 async function createOrder(event, openid) {
     const { productId, quantity = 1, address, remark, inviterOpenid, fissionCampaignId } = event
 
+    const storeRes = await db.collection('stores').limit(1).get().catch(() => ({ data: [] }))
+    const storeId = (storeRes.data || [])[0]?._id || ''
+
     // 1. 查商品
     let product
     try { product = (await db.collection('products').doc(productId).get()).data }
@@ -161,6 +186,7 @@ async function createOrder(event, openid) {
             status: 'pending', paymentId: '',
             inviterOpenid: inviterOpenid || '',
             fissionCampaignId: fissionCampaignId || '',
+            storeId,
             productId, productName: product.name, quantity,
             address: address || {}, remark: remark || '',
             createdAt: db.serverDate(), paidAt: null, completedAt: null,
@@ -190,6 +216,7 @@ async function createOrder(event, openid) {
     await db.collection('order_items').add({
         data: {
             _openid: openid, orderId: orderRes._id, productId,
+            storeId,
             productName: product.name, productImage: (product.images || [])[0] || '',
             productType: product.type, price: activityPrice, quantity, subtotal: totalAmount,
             packageItems, packageRemaining, verifyCode, packageExpireAt,
@@ -211,6 +238,9 @@ async function createOrder(event, openid) {
 async function createCartOrder(event, openid) {
     const rawItems = Array.isArray(event.items) ? event.items : []
     if (!rawItems.length) return { code: -1, msg: '请选择要结算的商品' }
+
+    const storeRes = await db.collection('stores').limit(1).get().catch(() => ({ data: [] }))
+    const storeId = (storeRes.data || [])[0]?._id || ''
 
     const mergedItemsMap = new Map()
     rawItems.forEach(item => {
@@ -293,6 +323,7 @@ async function createCartOrder(event, openid) {
             paymentId: '',
             inviterOpenid: '',
             fissionCampaignId: '',
+            storeId,
             productId: '',
             productName: summary.productName,
             quantity: summary.totalQuantity,
@@ -312,6 +343,7 @@ async function createCartOrder(event, openid) {
         data: {
             _openid: openid,
             orderId: orderRes._id,
+            storeId,
             ...item,
             createdAt: db.serverDate()
         }
@@ -645,7 +677,7 @@ async function handleRefund(event, openid) {
                 data: refundPlan.orderUpdate
             })
             await transaction.collection('refund_requests').add({
-                data: refundPlan.refundRequestData
+                data: { ...refundPlan.refundRequestData, storeId: order.storeId || '' }
             })
         })
 

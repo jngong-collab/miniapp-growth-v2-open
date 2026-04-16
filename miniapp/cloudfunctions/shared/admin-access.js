@@ -11,8 +11,10 @@ const ADMIN_WEB_PERMISSIONS = [
 ]
 
 function normalizeAdminPermissions(permissions) {
-  const source = Array.isArray(permissions) && permissions.length ? permissions : ADMIN_WEB_PERMISSIONS
-  return Array.from(new Set(source.filter(Boolean)))
+  const source = Array.isArray(permissions) ? permissions : ADMIN_WEB_PERMISSIONS
+  return Array.from(new Set(
+    source.filter(permission => permission && ADMIN_WEB_PERMISSIONS.includes(permission))
+  ))
 }
 
 function buildAdminAccountRecord(input, serverDate) {

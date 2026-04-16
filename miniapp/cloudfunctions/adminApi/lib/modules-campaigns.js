@@ -40,11 +40,14 @@ function normalizeLotteryPayload(payload) {
 
 async function listCampaigns(access) {
   const storeId = getAccessStoreId(access)
-  const [fissionCampaigns, lotteryCampaigns, lotteryRecords] = await Promise.all([
+  const [fissionCampaigns, lotteryCampaigns] = await Promise.all([
     safeList('fission_campaigns', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 100 }),
-    safeList('lottery_campaigns', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 100 }),
-    safeList('lottery_records', {}, { orderBy: ['createdAt', 'desc'], limit: 500 })
+    safeList('lottery_campaigns', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 100 })
   ])
+  const lotteryCampaignIds = lotteryCampaigns.map(item => item._id).filter(Boolean)
+  const lotteryRecords = lotteryCampaignIds.length
+    ? await safeList('lottery_records', { campaignId: _cmd.in(lotteryCampaignIds) }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+    : []
 
   const lotteryStats = lotteryRecords.reduce((acc, item) => {
     if (!item.campaignId) return acc

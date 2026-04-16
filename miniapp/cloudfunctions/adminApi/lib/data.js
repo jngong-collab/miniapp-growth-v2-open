@@ -10,6 +10,13 @@ function getAccessStoreId(access) {
   return storeId
 }
 
+function withStoreScope(storeId, condition = {}, storeField = 'storeId') {
+  return {
+    ...(condition || {}),
+    [storeField]: storeId
+  }
+}
+
 async function safeCount(collectionName, condition) {
   try {
     const res = await db.collection(collectionName).where(condition || {}).count()
@@ -52,6 +59,20 @@ async function safeList(collectionName, condition = {}, options = {}) {
   }
 }
 
+async function safeGetFirstByStore(collectionName, storeId, condition = {}, storeField = 'storeId') {
+  return safeGetFirst(collectionName, withStoreScope(storeId, condition, storeField))
+}
+
+async function safeListByStore(collectionName, storeId, condition = {}, options = {}, storeField = 'storeId') {
+  return safeList(collectionName, withStoreScope(storeId, condition, storeField), options)
+}
+
+async function safeGetByIdAndStore(collectionName, id, storeId, storeField = 'storeId') {
+  const record = await safeGetById(collectionName, id)
+  if (!record) return null
+  return String(record[storeField] || '') === String(storeId || '') ? record : null
+}
+
 async function fetchUsersMap(openids) {
   const ids = uniqueValues(openids)
   if (!ids.length) return {}
@@ -86,10 +107,14 @@ module.exports = {
   db,
   _cmd,
   getAccessStoreId,
+  withStoreScope,
   safeCount,
   safeGetFirst,
   safeGetById,
   safeList,
+  safeGetFirstByStore,
+  safeListByStore,
+  safeGetByIdAndStore,
   fetchUsersMap,
   fetchOrdersMap,
   writeAuditLog

@@ -1,5 +1,14 @@
 const { db, _cmd } = require('./context')
-const { safeGetById, safeGetFirst, safeList, fetchOrdersMap, fetchUsersMap, writeAuditLog } = require('./data')
+const {
+  getAccessStoreId,
+  safeGetById,
+  safeGetByIdAndStore,
+  safeGetFirst,
+  safeList,
+  fetchOrdersMap,
+  fetchUsersMap,
+  writeAuditLog
+} = require('./data')
 const {
   fenToYuan,
   formatDateTime,
@@ -136,9 +145,17 @@ function buildRefundTimeline(refundRequest, order) {
   return rows
 }
 
-async function loadOrderContext(limit = 500) {
-  const orders = await safeList('orders', {}, { orderBy: ['createdAt', 'desc'], limit })
+async function loadOrderContext(storeId, limit = 500) {
+  const orders = await safeList('orders', { storeId }, { orderBy: ['createdAt', 'desc'], limit })
   const orderIds = orders.map(item => item._id)
+  if (!orderIds.length) {
+    return {
+      orders: [],
+      refundMap: {},
+      users: {},
+      orderItemsMap: {}
+    }
+  }
   const [refundRequests, users, orderItems] = await Promise.all([
     safeList('refund_requests', { orderId: _cmd.in(orderIds) }, { orderBy: ['updatedAt', 'desc'], limit: Math.max(orderIds.length, 20) }),
     fetchUsersMap(orders.map(item => item._openid)),
@@ -153,7 +170,7 @@ async function loadOrderContext(limit = 500) {
 }
 
 async function loadVerificationQueueContext(access, limit = 500) {
-  const storeId = access.account.storeId
+  const storeId = getAccessStoreId(access)
   const orders = await safeList('orders', {
     storeId,
     status: _cmd.in(['paid', 'completed'])
@@ -188,7 +205,8 @@ async function loadVerificationQueueContext(access, limit = 500) {
   }
 }
 
-async function loadVerificationContext(verifyCode) {
+async function loadVerificationContext(access, verifyCode) {
+  const storeId = getAccessStoreId(access)
   const itemList = await safeList('order_items', {
     verifyCode,
     productType: _cmd.in(['service', 'package'])
@@ -203,6 +221,9 @@ async function loadVerificationContext(verifyCode) {
 
   if (!order) {
     return { code: -1, msg: '订单不存在' }
+  }
+  if (order.storeId !== storeId) {
+    return { code: -1, msg: '无权限访问该门店订单' }
   }
 
   if (!['paid', 'completed'].includes(order.status)) {
@@ -236,7 +257,7 @@ async function queryVerifyCode(access, event) {
   const verifyCode = String((event && event.verifyCode) || '').trim()
   if (!verifyCode) return { code: -1, msg: '缺少核销码' }
 
-  const verification = await loadVerificationContext(verifyCode)
+  const verification = await loadVerificationContext(access, verifyCode)
   if (verification.code) return verification
 
   return {
@@ -307,7 +328,7 @@ async function listVerificationRecords(access, event) {
     dateRange = []
   } = event
 
-  const storeId = access.account.storeId
+  const storeId = getAccessStoreId(access)
   const keywordText = String(keyword || '').trim().toLowerCase()
   const orderIdText = String(orderId || '').trim()
   const serviceNameText = String(serviceName || '').trim().toLowerCase()
@@ -317,33 +338,37 @@ async function listVerificationRecords(access, event) {
   const startTimestamp = startAt ? toTimestamp(startAt) : 0
   const endTimestamp = endAt ? toTimestamp(endAt) : 0
 
-  let orderItems = []
-  if (orderIdText) {
-    const orderItemsWhere = { orderId: orderIdText }
-    if (productType !== 'all') {
-      orderItemsWhere.productType = productType
-    }
-    if (verifyCodeText) {
-      orderItemsWhere.verifyCode = verifyCodeText
-    }
-    orderItems = await safeList('order_items', orderItemsWhere, {
-      orderBy: ['createdAt', 'desc'],
-      limit: 100
-    })
-    if (!orderItems.length) {
-      return {
-        code: 0,
-        data: paginate([], Number(page || 1), Number(pageSize || 20))
-      }
+  const storeOrders = orderIdText
+    ? await safeList('orders', { _id: orderIdText, storeId }, { limit: 1 })
+    : await safeList('orders', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const orderIds = storeOrders.map(item => item._id).filter(Boolean)
+  if (!orderIds.length) {
+    return {
+      code: 0,
+      data: paginate([], Number(page || 1), Number(pageSize || 20))
     }
   }
 
-  const orderItemIds = orderIdText
-    ? Array.from(new Set(orderItems.map(item => item._id).filter(Boolean)))
-    : []
-  const recordsWhere = orderItemIds.length
-    ? { orderItemId: _cmd.in(orderItemIds) }
-    : {}
+  const orderItemsWhere = { orderId: _cmd.in(orderIds) }
+  if (productType !== 'all') {
+    orderItemsWhere.productType = productType
+  }
+  if (verifyCodeText) {
+    orderItemsWhere.verifyCode = verifyCodeText
+  }
+  const orderItems = await safeList('order_items', orderItemsWhere, {
+    orderBy: ['createdAt', 'desc'],
+    limit: Math.max(orderIds.length * 4, 100)
+  })
+  const orderItemIds = Array.from(new Set(orderItems.map(item => item._id).filter(Boolean)))
+  if (!orderItemIds.length) {
+    return {
+      code: 0,
+      data: paginate([], Number(page || 1), Number(pageSize || 20))
+    }
+  }
+
+  const recordsWhere = { orderItemId: _cmd.in(orderItemIds) }
   const records = await safeList('package_usage', recordsWhere, {
     orderBy: ['createdAt', 'desc'],
     limit: 500
@@ -357,25 +382,18 @@ async function listVerificationRecords(access, event) {
   }
 
   const hydratedOrderItemIds = Array.from(new Set(records.map(item => item.orderItemId).filter(Boolean)))
-  const joinedOrderItems = orderItemIds.length
-    ? orderItems
-    : hydratedOrderItemIds.length
-      ? await safeList('order_items', { _id: _cmd.in(hydratedOrderItemIds) }, { limit: hydratedOrderItemIds.length })
-      : []
+  const joinedOrderItems = hydratedOrderItemIds.length
+    ? orderItems.filter(item => hydratedOrderItemIds.includes(item._id))
+    : []
   const orderItemsMap = toMap(joinedOrderItems, '_id')
-  const orderIds = orderIdText
-    ? [orderIdText]
-    : Array.from(new Set(joinedOrderItems.map(item => item.orderId).filter(Boolean)))
-  const ordersMap = orderIds.length
-    ? await fetchOrdersMap(orderIds)
-    : {}
+  const ordersMap = toMap(storeOrders, '_id')
   const users = await fetchUsersMap(Object.values(ordersMap).map(order => order._openid))
 
   const rows = records.map(record => {
     const item = orderItemsMap[record.orderItemId] || null
     if (!item) return null
     const order = ordersMap[item.orderId] || null
-    if (!order || order.storeId !== storeId) return null
+    if (!order) return null
     const user = users[order._openid] || null
     return normalizeVerificationRecord(record, item, order, user)
   }).filter(Boolean).filter(row => {
@@ -415,7 +433,7 @@ async function verifyOrderItem(access, event) {
 
   if (!verifyCode) return { code: -1, msg: '缺少核销码' }
 
-  const verification = await loadVerificationContext(verifyCode)
+  const verification = await loadVerificationContext(access, verifyCode)
   if (verification.code) return verification
 
   const { item, order } = verification
@@ -508,7 +526,8 @@ async function listOrders(access, event) {
     dateRange = []
   } = event
 
-  const { orders, refundMap, users, orderItemsMap } = await loadOrderContext(500)
+  const storeId = getAccessStoreId(access)
+  const { orders, refundMap, users, orderItemsMap } = await loadOrderContext(storeId, 500)
   const keywordText = String(keyword || '').trim().toLowerCase()
   const [startAt, endAt] = Array.isArray(dateRange) ? dateRange : []
   const startTimestamp = startAt ? toTimestamp(startAt) : 0
@@ -549,8 +568,9 @@ async function listOrders(access, event) {
 async function getOrderDetail(access, event) {
   const { orderId = '' } = event
   if (!orderId) return { code: -1, msg: '缺少订单 ID' }
-  const order = await safeGetById('orders', orderId)
-  if (!order) return { code: -1, msg: '订单不存在' }
+  const storeId = getAccessStoreId(access)
+  const order = await safeGetByIdAndStore('orders', orderId, storeId)
+  if (!order) return { code: -1, msg: '无权限查看该订单' }
 
   const [items, refundRequest, user] = await Promise.all([
     safeList('order_items', { orderId }, { orderBy: ['createdAt', 'asc'], limit: 100 }),
@@ -619,10 +639,11 @@ async function reviewRefund(access, event) {
   if (!requestId || !orderId || !status) return { code: -1, msg: '参数不完整' }
   if (!['approved', 'rejected'].includes(status)) return { code: -1, msg: '退款审核状态异常' }
 
+  const storeId = getAccessStoreId(access)
   const request = await safeGetById('refund_requests', requestId)
   if (!request || request.orderId !== orderId) return { code: -1, msg: '退款申请不存在' }
-  const order = await safeGetById('orders', orderId)
-  if (!order) return { code: -1, msg: '订单不存在' }
+  const order = await safeGetByIdAndStore('orders', orderId, storeId)
+  if (!order) return { code: -1, msg: '无权限操作该门店订单' }
   if (request.status !== 'pending') return { code: -1, msg: '该申请已处理' }
 
   if (status === 'approved') {

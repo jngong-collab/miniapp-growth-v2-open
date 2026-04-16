@@ -3,9 +3,40 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
+const { isAuthorizedInternalCall } = require('../payApi/internal-auth')
 const { visibleProductsData, retainedFissionProduct, packagesData } = require('../common/catalog-data.js')
 
-exports.main = async () => {
+function isEnvEnabled(envValue) {
+  return ['1', 'true', 'yes', 'on', 'enabled'].includes(String(envValue || '').trim().toLowerCase())
+}
+
+function isTmpDbFixEnabled(env = process.env) {
+  return isEnvEnabled(env.TMP_DB_FIX_ENABLED)
+}
+
+function isControlledTmpDbFixRequest(event) {
+  return !!event
+    && event.action === 'syncCatalog'
+    && event.confirm === 'SYNC_CATALOG'
+}
+
+exports.main = async (event) => {
+  if (!isTmpDbFixEnabled()) {
+    return { code: 403, msg: 'tmpDbFix 未启用' }
+  }
+
+  const wxContext = cloud.getWXContext()
+  if (wxContext && wxContext.OPENID) {
+    return { code: 403, msg: 'tmpDbFix 仅允许受控服务调用' }
+  }
+
+  if (!isControlledTmpDbFixRequest(event)) {
+    return { code: 403, msg: 'tmpDbFix 仅允许受控调用，请提供 action=syncCatalog 与 confirm=SYNC_CATALOG' }
+  }
+
+  if (!isAuthorizedInternalCall(event)) {
+    return { code: 403, msg: '无权访问' }
+  }
   try {
     const allProducts = [...visibleProductsData, retainedFissionProduct]
     let updated = 0

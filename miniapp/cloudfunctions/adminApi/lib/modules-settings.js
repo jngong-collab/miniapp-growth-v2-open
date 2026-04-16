@@ -1,5 +1,11 @@
 const { db } = require('./context')
-const { safeGetById, safeGetFirst, safeList, writeAuditLog } = require('./data')
+const {
+  getAccessStoreId,
+  safeGetById,
+  safeGetFirstByStore,
+  safeList,
+  writeAuditLog
+} = require('./data')
 const { sanitizeStore, splitPlainList } = require('./helpers')
 
 function normalizeStorePayload(payload) {
@@ -28,13 +34,13 @@ function normalizeSecretPayload(payload, secretField) {
 }
 
 async function getSettings(access) {
-  const storeId = access.account.storeId || access.store._id
+  const storeId = getAccessStoreId(access)
   const [storeInfo, aiConfig, payConfig, adminAccounts, notificationConfig] = await Promise.all([
     safeGetById('stores', storeId),
-    safeGetFirst('ai_config', {}),
-    safeGetFirst('pay_config', {}),
+    safeGetFirstByStore('ai_config', storeId),
+    safeGetFirstByStore('pay_config', storeId),
     safeList('admin_accounts', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 50 }),
-    safeGetFirst('notification_settings', { storeId })
+    safeGetFirstByStore('notification_settings', storeId)
   ])
 
   return {
@@ -57,7 +63,7 @@ async function getSettings(access) {
 
 async function updateStore(access, event) {
   const payload = normalizeStorePayload(event.payload || {})
-  const storeId = access.account.storeId || access.store._id
+  const storeId = getAccessStoreId(access)
   const before = await safeGetById('stores', storeId)
   await db.collection('stores').doc(storeId).update({
     data: { ...payload, updatedAt: db.serverDate() }
@@ -75,15 +81,16 @@ async function updateStore(access, event) {
 }
 
 async function updatePayConfig(access, event) {
+  const storeId = getAccessStoreId(access)
   const payload = normalizeSecretPayload(event.payload || {}, 'mchKey')
-  const existing = await safeGetFirst('pay_config', {})
-  const data = { ...payload, updatedAt: db.serverDate() }
+  const existing = await safeGetFirstByStore('pay_config', storeId)
+  const data = { ...payload, storeId, updatedAt: db.serverDate() }
   if (existing) {
     await db.collection('pay_config').doc(existing._id).update({ data })
   } else {
     await db.collection('pay_config').add({ data: { ...data, createdAt: db.serverDate() } })
   }
-  const updated = await safeGetFirst('pay_config', {})
+  const updated = await safeGetFirstByStore('pay_config', storeId)
   await writeAuditLog(access, {
     action: 'settings.updatePayConfig',
     module: 'settings',
@@ -100,15 +107,16 @@ async function updatePayConfig(access, event) {
 }
 
 async function updateAiConfig(access, event) {
+  const storeId = getAccessStoreId(access)
   const payload = normalizeSecretPayload(event.payload || {}, 'apiKey')
-  const existing = await safeGetFirst('ai_config', {})
-  const data = { ...payload, updatedAt: db.serverDate() }
+  const existing = await safeGetFirstByStore('ai_config', storeId)
+  const data = { ...payload, storeId, updatedAt: db.serverDate() }
   if (existing) {
     await db.collection('ai_config').doc(existing._id).update({ data })
   } else {
     await db.collection('ai_config').add({ data: { ...data, createdAt: db.serverDate() } })
   }
-  const updated = await safeGetFirst('ai_config', {})
+  const updated = await safeGetFirstByStore('ai_config', storeId)
   await writeAuditLog(access, {
     action: 'settings.updateAiConfig',
     module: 'settings',
@@ -127,7 +135,7 @@ async function updateAiConfig(access, event) {
 async function updateNotificationConfig(access, event) {
   const payload = event.payload || {}
   const storeId = getAccessStoreId(access)
-  const existing = await safeGetFirst('notification_settings', { storeId })
+  const existing = await safeGetFirstByStore('notification_settings', storeId)
   const data = {
     storeId,
     orderNotifyEnabled: payload.orderNotifyEnabled !== false,
@@ -142,7 +150,7 @@ async function updateNotificationConfig(access, event) {
   } else {
     await db.collection('notification_settings').add({ data: { ...data, createdAt: db.serverDate() } })
   }
-  const updated = await safeGetFirst('notification_settings', { storeId })
+  const updated = await safeGetFirstByStore('notification_settings', storeId)
   await writeAuditLog(access, {
     action: 'settings.updateNotificationConfig',
     module: 'settings',
