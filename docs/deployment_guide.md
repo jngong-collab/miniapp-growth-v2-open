@@ -77,6 +77,62 @@ VITE_CLOUDBASE_REGION=ap-shanghai
 VITE_CLOUDBASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
+### 4. 网页后台访问地址与自定义域名
+
+当前已验证可用的后台域名：
+
+- 正式域名：`https://liebian.nv2.cn`
+- CloudBase 默认域名：`https://yuxiaozhu111-4ga6qic990d1eb4e-1324361690.tcloudbaseapp.com`
+
+如需给新门店绑定自己的后台域名，按下面顺序处理：
+
+1. 在腾讯云 SSL 证书控制台准备好该域名的证书，拿到 `certId`
+2. 绑定域名：
+
+```bash
+tcb domains add your-admin-domain.com --certid your-cert-id -e your-cloud-env-id
+```
+
+3. 查看 CloudBase 返回的目标 `CNAME`
+
+```bash
+tcb domains ls -e your-cloud-env-id
+```
+
+4. 在域名 DNS 后台新增 `CNAME` 记录，解析到上一步返回的 `CName`
+5. 给该域名添加静态托管路由，推荐直接使用根路径 `/`
+
+```bash
+tcb routes add -e your-cloud-env-id --data '{"domain":"your-admin-domain.com","routes":[{"path":"/","upstreamResourceType":"STATIC_STORE","upstreamResourceName":"staticstore"}]}'
+```
+
+6. 如果旧配置里已经加过 `/*` 路由，删掉旧路由，避免和 `/` 冲突
+
+```bash
+tcb routes delete your-admin-domain.com -e your-cloud-env-id -p '/*'
+```
+
+7. 打开 HTTP 访问服务。如果域名访问时报 `HTTPSERVICE_NONACTIVATED`，直接执行：
+
+```bash
+tcb api tcb ModifyCloudBaseGWPrivilege --body '{"ServiceId":"your-cloud-env-id","EnableService":true}' --json
+```
+
+8. 用下面命令复查状态，确保：
+   - `DNS status` 为 `OK`
+   - `EnableService` 为 `true`
+
+```bash
+tcb domains ls -e your-cloud-env-id
+tcb api tcb DescribeCloudBaseGWService --body '{"ServiceId":"your-cloud-env-id","EnableUnion":true}' --json
+```
+
+排障经验：
+
+- 自定义域名绑定后，如果默认 CloudBase 域名能访问而自定义域名返回 `403`，优先检查 `EnableService` 是否仍为 `false`
+- 自定义域名绑定后如果返回 `404`，优先检查路由是否错误写成 `/*`，以及是否存在旧路由冲突
+- DNS 配置必须以 `tcb domains ls` 返回的 `CName` 为准，不要手填旧的通用地址
+
 ## 四、微信支付与退款配置
 
 ### 1. 支付架构原则
