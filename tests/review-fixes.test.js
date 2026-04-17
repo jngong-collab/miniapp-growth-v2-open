@@ -266,6 +266,30 @@ test('workbench catalog exposes formal category and mall visibility', () => {
   assert.match(catalogJs, /categoryLabel|mallVisibilityLabel|showInMall/);
 });
 
+test('review mode backend fails closed and exposes a minimal runtime contract', () => {
+  const growthApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'growthApi', 'index.js'), 'utf8');
+
+  assert.match(growthApi, /case 'getTongueRuntimeConfig'/);
+  assert.match(growthApi, /case 'reanalyzeTongueReport'/);
+  assert.match(growthApi, /if \(runtime\.isInReview\)\s*\{\s*const reviewRecord = await createTongueReportRecord/s);
+  assert.match(growthApi, /isReviewMode:\s*true/);
+  assert.match(growthApi, /reviewSavedAt:\s*db\.serverDate\(\)/);
+  assert.match(growthApi, /condition\.isReviewMode = true/);
+  assert.match(growthApi, /buildReviewSafeReport/);
+  assert.match(growthApi, /allowReanalyzeAfterReview/);
+  assert.match(growthApi, /reanalyzedAt:\s*db\.serverDate\(\)/);
+  assert.match(growthApi, /reanalyzeSource:\s*'review_record'/);
+});
+
+test('review mode home content can override banners and share image with safe assets', () => {
+  const contentApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'contentApi', 'index.js'), 'utf8');
+
+  assert.match(contentApi, /return getHomeContent\(OPENID,\s*event\)/);
+  assert.match(contentApi, /shareImageUrl:\s*runtime\.reviewConfig\.safeShareImageUrl \|\| ''/);
+  assert.match(contentApi, /reviewConfig\.enabled && reviewConfig\.safeBannerUrl/);
+  assert.match(contentApi, /rest\.banners = \[reviewConfig\.safeBannerUrl\]/);
+});
+
 test('page json files avoid unsupported share config flags', () => {
   for (const relPath of [
     path.join('miniapp', 'pages', 'index', 'index.json'),

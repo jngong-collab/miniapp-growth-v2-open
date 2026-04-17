@@ -3,6 +3,108 @@ const config = require('./config')
 const { callCloud } = require('./utils/cloud-api')
 
 App({
+  _buildDefaultReviewConfig() {
+    return {
+      ...(config.reviewModeFallback || {}),
+      enabled: true,
+      hideHistoryAiRecords: true,
+      allowReanalyzeAfterReview: true
+    }
+  },
+
+  _normalizeReviewConfig(payload) {
+    const fallback = this._buildDefaultReviewConfig()
+    const reviewConfig = payload && typeof payload === 'object'
+      ? (payload.reviewConfig && typeof payload.reviewConfig === 'object' ? payload.reviewConfig : payload)
+      : {}
+
+    const enabled = reviewConfig.enabled !== undefined ? reviewConfig.enabled !== false : fallback.enabled !== false
+    const merged = {
+      ...fallback,
+      ...reviewConfig,
+      enabled,
+      hideHistoryAiRecords: reviewConfig.hideHistoryAiRecords !== undefined
+        ? reviewConfig.hideHistoryAiRecords !== false
+        : fallback.hideHistoryAiRecords !== false,
+      allowReanalyzeAfterReview: reviewConfig.allowReanalyzeAfterReview !== undefined
+        ? reviewConfig.allowReanalyzeAfterReview !== false
+        : fallback.allowReanalyzeAfterReview !== false
+    }
+
+    if (!merged.shareTitle) {
+      merged.shareTitle = enabled
+        ? (fallback.shareTitle || config.shareTitle)
+        : (config.normalShareTitle || config.shareTitle)
+    }
+    if (!merged.entryTitle) {
+      merged.entryTitle = enabled ? fallback.entryTitle : 'AI看舌象'
+    }
+    if (!merged.pageTitle) {
+      merged.pageTitle = enabled ? fallback.pageTitle : 'AI看舌象'
+    }
+    if (!merged.historyTitle) {
+      merged.historyTitle = enabled ? fallback.historyTitle : '分析记录'
+    }
+    if (!merged.reportTitle) {
+      merged.reportTitle = enabled ? fallback.reportTitle : '舌象分析报告'
+    }
+    if (!merged.submitText) {
+      merged.submitText = enabled ? fallback.submitText : '开始 AI 分析'
+    }
+    if (!merged.historyLinkText) {
+      merged.historyLinkText = enabled ? fallback.historyLinkText : '查看历史报告'
+    }
+    if (!merged.historyEmptyText) {
+      merged.historyEmptyText = enabled ? fallback.historyEmptyText : '暂无分析记录'
+    }
+    if (!merged.listTagText) {
+      merged.listTagText = fallback.listTagText || '待AI分析'
+    }
+    if (!merged.detailCtaText) {
+      merged.detailCtaText = fallback.detailCtaText || '消耗 1 积分，立即生成 AI 体质报告'
+    }
+    if (!merged.previewPrimaryText) {
+      merged.previewPrimaryText = enabled ? fallback.previewPrimaryText : '开始 AI 分析'
+    }
+    if (!merged.analyzingTitle) {
+      merged.analyzingTitle = enabled ? fallback.analyzingTitle : '正在深度解析舌象特征'
+    }
+    if (!merged.analyzingSubtitle) {
+      merged.analyzingSubtitle = enabled ? fallback.analyzingSubtitle : '结合中医体质理论进行推演…'
+    }
+    if (!Array.isArray(merged.guideTips) || merged.guideTips.length === 0) {
+      merged.guideTips = Array.isArray(fallback.guideTips) ? fallback.guideTips : []
+    }
+
+    return merged
+  },
+
+  _applyRuntimeReviewConfig(nextConfig) {
+    const reviewConfig = this._normalizeReviewConfig(nextConfig)
+    this.globalData.reviewConfig = reviewConfig
+    this.globalData.config = {
+      ...config,
+      shareTitle: reviewConfig.shareTitle || config.shareTitle,
+      shareImageUrl: reviewConfig.enabled
+        ? (reviewConfig.safeShareImageUrl || config.shareImageUrl || '')
+        : (config.shareImageUrl || '')
+    }
+    this._updateReviewTabBar(reviewConfig.entryTitle)
+    return reviewConfig
+  },
+
+  _updateReviewTabBar(entryTitle) {
+    if (!entryTitle) return
+    try {
+      wx.setTabBarItem({
+        index: 1,
+        text: entryTitle
+      })
+    } catch (error) {
+      console.warn('更新舌象 TabBar 文案失败:', error)
+    }
+  },
+
   _buildCustomerAccess() {
     return {
       role: 'customer',
@@ -122,7 +224,12 @@ App({
       traceUser: true
     })
 
-    this.globalData.config = config
+    this.globalData.config = {
+      ...config,
+      shareTitle: (config.reviewModeFallback && config.reviewModeFallback.shareTitle) || config.shareTitle
+    }
+    this._applyRuntimeReviewConfig(this._buildDefaultReviewConfig())
+    this.loadReviewConfig().catch(() => {})
 
     // 登录
     this._login()
@@ -136,10 +243,56 @@ App({
     role: 'customer',      // customer / staff / admin
     permissions: [],       // ['verify', 'viewOrders', ...]
     workbenchAccess: null,
+    reviewConfig: null,
+    _reviewConfigPromise: null,
     _roleReady: false,
     _rolePromise: null,
     _pendingInviter: '',
     _loginPromise: null
+  },
+
+  loadReviewConfig: function ({ force = false } = {}) {
+    if (!force && this.globalData.reviewConfig && this.globalData.reviewConfig._isRemoteConfig) {
+      return Promise.resolve(this.globalData.reviewConfig)
+    }
+    if (!force && this.globalData._reviewConfigPromise) {
+      return this.globalData._reviewConfigPromise
+    }
+
+    const promise = callCloud('growthApi', { action: 'getTongueRuntimeConfig' })
+      .then(res => {
+        const reviewConfig = this._applyRuntimeReviewConfig(res)
+        this.globalData.reviewConfig = {
+          ...reviewConfig,
+          _isRemoteConfig: true
+        }
+        return this.globalData.reviewConfig
+      })
+      .catch(error => {
+        console.warn('加载审核配置失败，使用本地安全兜底:', error && error.message ? error.message : error)
+        return this._applyRuntimeReviewConfig(this._buildDefaultReviewConfig())
+      })
+      .finally(() => {
+        this.globalData._reviewConfigPromise = null
+      })
+
+    this.globalData._reviewConfigPromise = promise
+    return promise
+  },
+
+  getReviewConfig: function () {
+    if (this.globalData.reviewConfig) return this.globalData.reviewConfig
+    return this._applyRuntimeReviewConfig(this._buildDefaultReviewConfig())
+  },
+
+  getShareConfig: function () {
+    const reviewConfig = this.getReviewConfig()
+    return {
+      title: reviewConfig.shareTitle || this.globalData.config.shareTitle || config.shareTitle,
+      imageUrl: reviewConfig.enabled
+        ? (reviewConfig.safeShareImageUrl || this.globalData.config.shareImageUrl || '')
+        : (this.globalData.config.shareImageUrl || config.shareImageUrl || '')
+    }
   },
 
   _login: function () {
@@ -250,21 +403,83 @@ App({
 
   getStoreInfo: function () {
     return new Promise((resolve) => {
-      if (this.globalData.storeInfo) { resolve(this.globalData.storeInfo); return }
+      if (this.globalData.storeInfo) {
+        this._normalizeStoreCloudAssets(this.globalData.storeInfo).then(storeWithAssets => {
+          this.globalData.storeInfo = storeWithAssets
+          resolve(storeWithAssets)
+        }).catch(() => resolve(this._stripUnresolvedStoreCloudAssets(this.globalData.storeInfo)))
+        return
+      }
       this._callCloudWithFallback([
         { name: 'opsApi', action: 'getStoreInfo' }
       ], {}).then(storeInfo => {
         const normalizedStore = storeInfo && storeInfo.data ? storeInfo.data : storeInfo
-        this.globalData.storeInfo = normalizedStore
-        resolve(normalizedStore)
+        return this._normalizeStoreCloudAssets(normalizedStore)
+      }).then(storeWithAssets => {
+        this.globalData.storeInfo = storeWithAssets
+        resolve(storeWithAssets)
       }).catch(() => resolve(null))
     })
   },
 
+  _normalizeStoreCloudAssets: function (storeInfo) {
+    if (!storeInfo) return Promise.resolve(null)
+
+    const fileList = []
+    if (storeInfo.logo && String(storeInfo.logo).startsWith('cloud://')) {
+      fileList.push(String(storeInfo.logo))
+    }
+    if (Array.isArray(storeInfo.banners)) {
+      storeInfo.banners.forEach(item => {
+        if (item && String(item).startsWith('cloud://')) {
+          fileList.push(String(item))
+        }
+      })
+    }
+
+    if (!fileList.length) {
+      return Promise.resolve(this._stripUnresolvedStoreCloudAssets(storeInfo))
+    }
+
+    return wx.cloud.getTempFileURL({
+      fileList: [...new Set(fileList)]
+    }).then(res => {
+      const urlMap = {}
+      ;(res.fileList || []).forEach(item => {
+        if (item.fileID && item.tempFileURL) {
+          urlMap[item.fileID] = item.tempFileURL
+        }
+      })
+      return {
+        ...this._stripUnresolvedStoreCloudAssets(storeInfo),
+        logo: urlMap[storeInfo.logo] || storeInfo.logo || '',
+        banners: Array.isArray(storeInfo.banners)
+          ? storeInfo.banners.map(item => urlMap[item] || item)
+          : []
+      }
+    }).catch(error => {
+      console.warn('转换门店资源地址失败，回退原始数据:', error)
+      return this._stripUnresolvedStoreCloudAssets(storeInfo)
+    })
+  },
+
+  _stripUnresolvedStoreCloudAssets: function (storeInfo) {
+    if (!storeInfo) return null
+    const next = { ...storeInfo }
+    if (next.logo && String(next.logo).startsWith('cloud://')) {
+      next.logo = ''
+    }
+    if (Array.isArray(next.banners)) {
+      next.banners = next.banners.filter(item => item && !String(item).startsWith('cloud://'))
+    }
+    return next
+  },
+
   onShareAppMessage: function () {
+    const shareConfig = this.getShareConfig()
     return {
-      title: this.globalData.config.shareTitle,
-      imageUrl: this.globalData.config.shareImageUrl || '',
+      title: shareConfig.title,
+      imageUrl: shareConfig.imageUrl || '',
       path: '/pages/index/index'
     }
   }

@@ -25,7 +25,7 @@ module.exports = {
      */
     // 部署到生产环境前在此处填写门店自己的 CloudBase 环境 ID。
     // 不要在仓库中提交真实环境 ID。
-    cloudEnv: 'your-production-env-id',
+    cloudEnv: 'yuxiaozhu111-4ga6qic990d1eb4e',
 
     // ============================================================
     // 📱 应用配置
@@ -94,11 +94,39 @@ module.exports = {
     // 🔗 分享配置
     // ============================================================
 
-    /** 默认分享标题 */
-    shareTitle: '🔮 AI 看舌象，免费测体质！',
+    /** 默认分享标题（运行时会根据审核模式覆盖） */
+    shareTitle: '记录宝宝健康每一天',
 
     /** 默认分享图片路径（小程序内相对路径或云存储 URL） */
     shareImageUrl: '',
+
+    /** 正常模式分享标题 */
+    normalShareTitle: '🔮 AI 看舌象，免费测体质！',
+
+    /** 审核模式安全兜底配置 */
+    reviewModeFallback: {
+        enabled: true,
+        entryTitle: '宝宝日常',
+        pageTitle: '宝宝日常',
+        historyTitle: '成长记录',
+        reportTitle: '记录详情',
+        submitText: '保存本次记录',
+        shareTitle: '记录宝宝健康每一天',
+        emptyText: '暂无成长记录',
+        listTagText: '待AI分析',
+        detailCtaText: '消耗 1 积分，立即生成 AI 体质报告',
+        historyLinkText: '查看成长记录',
+        historyEmptyText: '暂无成长记录',
+        guideTitle: '拍照小贴士',
+        guideTips: ['光线明亮自然', '面部和舌面保持清晰', '避免滤镜和美颜'],
+        previewPrimaryText: '保存本次记录',
+        analyzingTitle: '正在保存照片记录',
+        analyzingSubtitle: '请稍候，正在整理本次拍摄内容…',
+        safeBannerUrl: '/assets/images/baby-massage.png',
+        safeShareImageUrl: '/assets/images/baby-massage.png',
+        hideHistoryAiRecords: true,
+        allowReanalyzeAfterReview: true
+    },
 
     /** 裂变商品分享标题模板（{price} 和 {cashback} 会被替换） */
     fissionShareTitle: '🔥 仅需¥{price}，分享给好友还能赚¥{cashback}！',

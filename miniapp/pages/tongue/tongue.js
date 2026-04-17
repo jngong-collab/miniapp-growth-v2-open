@@ -1,4 +1,5 @@
 // pages/tongue/tongue.js
+const config = require('../../config')
 const { callCloud } = require('../../utils/cloud-api')
 
 Page({
@@ -12,10 +13,18 @@ Page({
         ageList: ['0-1岁', '1岁', '2岁', '3岁', '4岁', '5岁', '6岁', '7岁', '8岁', '9岁', '10岁', '11岁', '12岁及以上'],
         ageIndex: -1,
         babyGender: '',
-        otherSymptom: ''
+        otherSymptom: '',
+        reviewConfig: config.reviewModeFallback || {},
+        isReviewMode: true,
+        stepLabels: ['填写信息', '拍摄照片', '保存记录'],
+        historyText: '暂无照片记录',
+        primaryActionText: '保存本次记录',
+        analyzingTitle: '正在保存照片记录',
+        analyzingSubtitle: '请稍候，正在整理本次拍摄内容…'
     },
 
-    onLoad: function () {
+    onLoad: async function () {
+        await this._syncReviewConfig()
         this._loadHistory()
         // 读取上次保存的宝宝信息
         const savedAge = wx.getStorageSync('tongue_baby_age_index')
@@ -35,13 +44,48 @@ Page({
             this.setData({ state: 'idle', selectedImage: '' })
             this._loadHistory()
         }
+        this._syncReviewConfig()
+    },
+
+    _syncReviewConfig: async function () {
+        const app = getApp()
+        if (app.loadReviewConfig) {
+            await app.loadReviewConfig().catch(() => {})
+        }
+        const reviewConfig = app.getReviewConfig ? app.getReviewConfig() : (config.reviewModeFallback || {})
+        const isReviewMode = reviewConfig.enabled !== false
+        const stepLabels = isReviewMode
+            ? ['填写信息', '拍摄照片', '保存记录']
+            : ['填写信息', '拍摄舌象', '获取报告']
+        const historyLabel = isReviewMode ? reviewConfig.historyLinkText : '查看历史报告'
+        const emptyLabel = isReviewMode ? reviewConfig.historyEmptyText : '暂无历史报告'
+
+        this.setData({
+            reviewConfig,
+            isReviewMode,
+            stepLabels,
+            historyText: this.data.historyCount > 0
+                ? `${historyLabel} (${this.data.historyCount})`
+                : emptyLabel,
+            primaryActionText: isReviewMode ? reviewConfig.previewPrimaryText : '开始 AI 分析',
+            analyzingTitle: isReviewMode ? reviewConfig.analyzingTitle : '正在深度解析舌象特征',
+            analyzingSubtitle: isReviewMode ? reviewConfig.analyzingSubtitle : '结合中医体质理论进行推演…'
+        })
+
+        wx.setNavigationBarTitle({
+            title: isReviewMode ? (reviewConfig.pageTitle || reviewConfig.entryTitle || '健康打卡') : 'AI看舌象'
+        })
     },
 
     // 加载历史记录数量
     _loadHistory: async function () {
         try {
             const history = await callCloud('growthApi', { action: 'getTongueHistory' })
-            this.setData({ historyCount: history.length })
+            const historyCount = history.length
+            const historyText = historyCount > 0
+                ? `${this.data.isReviewMode ? this.data.reviewConfig.historyLinkText : '查看历史报告'} (${historyCount})`
+                : (this.data.isReviewMode ? this.data.reviewConfig.historyEmptyText : '暂无历史报告')
+            this.setData({ historyCount, historyText })
         } catch (e) { /* ignore */ }
     },
 
@@ -89,7 +133,7 @@ Page({
         this.setData({ otherSymptom: e.detail.value })
     },
 
-    // 开始分析
+    // 开始分析 / 保存记录
     startAnalyze: async function () {
         this.setData({ state: 'analyzing', step: 0 })
 
@@ -102,10 +146,10 @@ Page({
             })
             const fileId = uploadRes.fileID
 
-            // 步骤 2：通知 AI 识别
+            // 步骤 2：提交通用后端处理（审核态将由后端降级为照片记录）
             this.setData({ step: 2 })
 
-            // 步骤 3：综合分析（模拟进度）
+            // 步骤 3：模拟进度
             setTimeout(() => { if (this.data.state === 'analyzing') this.setData({ step: 3 }) }, 3000)
 
             // 整理症状
@@ -155,9 +199,15 @@ Page({
 
     // 分享
     onShareAppMessage: function () {
+        const app = getApp()
+        const shareConfig = app.getShareConfig ? app.getShareConfig() : {
+            title: this.data.reviewConfig.shareTitle || config.shareTitle,
+            imageUrl: this.data.reviewConfig.safeShareImageUrl || ''
+        }
         return {
-            title: '🔮 AI 看舌象，免费测体质！',
-            path: '/pages/tongue/tongue'
+            title: shareConfig.title || this.data.reviewConfig.shareTitle || config.shareTitle,
+            path: '/pages/tongue/tongue',
+            imageUrl: shareConfig.imageUrl || ''
         }
     }
 })

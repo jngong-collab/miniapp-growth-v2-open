@@ -19,11 +19,34 @@ Page({
         version: config.version || '1.0.0',
         role: 'customer',
         permissions: [],
-        canEnterWorkbench: false
+        canEnterWorkbench: false,
+        reviewConfig: config.reviewModeFallback || {},
+        isReviewMode: true,
+        tongueMenuLabel: '照片记录',
+        tongueCountLabel: ''
     },
 
-    onLoad: function () { /* 首次由 onShow 触发 */ },
-    onShow: function () { this._loadAll() },
+    onLoad: async function () {
+        await this._syncReviewConfig()
+    },
+    onShow: async function () {
+        await this._syncReviewConfig()
+        this._loadAll()
+    },
+
+    _syncReviewConfig: async function () {
+        const app = getApp()
+        if (app.loadReviewConfig) {
+            await app.loadReviewConfig().catch(() => {})
+        }
+        const reviewConfig = app.getReviewConfig ? app.getReviewConfig() : (config.reviewModeFallback || {})
+        const isReviewMode = reviewConfig.enabled !== false
+        this.setData({
+            reviewConfig,
+            isReviewMode,
+            tongueMenuLabel: isReviewMode ? (reviewConfig.historyTitle || '照片记录') : 'AI 舌象记录'
+        })
+    },
 
     _loadAll: async function () {
         const app = getApp()
@@ -65,7 +88,10 @@ Page({
                 orderCount: counts.all || 0,
                 pendingCount: counts.pending || 0,
                 packageCount: countActivePackageItems(packages),
-                tongueCount: tongues.length
+                tongueCount: tongues.length,
+                tongueCountLabel: tongues.length
+                    ? `${tongues.length} ${this.data.isReviewMode ? '条记录' : '次分析'}`
+                    : ''
             })
         } catch (e) { console.error('加载统计失败:', e) }
     },

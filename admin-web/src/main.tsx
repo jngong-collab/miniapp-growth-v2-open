@@ -5,6 +5,7 @@ import { ConfigProvider, App as AntApp } from 'antd'
 import { RouterProvider } from 'react-router-dom'
 import zhCN from 'antd/locale/zh_CN'
 import AppRouter from './App'
+import 'leaflet/dist/leaflet.css'
 import './index.css'
 
 const queryClient = new QueryClient({

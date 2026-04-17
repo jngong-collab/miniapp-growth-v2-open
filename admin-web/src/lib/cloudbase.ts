@@ -77,3 +77,22 @@ export async function callFunction<T>(name: string, data: Record<string, unknown
   })
   return result as T
 }
+
+export async function uploadFileToCloud(cloudPath: string, file: File) {
+  const app = getCloudbaseApp()
+  await ensureCloudbaseSessionReady()
+  return app.uploadFile({
+    cloudPath,
+    filePath: file as unknown as string
+  })
+}
+
+export async function getTempFileUrl(fileID: string) {
+  const app = getCloudbaseApp()
+  await ensureCloudbaseSessionReady()
+  const result = await app.getTempFileURL({
+    fileList: [fileID]
+  })
+  const item = result.fileList?.[0]
+  return item?.tempFileURL || ''
+}

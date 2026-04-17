@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
-  "envId": "your-production-env-id",
+  "envId": "yuxiaozhu111-4ga6qic990d1eb4e",
   "appid": "your-miniapp-appid",
   "miniprogramRoot": "miniapp/",
   "cloudfunctionRoot": "miniapp/cloudfunctions/",

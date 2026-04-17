@@ -234,3 +234,57 @@ test('cart accepts string -1 stock as unlimited inventory', () => {
 
   delete global.wx
 })
+
+test('review mode defaults and runtime wiring keep tongue entry in a safe state on cold start', () => {
+  const appJson = readSource('miniapp/app.json')
+  const appJs = readSource('miniapp/app.js')
+  const configSource = readSource('miniapp/config.js')
+  const tongueJson = readSource('miniapp/pages/tongue/tongue.json')
+  const reportJson = readSource('miniapp/pages/tongue-report/tongue-report.json')
+
+  assert.match(appJson, /"text":\s*"健康打卡"/)
+  assert.match(tongueJson, /"navigationBarTitleText":\s*"健康打卡"/)
+  assert.match(reportJson, /"navigationBarTitleText":\s*"照片记录"/)
+  assert.match(configSource, /reviewModeFallback/)
+  assert.match(configSource, /entryTitle:\s*'宝宝日常'/)
+  assert.match(configSource, /shareTitle:\s*'记录宝宝健康每一天'/)
+  assert.match(appJs, /callCloud\('growthApi',\s*\{\s*action:\s*'getTongueRuntimeConfig'\s*\}\)/)
+  assert.match(appJs, /wx\.setTabBarItem/)
+  assert.match(appJs, /_isRemoteConfig:\s*true/)
+  assert.match(appJs, /getShareConfig:\s*function/)
+})
+
+test('tongue-related pages render review-safe copy from runtime config', () => {
+  const indexJs = readSource('miniapp/pages/index/index.js')
+  const indexWxml = readSource('miniapp/pages/index/index.wxml')
+  const tongueJs = readSource('miniapp/pages/tongue/tongue.js')
+  const tongueWxml = readSource('miniapp/pages/tongue/tongue.wxml')
+  const reportJs = readSource('miniapp/pages/tongue-report/tongue-report.js')
+  const reportWxml = readSource('miniapp/pages/tongue-report/tongue-report.wxml')
+  const profileJs = readSource('miniapp/pages/profile/profile.js')
+  const profileWxml = readSource('miniapp/pages/profile/profile.wxml')
+
+  assert.match(indexJs, /tongueBadgeText:/)
+  assert.match(indexJs, /tongueTitleText:/)
+  assert.match(indexWxml, /\{\{tongueBadgeText\}\}/)
+  assert.match(indexWxml, /\{\{tongueTitleText\}\}/)
+  assert.match(indexWxml, /\{\{tongueDescText\}\}/)
+
+  assert.match(tongueJs, /loadReviewConfig/)
+  assert.match(tongueJs, /historyText:/)
+  assert.match(tongueJs, /primaryActionText:/)
+  assert.match(tongueWxml, /\{\{primaryActionText\}\}/)
+  assert.match(tongueWxml, /\{\{historyText\}\}/)
+  assert.match(tongueWxml, /\{\{analyzingTitle\}\}/)
+
+  assert.match(reportJs, /safeReportView:/)
+  assert.match(reportJs, /reanalyzeReport:/)
+  assert.match(reportWxml, /wx:if="\{\{safeReportView\}\}"/)
+  assert.match(reportWxml, /\{\{reviewConfig\.detailCtaText\}\}/)
+  assert.match(reportWxml, /\{\{reviewConfig\.historyEmptyText\}\}/)
+
+  assert.match(profileJs, /tongueMenuLabel:/)
+  assert.match(profileJs, /tongueCountLabel:/)
+  assert.match(profileWxml, /\{\{tongueMenuLabel\}\}/)
+  assert.match(profileWxml, /\{\{tongueCountLabel\}\}/)
+})

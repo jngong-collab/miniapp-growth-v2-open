@@ -81,6 +81,8 @@ exports.main = async (event = {}) => {
       return withAdmin('manageSettings', access => settingsModule.updateAiConfig(access, event))
     case 'settings.updateNotificationConfig':
       return withAdmin('manageSettings', access => settingsModule.updateNotificationConfig(access, event))
+    case 'settings.geocodeAddress':
+      return withAdmin('manageSettings', access => settingsModule.geocodeAddress(access, event))
     case 'settings.getSystemHealth':
       return withAdmin('manageSettings', access => settingsModule.getSystemHealth(access))
     case 'staff.list':

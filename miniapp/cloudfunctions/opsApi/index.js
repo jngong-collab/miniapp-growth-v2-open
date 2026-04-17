@@ -131,7 +131,7 @@ async function getStoreInfo(openid) {
     if (!storeId) return { code: 0, data: null }
     const storeRes = await safeGetFirst('stores', { _id: storeId })
     if (!storeRes) return { code: 0, data: null }
-    return { code: 0, data: sanitizeStore(storeRes) }
+    return { code: 0, data: await sanitizeStore(storeRes) }
 }
 
 async function getStaffList(openid) {
@@ -546,7 +546,7 @@ async function getWorkbenchSettings(openid) {
     return {
         code: 0,
         data: {
-            storeInfo: storeInfo ? sanitizeStore(storeInfo) : null,
+            storeInfo: storeInfo ? await sanitizeStore(storeInfo) : null,
             aiConfig: safeAiConfig,
             payConfig: safePayConfig,
             staff: ((storeInfo && storeInfo.staff) || []).map(item => ({
@@ -876,9 +876,34 @@ function ensureStoreOwnership(expectedStoreId, candidateStoreIds, message) {
     return null
 }
 
-function sanitizeStore(store) {
+async function resolveCloudFileMap(fileList = []) {
+    const uniqueFileList = [...new Set((fileList || []).filter(item => item && String(item).startsWith('cloud://')).map(String))]
+    if (!uniqueFileList.length) return {}
+    try {
+        const res = await cloud.getTempFileURL({ fileList: uniqueFileList })
+        return (res.fileList || []).reduce((acc, item) => {
+            if (item.fileID && item.tempFileURL) {
+                acc[item.fileID] = item.tempFileURL
+            }
+            return acc
+        }, {})
+    } catch (error) {
+        console.error('opsApi 转换云存储资源失败:', error)
+        return {}
+    }
+}
+
+async function sanitizeStore(store) {
     const { adminOpenids, staff, ...rest } = store
-    return rest
+    const fileMap = await resolveCloudFileMap([
+        rest.logo,
+        ...(Array.isArray(rest.banners) ? rest.banners : [])
+    ])
+    return {
+        ...rest,
+        logo: fileMap[rest.logo] || rest.logo || '',
+        banners: Array.isArray(rest.banners) ? rest.banners.map(item => fileMap[item] || item) : []
+    }
 }
 
 async function getPendingVerifyCount(storeId) {

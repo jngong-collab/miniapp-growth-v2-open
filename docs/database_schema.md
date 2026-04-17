@@ -37,6 +37,20 @@
 | `dailyLimit` | number | 每日全局额度 |
 | `userDailyLimit` | number | 每用户每日额度 |
 | `enabled` | boolean | 是否启用 |
+| `reviewConfig` | object | 审核模式配置对象 |
+| `reviewConfig.enabled` | boolean | 是否启用审核模式 |
+| `reviewConfig.entryTitle` | string | 审核态首页/Tab 入口文案 |
+| `reviewConfig.pageTitle` | string | 审核态舌象页标题 |
+| `reviewConfig.historyTitle` | string | 审核态历史列表标题 |
+| `reviewConfig.reportTitle` | string | 审核态详情标题 |
+| `reviewConfig.submitText` | string | 审核态提交按钮文案 |
+| `reviewConfig.shareTitle` | string | 审核态分享标题 |
+| `reviewConfig.emptyText` | string | 审核态空状态文案 |
+| `reviewConfig.listTagText` | string | 非审核态下审核期记录的列表标签文案 |
+| `reviewConfig.safeBannerUrl` | string | 审核态安全 Banner 素材地址 |
+| `reviewConfig.safeShareImageUrl` | string | 审核态安全分享图地址 |
+| `reviewConfig.hideHistoryAiRecords` | boolean | 审核态是否只展示审核期照片记录 |
+| `reviewConfig.allowReanalyzeAfterReview` | boolean | 审核结束后是否允许对审核期记录补发 AI 分析 |
 | `createdAt` | date | 创建时间 |
 | `updatedAt` | date | 更新时间 |
 
@@ -234,8 +248,13 @@
 | `result.conclusion` | string | 综合结论 |
 | `result.suggestions` | array\<string\> | 调理建议 |
 | `result.recommendProducts` | array\<string\> | 推荐商品 ID |
+| `isReviewMode` | boolean | 是否为审核期保存的照片记录 |
+| `reviewSavedAt` | date | 审核态下保存记录时间，可与 `createdAt` 同步 |
+| `reanalyzedAt` | date | 审核结束后补发 AI 分析的时间 |
 | `shareCount` | number | 分享次数 |
 | `createdAt` | date | 创建时间 |
+
+> **审核模式说明**：审核期产生的“仅图片记录”与正常 AI 报告共用 `tongue_reports` 集合，不额外拆表。审核态写入时应标记 `isReviewMode: true`，并且 `result` 为空；非审核态下可对这类记录补发正式 AI 分析，并写回 `reanalyzedAt` 等补分析字段。
 
 ---
 
@@ -391,7 +410,7 @@ users:          _openid (唯一)
 orders:         _openid + status, orderNo (唯一), createdAt
 order_items:    orderId, _openid + productType, verifyCode
 fission_records: inviterOpenid, inviteeOpenid, campaignId
-tongue_reports: _openid + createdAt
+tongue_reports: _openid + createdAt, _openid + isReviewMode + createdAt
 fission_campaigns: status + startTime + endTime
 products:       storeId + status + sortOrder
 package_usage:  orderItemId

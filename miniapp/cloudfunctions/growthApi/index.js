@@ -26,12 +26,16 @@ exports.main = async (event) => {
             return getLotteryHome(OPENID)
         case 'drawLottery':
             return drawLottery(OPENID)
+        case 'getTongueRuntimeConfig':
+            return getTongueRuntimeConfig(event, OPENID)
         case 'analyzeTongue':
             return analyzeTongue(event, OPENID)
         case 'getTongueReport':
             return getTongueReport(event, OPENID)
         case 'getTongueHistory':
             return getTongueHistory(OPENID)
+        case 'reanalyzeTongueReport':
+            return reanalyzeTongueReport(event, OPENID)
         default:
             return { code: -1, msg: '未知操作' }
     }
@@ -149,164 +153,79 @@ async function drawLottery(openid) {
     }
 }
 
-async function analyzeTongue(event, openid) {
-    const { imageFileId, babyAge, babyGender, symptoms } = event
+async function getTongueRuntimeConfig(event, openid) {
+    const runtime = await loadTongueRuntime(openid, event)
+    return {
+        code: 0,
+        data: {
+            storeId: runtime.storeId || '',
+            reviewConfig: runtime.reviewConfig,
+            isInReview: runtime.isInReview
+        }
+    }
+}
 
-    const configRes = await db.collection('ai_config').where({ enabled: true }).limit(1).get()
-    if (configRes.data.length === 0) {
+async function analyzeTongue(event, openid) {
+    const { imageFileId, babyAge, babyGender } = event
+    const symptoms = normalizeSymptoms(event.symptoms)
+    const runtime = await loadTongueRuntime(openid, event)
+
+    if (runtime.isInReview) {
+        const reviewRecord = await createTongueReportRecord({
+            openid,
+            storeId: runtime.storeId,
+            imageFileId,
+            babyAge,
+            babyGender,
+            symptoms,
+            result: null,
+            isReviewMode: true,
+            extra: {
+                reviewSavedAt: db.serverDate()
+            }
+        })
+
+        return {
+            code: 0,
+            data: {
+                reportId: reviewRecord._id,
+                reviewMode: true,
+                isReviewMode: true,
+                result: null
+            }
+        }
+    }
+
+    if (!runtime.aiConfig || !runtime.aiConfig.enabled) {
         return { code: -1, msg: 'AI 功能未配置，请联系门店' }
     }
-    const aiConfig = configRes.data[0]
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const [userUsageRes, globalUsageRes] = await Promise.all([
-        db.collection('tongue_reports').where({
-            _openid: openid,
-            createdAt: _.gte(today)
-        }).count(),
-        db.collection('tongue_reports').where({
-            createdAt: _.gte(today)
-        }).count()
-    ])
-
-    if (aiConfig.userDailyLimit > 0 && userUsageRes.total >= aiConfig.userDailyLimit) {
-        return { code: -2, msg: `今日分析次数已用完（每日限 ${aiConfig.userDailyLimit} 次）` }
-    }
-    if (aiConfig.dailyLimit > 0 && globalUsageRes.total >= aiConfig.dailyLimit) {
-        return { code: -3, msg: '今日门店分析次数已达上限，请明日再来' }
-    }
-
-    let imageUrl = imageFileId
-    if (imageFileId && imageFileId.startsWith('cloud://')) {
-        try {
-            const fileRes = await cloud.getTempFileURL({ fileList: [imageFileId] })
-            imageUrl = fileRes.fileList[0].tempFileURL
-        } catch (e) {
-            console.error('获取图片链接失败:', e.message)
-            return { code: -1, msg: '图片处理失败，请重试' }
-        }
-    }
-
-    let productCatalog = ''
-    try {
-        const productsRes = await db.collection('products').where({ status: 'on' }).limit(100).get()
-        if (productsRes.data.length > 0) {
-            const lines = productsRes.data.map(p => {
-                const price = p.price ? `¥${(p.price / 100).toFixed(0)}` : ''
-                return `- ${p.name} | 卖点: ${p.sellingPoint || p.description || ''} | 适用体质: ${p.applicableConstitution || ''} | 核心功效: ${p.efficacy || ''} | 建议零售价: ${price}`
-            })
-            productCatalog = `\n\n---\n以下是当前商城在售的产品库，请从中精选 2-3 款推荐：\n${lines.join('\n')}`
-        }
-    } catch (e) {
-        console.log('读取产品库失败:', e.message)
-    }
-
-    let babyContext = ''
-    if (babyAge) babyContext += `宝宝年龄：${babyAge}。`
-    if (babyGender) babyContext += `性别：${babyGender === 'boy' ? '男' : '女'}宝。`
-    if (symptoms && symptoms.length > 0) babyContext += `主诉症状：${symptoms.join('；')}。`
-    if (babyContext) babyContext = `\n\n【宝宝信息】${babyContext}`
-
-    const finalPrompt = (aiConfig.systemPrompt || '你是一位中医舌诊专家，请分析用户上传的舌象照片。') + babyContext + productCatalog
+    const limitResult = await ensureTongueLimits({
+        openid,
+        storeId: runtime.storeId,
+        aiConfig: runtime.aiConfig
+    })
+    if (limitResult) return limitResult
 
     try {
-        const parsedUrl = new URL(aiConfig.apiUrl)
-        const httpModule = parsedUrl.protocol === 'https:' ? https : http
-        const apiPath = (!parsedUrl.pathname || parsedUrl.pathname === '/') ? '/v1/chat/completions' : parsedUrl.pathname
-
-        const requestBody = JSON.stringify({
-            model: aiConfig.model,
-            messages: [
-                { role: 'system', content: finalPrompt },
-                {
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: '请分析这张舌象照片，以JSON格式返回分析结果' },
-                        { type: 'image_url', image_url: { url: imageUrl } }
-                    ]
-                }
-            ],
-            max_tokens: 2000,
-            response_format: { type: 'json_object' }
+        const result = await runTongueAiAnalysis({
+            aiConfig: runtime.aiConfig,
+            imageFileId,
+            babyAge,
+            babyGender,
+            symptoms,
+            storeId: runtime.storeId
         })
 
-        const aiResult = await new Promise((resolve, reject) => {
-            const req = httpModule.request({
-                hostname: parsedUrl.hostname,
-                port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
-                path: apiPath,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${aiConfig.apiKey}`
-                },
-                timeout: 60000
-            }, res => {
-                let data = ''
-                res.on('data', chunk => { data += chunk })
-                res.on('end', () => {
-                    try {
-                        resolve(JSON.parse(data))
-                    } catch (error) {
-                        reject(new Error(`AI 响应解析失败: ${data.slice(0, 200)}`))
-                    }
-                })
-            })
-            req.on('error', reject)
-            req.on('timeout', () => {
-                req.destroy()
-                reject(new Error('当前访问人数较多，请稍后再试'))
-            })
-            req.write(requestBody)
-            req.end()
-        })
-
-        const content = aiResult.choices?.[0]?.message?.content
-        if (!content) return { code: -1, msg: 'AI 返回结果为空，请重试' }
-
-        let result
-        try {
-            result = JSON.parse(content)
-        } catch (e) {
-            result = {
-                conclusion: content.slice(0, 100),
-                features: {},
-                analysis_details: content,
-                product_recommendations: [],
-                suggestions: []
-            }
-        }
-
-        if (result.features) {
-            result.tongueColor = result.features.color || result.tongueColor || ''
-            result.tongueCoating = result.features.coating || result.tongueCoating || ''
-            result.tongueShape = result.features.shape || result.tongueShape || ''
-            result.moisture = result.features.moisture || result.moisture || ''
-        }
-
-        const reportRes = await db.collection('tongue_reports').add({
-            data: {
-                _openid: openid,
-                imageFileId,
-                babyAge: babyAge || '',
-                babyGender: babyGender || '',
-                symptoms: symptoms || [],
-                result: {
-                    conclusion: result.conclusion || '',
-                    tongueColor: result.tongueColor || '',
-                    tongueCoating: result.tongueCoating || '',
-                    tongueShape: result.tongueShape || '',
-                    moisture: result.moisture || '',
-                    features: result.features || {},
-                    analysis_details: result.analysis_details || '',
-                    product_recommendations: result.product_recommendations || [],
-                    suggestions: result.suggestions || []
-                },
-                shareCount: 0,
-                createdAt: db.serverDate()
-            }
+        const reportRes = await createTongueReportRecord({
+            openid,
+            storeId: runtime.storeId,
+            imageFileId,
+            babyAge,
+            babyGender,
+            symptoms,
+            result,
+            isReviewMode: false
         })
 
         return { code: 0, data: { reportId: reportRes._id, ...result } }
@@ -316,16 +235,21 @@ async function analyzeTongue(event, openid) {
         if (msg.includes('timed out') || msg.includes('time_limit') || msg.includes('较多')) {
             return { code: -1, msg: '当前访问人数较多，请稍后再试' }
         }
-        return { code: -1, msg: `AI 分析失败，请重试` }
+        return { code: -1, msg: 'AI 分析失败，请重试' }
     }
 }
 
 async function getTongueReport(event, openid) {
     try {
+        const runtime = await loadTongueRuntime(openid, event)
         const res = await db.collection('tongue_reports').doc(event.reportId).get()
         const report = res.data
         if (!report) return { code: -1, msg: '报告不存在' }
         if (report._openid !== openid) return { code: 403, msg: '无权查看此报告' }
+
+        if (runtime.isInReview) {
+            return { code: 0, data: buildReviewSafeReport(report, runtime.reviewConfig) }
+        }
 
         if (report.result?.product_recommendations?.length > 0) {
             try {
@@ -381,12 +305,375 @@ async function getTongueReport(event, openid) {
 }
 
 async function getTongueHistory(openid) {
-    const res = await db.collection('tongue_reports').where({ _openid: openid })
+    const runtime = await loadTongueRuntime(openid)
+    const condition = { _openid: openid }
+    if (runtime.isInReview) {
+        condition.isReviewMode = true
+    }
+
+    const res = await db.collection('tongue_reports').where(condition)
         .orderBy('createdAt', 'desc')
         .limit(20)
-        .field({ imageFileId: true, 'result.conclusion': true, createdAt: true })
+        .field({ imageFileId: true, 'result.conclusion': true, createdAt: true, isReviewMode: true, result: true })
         .get()
-    return { code: 0, data: res.data }
+
+    const data = runtime.isInReview
+        ? res.data.map(item => buildReviewSafeHistoryItem(item))
+        : res.data.map(item => ({
+            ...item,
+            isReviewMode: item.isReviewMode === true,
+            canReanalyze: item.isReviewMode === true && !hasTongueResult(item.result)
+        }))
+
+    return { code: 0, data }
+}
+
+async function reanalyzeTongueReport(event, openid) {
+    const reportId = String(event.reportId || '').trim()
+    if (!reportId) return { code: -1, msg: '报告不存在' }
+
+    const runtime = await loadTongueRuntime(openid, event)
+    if (runtime.isInReview) {
+        return { code: -1, msg: '审核模式下不可发起 AI 分析' }
+    }
+    if (!runtime.aiConfig || !runtime.aiConfig.enabled) {
+        return { code: -1, msg: 'AI 功能未配置，请联系门店' }
+    }
+
+    let report
+    try {
+        const res = await db.collection('tongue_reports').doc(reportId).get()
+        report = res.data
+    } catch (error) {
+        return { code: -1, msg: '报告不存在' }
+    }
+
+    if (!report || report._openid !== openid) return { code: 403, msg: '无权操作此报告' }
+    if (report.isReviewMode !== true) return { code: -1, msg: '该记录不是审核模式记录' }
+    if (hasTongueResult(report.result)) return { code: -1, msg: '该记录已完成分析' }
+    if (!report.imageFileId) return { code: -1, msg: '图片缺失，无法重新分析' }
+
+    const limitResult = await ensureTongueLimits({
+        openid,
+        storeId: runtime.storeId || report.storeId || '',
+        aiConfig: runtime.aiConfig
+    })
+    if (limitResult) return limitResult
+
+    try {
+        const result = await runTongueAiAnalysis({
+            aiConfig: runtime.aiConfig,
+            imageFileId: report.imageFileId,
+            babyAge: report.babyAge || '',
+            babyGender: report.babyGender || '',
+            symptoms: normalizeSymptoms(report.symptoms),
+            storeId: runtime.storeId || report.storeId || ''
+        })
+
+        const normalizedResult = normalizeTongueResult(result)
+        await db.collection('tongue_reports').doc(reportId).update({
+            data: {
+                result: normalizedResult,
+                reanalyzedAt: db.serverDate(),
+                reanalyzeSource: 'review_record',
+                updatedAt: db.serverDate()
+            }
+        })
+
+        return {
+            code: 0,
+            data: {
+                reportId,
+                reanalyzedAt: new Date().toISOString(),
+                ...normalizedResult
+            }
+        }
+    } catch (err) {
+        console.error('重新分析失败:', err)
+        const msg = err.message || ''
+        if (msg.includes('timed out') || msg.includes('time_limit') || msg.includes('较多')) {
+            return { code: -1, msg: '当前访问人数较多，请稍后再试' }
+        }
+        return { code: -1, msg: 'AI 分析失败，请重试' }
+    }
+}
+
+async function loadTongueRuntime(openid, event = {}) {
+    const user = await safeGetFirst('users', { _openid: openid })
+    const storeId = await resolveUserStoreId({
+        openid,
+        invitedBy: event.invitedBy || '',
+        currentUser: user
+    })
+    const aiConfig = storeId
+        ? await safeGetFirst('ai_config', { storeId })
+        : await safeGetFirst('ai_config', { enabled: true })
+    const reviewConfig = sanitizeReviewConfig(aiConfig && aiConfig.reviewConfig)
+
+    return {
+        user,
+        storeId,
+        aiConfig,
+        reviewConfig,
+        isInReview: reviewConfig.enabled === true
+    }
+}
+
+async function resolveUserStoreId({ openid, invitedBy = '', currentUser = null } = {}) {
+    const directUser = currentUser || await safeGetFirst('users', { _openid: openid })
+    if (directUser && directUser.storeId) return directUser.storeId
+
+    const adminStore = await safeGetFirst('stores', { adminOpenids: openid })
+    if (adminStore && adminStore._id) return adminStore._id
+
+    const staffStore = await safeGetFirst('stores', { 'staff.openid': openid })
+    if (staffStore && staffStore._id) return staffStore._id
+
+    if (invitedBy && invitedBy !== openid) {
+        const inviterUser = await safeGetFirst('users', { _openid: invitedBy })
+        if (inviterUser && inviterUser.storeId) return inviterUser.storeId
+
+        const inviterAdminStore = await safeGetFirst('stores', { adminOpenids: invitedBy })
+        if (inviterAdminStore && inviterAdminStore._id) return inviterAdminStore._id
+
+        const inviterStaffStore = await safeGetFirst('stores', { 'staff.openid': invitedBy })
+        if (inviterStaffStore && inviterStaffStore._id) return inviterStaffStore._id
+    }
+
+    const stores = await safeList('stores', {}, { limit: 2 })
+    if (stores.length === 1) return stores[0]._id || ''
+    return ''
+}
+
+function sanitizeReviewConfig(reviewConfig = {}) {
+    return {
+        enabled: reviewConfig.enabled === true,
+        entryTitle: String(reviewConfig.entryTitle || '').trim(),
+        pageTitle: String(reviewConfig.pageTitle || '').trim(),
+        historyTitle: String(reviewConfig.historyTitle || '').trim(),
+        reportTitle: String(reviewConfig.reportTitle || '').trim(),
+        submitText: String(reviewConfig.submitText || '').trim(),
+        shareTitle: String(reviewConfig.shareTitle || '').trim(),
+        emptyText: String(reviewConfig.emptyText || '').trim(),
+        listTagText: String(reviewConfig.listTagText || '').trim(),
+        safeBannerUrl: String(reviewConfig.safeBannerUrl || '').trim(),
+        safeShareImageUrl: String(reviewConfig.safeShareImageUrl || '').trim(),
+        hideHistoryAiRecords: reviewConfig.hideHistoryAiRecords !== false,
+        allowReanalyzeAfterReview: reviewConfig.allowReanalyzeAfterReview !== false
+    }
+}
+
+function normalizeSymptoms(symptoms) {
+    return Array.isArray(symptoms)
+        ? symptoms.map(item => String(item || '').trim()).filter(Boolean)
+        : []
+}
+
+async function ensureTongueLimits({ openid, storeId, aiConfig }) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const userCondition = {
+        _openid: openid,
+        createdAt: _.gte(today),
+        isReviewMode: _.neq(true)
+    }
+    const storeCondition = {
+        createdAt: _.gte(today),
+        isReviewMode: _.neq(true)
+    }
+    if (storeId) {
+        storeCondition.storeId = storeId
+    }
+
+    const [userUsageRes, globalUsageRes] = await Promise.all([
+        db.collection('tongue_reports').where(userCondition).count(),
+        db.collection('tongue_reports').where(storeCondition).count()
+    ])
+
+    if (aiConfig.userDailyLimit > 0 && userUsageRes.total >= aiConfig.userDailyLimit) {
+        return { code: -2, msg: `今日分析次数已用完（每日限 ${aiConfig.userDailyLimit} 次）` }
+    }
+    if (aiConfig.dailyLimit > 0 && globalUsageRes.total >= aiConfig.dailyLimit) {
+        return { code: -3, msg: '今日门店分析次数已达上限，请明日再来' }
+    }
+
+    return null
+}
+
+async function runTongueAiAnalysis({ aiConfig, imageFileId, babyAge, babyGender, symptoms, storeId }) {
+    let imageUrl = imageFileId
+    if (imageFileId && imageFileId.startsWith('cloud://')) {
+        try {
+            const fileRes = await cloud.getTempFileURL({ fileList: [imageFileId] })
+            imageUrl = fileRes.fileList[0].tempFileURL
+        } catch (e) {
+            console.error('获取图片链接失败:', e.message)
+            throw new Error('图片处理失败，请重试')
+        }
+    }
+
+    let productCatalog = ''
+    try {
+        const productCondition = { status: 'on' }
+        if (storeId) productCondition.storeId = storeId
+        const productsRes = await db.collection('products').where(productCondition).limit(100).get()
+        if (productsRes.data.length > 0) {
+            const lines = productsRes.data.map(p => {
+                const price = p.price ? `¥${(p.price / 100).toFixed(0)}` : ''
+                return `- ${p.name} | 卖点: ${p.sellingPoint || p.description || ''} | 适用体质: ${p.applicableConstitution || ''} | 核心功效: ${p.efficacy || ''} | 建议零售价: ${price}`
+            })
+            productCatalog = `\n\n---\n以下是当前商城在售的产品库，请从中精选 2-3 款推荐：\n${lines.join('\n')}`
+        }
+    } catch (e) {
+        console.log('读取产品库失败:', e.message)
+    }
+
+    let babyContext = ''
+    if (babyAge) babyContext += `宝宝年龄：${babyAge}。`
+    if (babyGender) babyContext += `性别：${babyGender === 'boy' ? '男' : '女'}宝。`
+    if (symptoms && symptoms.length > 0) babyContext += `主诉症状：${symptoms.join('；')}。`
+    if (babyContext) babyContext = `\n\n【宝宝信息】${babyContext}`
+
+    const finalPrompt = (aiConfig.systemPrompt || '你是一位中医舌诊专家，请分析用户上传的舌象照片。') + babyContext + productCatalog
+    const parsedUrl = new URL(aiConfig.apiUrl)
+    const httpModule = parsedUrl.protocol === 'https:' ? https : http
+    const apiPath = (!parsedUrl.pathname || parsedUrl.pathname === '/') ? '/v1/chat/completions' : parsedUrl.pathname
+
+    const requestBody = JSON.stringify({
+        model: aiConfig.model,
+        messages: [
+            { role: 'system', content: finalPrompt },
+            {
+                role: 'user',
+                content: [
+                    { type: 'text', text: '请分析这张舌象照片，以JSON格式返回分析结果' },
+                    { type: 'image_url', image_url: { url: imageUrl } }
+                ]
+            }
+        ],
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+    })
+
+    const aiResult = await new Promise((resolve, reject) => {
+        const req = httpModule.request({
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+            path: apiPath,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${aiConfig.apiKey}`
+            },
+            timeout: 60000
+        }, res => {
+            let data = ''
+            res.on('data', chunk => { data += chunk })
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data))
+                } catch (error) {
+                    reject(new Error(`AI 响应解析失败: ${data.slice(0, 200)}`))
+                }
+            })
+        })
+        req.on('error', reject)
+        req.on('timeout', () => {
+            req.destroy()
+            reject(new Error('当前访问人数较多，请稍后再试'))
+        })
+        req.write(requestBody)
+        req.end()
+    })
+
+    const content = aiResult.choices?.[0]?.message?.content
+    if (!content) throw new Error('AI 返回结果为空，请重试')
+
+    let result
+    try {
+        result = JSON.parse(content)
+    } catch (e) {
+        result = {
+            conclusion: content.slice(0, 100),
+            features: {},
+            analysis_details: content,
+            product_recommendations: [],
+            suggestions: []
+        }
+    }
+
+    return normalizeTongueResult(result)
+}
+
+function normalizeTongueResult(result = {}) {
+    const features = result.features || {}
+    return {
+        conclusion: result.conclusion || '',
+        tongueColor: features.color || result.tongueColor || '',
+        tongueCoating: features.coating || result.tongueCoating || '',
+        tongueShape: features.shape || result.tongueShape || '',
+        moisture: features.moisture || result.moisture || '',
+        features,
+        analysis_details: result.analysis_details || '',
+        product_recommendations: Array.isArray(result.product_recommendations) ? result.product_recommendations : [],
+        suggestions: Array.isArray(result.suggestions) ? result.suggestions : []
+    }
+}
+
+async function createTongueReportRecord({ openid, storeId, imageFileId, babyAge, babyGender, symptoms, result, isReviewMode, extra = {} }) {
+    const payload = {
+        _openid: openid,
+        storeId: storeId || '',
+        imageFileId: imageFileId || '',
+        babyAge: babyAge || '',
+        babyGender: babyGender || '',
+        symptoms: normalizeSymptoms(symptoms),
+        result: result ? normalizeTongueResult(result) : null,
+        isReviewMode: isReviewMode === true,
+        shareCount: 0,
+        createdAt: db.serverDate(),
+        ...extra
+    }
+
+    return db.collection('tongue_reports').add({ data: payload })
+}
+
+function hasTongueResult(result) {
+    if (!result || typeof result !== 'object') return false
+    if (String(result.conclusion || '').trim()) return true
+    if (String(result.analysis_details || '').trim()) return true
+    if (Array.isArray(result.product_recommendations) && result.product_recommendations.length > 0) return true
+    if (Array.isArray(result.suggestions) && result.suggestions.length > 0) return true
+    return false
+}
+
+function buildReviewSafeHistoryItem(item = {}) {
+    return {
+        _id: item._id,
+        imageFileId: item.imageFileId || '',
+        createdAt: item.createdAt || null,
+        isReviewMode: true,
+        result: null
+    }
+}
+
+function buildReviewSafeReport(report = {}, reviewConfig = {}) {
+    return {
+        _id: report._id,
+        _openid: report._openid,
+        storeId: report.storeId || '',
+        imageFileId: report.imageFileId || '',
+        babyAge: report.babyAge || '',
+        babyGender: report.babyGender || '',
+        symptoms: [],
+        createdAt: report.createdAt || null,
+        isReviewMode: true,
+        reviewMode: true,
+        canReanalyze: false,
+        reviewTitle: reviewConfig.reportTitle || '',
+        result: null
+    }
 }
 
 async function getActiveLotteryCampaign() {

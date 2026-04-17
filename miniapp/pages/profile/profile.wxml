@@ -104,10 +104,10 @@
       <view class="menu-row card-press" bindtap="goToTongue">
         <view class="menu-row-left">
           <view class="menu-icon" style="background:#EDF2EF">🌿</view>
-          <text class="menu-label">AI 舌象记录</text>
+          <text class="menu-label">{{tongueMenuLabel}}</text>
         </view>
         <view class="menu-row-right">
-          <text class="menu-extra" wx:if="{{tongueCount}}">{{tongueCount}} 次分析</text>
+          <text class="menu-extra" wx:if="{{tongueCountLabel}}">{{tongueCountLabel}}</text>
           <text class="menu-chevron">›</text>
         </view>
       </view>

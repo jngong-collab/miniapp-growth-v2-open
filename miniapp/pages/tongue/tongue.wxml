@@ -10,17 +10,17 @@
       <view class="process-strip animate-fade-up" style="animation-delay: 0.06s">
         <view class="process-step">
           <view class="step-num">1</view>
-          <text class="step-label">填写信息</text>
+          <text class="step-label">{{stepLabels[0]}}</text>
         </view>
         <view class="step-line"></view>
         <view class="process-step">
           <view class="step-num">2</view>
-          <text class="step-label">拍摄舌象</text>
+          <text class="step-label">{{stepLabels[1]}}</text>
         </view>
         <view class="step-line"></view>
         <view class="process-step">
           <view class="step-num">3</view>
-          <text class="step-label">获取报告</text>
+          <text class="step-label">{{stepLabels[2]}}</text>
         </view>
       </view>
 
@@ -59,28 +59,28 @@
           <view class="head-icon-bg" style="background:var(--color-primary-bg)">
             <text class="head-icon">📝</text>
           </view>
-          <text class="head-title">症状描述（选填）</text>
+          <text class="head-title">{{isReviewMode ? '备注信息（选填）' : '症状描述（选填）'}}</text>
         </view>
         <view class="other-symptom-box">
-          <textarea class="sym-textarea" placeholder="例如：夜间睡不安稳、腹泻、发烧、食欲不振…" placeholder-class="sym-placeholder" value="{{otherSymptom}}" bindinput="onOtherSymptomInput" auto-height="{{false}}" fixed="{{true}}" />
+          <textarea class="sym-textarea" placeholder="{{isReviewMode ? '例如：今天状态、饮食情况、作息表现…' : '例如：夜间睡不安稳、腹泻、发烧、食欲不振…'}}" placeholder-class="sym-placeholder" value="{{otherSymptom}}" bindinput="onOtherSymptomInput" auto-height="{{false}}" fixed="{{true}}" />
         </view>
       </view>
 
       <!-- 拍照指引 -->
       <view class="guide-box animate-fade-up" style="animation-delay: 0.18s">
-        <view class="guide-title">拍照小贴士</view>
+        <view class="guide-title">{{reviewConfig.guideTitle}}</view>
         <view class="guide-items">
           <view class="guide-item">
             <view class="guide-dot" style="background:var(--color-eco-bg);color:var(--color-eco-dark)">✓</view>
-            <text class="guide-text">光线明亮自然</text>
+            <text class="guide-text">{{reviewConfig.guideTips[0]}}</text>
           </view>
           <view class="guide-item">
             <view class="guide-dot" style="background:var(--color-eco-bg);color:var(--color-eco-dark)">✓</view>
-            <text class="guide-text">舌体自然舒展</text>
+            <text class="guide-text">{{reviewConfig.guideTips[1]}}</text>
           </view>
           <view class="guide-item">
             <view class="guide-dot" style="background:var(--color-primary-bg);color:var(--color-primary-dark)">×</view>
-            <text class="guide-text">避免滤镜美颜</text>
+            <text class="guide-text">{{reviewConfig.guideTips[2]}}</text>
           </view>
         </view>
       </view>
@@ -89,10 +89,10 @@
       <view class="action-dock animate-fade-up" style="animation-delay: 0.22s">
         <button class="scan-btn card-press" bindtap="chooseImage">
           <text class="btn-icon">📷</text>
-          <text class="btn-text">立即拍舌象</text>
+          <text class="btn-text">{{isReviewMode ? '立即拍照记录' : '立即拍舌象'}}</text>
         </button>
         <view class="history-link-wrap" bindtap="goToHistory">
-          <text class="history-link">{{historyCount > 0 ? ('查看历史报告 (' + historyCount + ')') : '暂无历史报告'}}</text>
+          <text class="history-link">{{historyText}}</text>
         </view>
       </view>
     </block>
@@ -110,7 +110,7 @@
         </view>
         <view class="preview-dock">
           <view class="prev-btn btn-ghost card-press" bindtap="retakePhoto">重新拍摄</view>
-          <view class="prev-btn btn-primary card-press" bindtap="startAnalyze">开始 AI 分析</view>
+          <view class="prev-btn btn-primary card-press" bindtap="startAnalyze">{{primaryActionText}}</view>
         </view>
       </view>
     </block>
@@ -124,8 +124,8 @@
           <view class="circle c3"></view>
           <view class="core-icon">🌿</view>
         </view>
-        <text class="analyzing-title">正在深度解析舌象特征</text>
-        <text class="analyzing-sub">结合中医体质理论进行推演…</text>
+        <text class="analyzing-title">{{analyzingTitle}}</text>
+        <text class="analyzing-sub">{{analyzingSubtitle}}</text>
       </view>
     </block>
   </view>

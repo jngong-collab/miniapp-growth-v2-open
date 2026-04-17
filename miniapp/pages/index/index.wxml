@@ -27,9 +27,14 @@
   <view class="home-content" wx:if="{{!loading}}">
     <!-- 品牌头部 -->
     <view class="header-section animate-fade-up">
-      <view class="greeting-wrap">
-        <text class="greeting-time">{{greeting}} {{greetingEmoji}}</text>
-        <text class="store-name">{{storeInfo.name || '浴小主小儿推拿'}}</text>
+      <view class="brand-row">
+        <view class="brand-logo-wrap" wx:if="{{brandLogoUrl}}">
+          <image class="brand-logo" src="{{brandLogoUrl}}" mode="aspectFit"></image>
+        </view>
+        <view class="greeting-wrap">
+          <text class="greeting-time">{{greeting}} {{greetingEmoji}}</text>
+          <text class="store-name">{{storeInfo.name || '浴小主小儿推拿'}}</text>
+        </view>
       </view>
       <view class="location-pill card-press" bindtap="openLocation" wx:if="{{storeInfo.address}}">
         <text class="loc-icon">📍</text>
@@ -42,9 +47,9 @@
     <view class="bento-box animate-fade-up" style="animation-delay: 0.1s">
       <view class="bento-main card-press bg-grad-ai" bindtap="goToTongue">
         <view class="bento-main-content">
-          <view class="bento-badge">AI 智能诊断</view>
-          <text class="bento-main-title">拍舌识体质</text>
-          <text class="bento-main-desc">黄帝内经 · 现代 AI 辅助</text>
+          <view class="bento-badge">{{tongueBadgeText}}</view>
+          <text class="bento-main-title">{{tongueTitleText}}</text>
+          <text class="bento-main-desc">{{tongueDescText}}</text>
         </view>
         <view class="bento-main-action">
           <text>立即体验</text>

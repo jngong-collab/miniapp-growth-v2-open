@@ -42,7 +42,7 @@
       },
       {
         "pagePath": "pages/tongue/tongue",
-        "text": "AI看舌象",
+        "text": "健康打卡",
         "iconPath": "assets/icons/tongue.png",
         "selectedIconPath": "assets/icons/tongue-active.png"
       },

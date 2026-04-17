@@ -71,6 +71,13 @@ export interface TrendPoint {
   refunds: number
 }
 
+export interface GeocodeResult {
+  latitude: number
+  longitude: number
+  formattedAddress: string
+  provider: string
+}
+
 export interface OrderSummary {
   _id: string
   orderNo: string

@@ -118,6 +118,7 @@ test('admin web and admin api expose the owner console skeleton', () => {
   assert.match(adminApiSource, /case 'campaigns\.saveFission'/)
   assert.match(adminApiSource, /case 'leads\.list'/)
   assert.match(adminApiSource, /case 'settings\.updateStore'/)
+  assert.match(adminApiSource, /case 'settings\.geocodeAddress'/)
   assert.match(adminApiSource, /case 'staff\.listAdminAccounts'/)
 
   assert.match(adminWebPackageSource, /"antd"/)
@@ -753,6 +754,12 @@ test('settings page includes notification config card', () => {
   assert.match(settingsSource, /updateNotificationConfig/)
   assert.match(settingsSource, /orderNotifyEnabled/)
   assert.match(settingsSource, /refundNotifyEnabled/)
+  assert.match(settingsSource, /一键解析地址/)
+  assert.match(settingsSource, /地图选点/)
+  assert.match(settingsSource, /门店地图位置/)
+  assert.match(settingsSource, /openstreetmap/)
+  assert.match(settingsSource, /上传 Logo/)
+  assert.match(settingsSource, /uploadFileToCloud/)
 })
 
 test('phase-d docs describe new collections and page routes', () => {

@@ -16,6 +16,7 @@ function getGreeting() {
 Page({
     data: {
         storeInfo: null,
+        brandLogoUrl: '',
         banners: [],
         fissionCampaigns: [],
         hotProducts: [],
@@ -24,10 +25,15 @@ Page({
         lotteryCampaign: null,
         loading: true,
         greeting: 'Hi, 你好',
-        greetingEmoji: '👋'
+        greetingEmoji: '👋',
+        reviewConfig: null,
+        isReviewMode: true,
+        tongueBadgeText: '照片记录',
+        tongueTitleText: '健康打卡',
+        tongueDescText: '日常照片留存与成长记录'
     },
 
-    onLoad: function (options) {
+    onLoad: async function (options) {
         // 设置时间问候语
         const g = getGreeting()
         this.setData({ greeting: g.text, greetingEmoji: g.emoji })
@@ -43,6 +49,7 @@ Page({
             console.log('扫码场景参数:', scene)
         }
 
+        await this._syncReviewConfig()
         this._loadPageData()
     },
 
@@ -60,10 +67,14 @@ Page({
     onShareAppMessage: function () {
         const app = getApp()
         const openid = app.globalData.openid || ''
-        return {
+        const shareConfig = app.getShareConfig ? app.getShareConfig() : {
             title: config.shareTitle,
-            path: `/pages/index/index?inviter=${openid}`,
             imageUrl: config.shareImageUrl || ''
+        }
+        return {
+            title: shareConfig.title || config.shareTitle,
+            path: `/pages/index/index?inviter=${openid}`,
+            imageUrl: shareConfig.imageUrl || ''
         }
     },
 
@@ -71,11 +82,34 @@ Page({
     onShareTimeline: function () {
         const app = getApp()
         const openid = app.globalData.openid || ''
-        return {
+        const shareConfig = app.getShareConfig ? app.getShareConfig() : {
             title: config.shareTitle,
-            query: `inviter=${openid}`,
             imageUrl: config.shareImageUrl || ''
         }
+        return {
+            title: shareConfig.title || config.shareTitle,
+            query: `inviter=${openid}`,
+            imageUrl: shareConfig.imageUrl || ''
+        }
+    },
+
+    _syncReviewConfig: async function () {
+        const app = getApp()
+        if (app.loadReviewConfig) {
+            await app.loadReviewConfig().catch(() => {})
+        }
+        this.setData({
+            reviewConfig: app.getReviewConfig ? app.getReviewConfig() : null
+        })
+        const reviewConfig = app.getReviewConfig ? app.getReviewConfig() : (config.reviewModeFallback || {})
+        const isReviewMode = reviewConfig.enabled !== false
+        this.setData({
+            reviewConfig,
+            isReviewMode,
+            tongueBadgeText: isReviewMode ? '照片记录' : 'AI 智能分析',
+            tongueTitleText: isReviewMode ? (reviewConfig.entryTitle || '健康打卡') : '拍舌识体质',
+            tongueDescText: isReviewMode ? '日常照片留存与成长记录' : '黄帝内经 · 现代 AI 辅助'
+        })
     },
 
     // 加载页面所有数据
@@ -85,7 +119,8 @@ Page({
         try {
             // 并行加载门店信息、裂变活动、推荐商品
             const homeContent = await this._loadHomeContent()
-            const storeInfo = homeContent.storeInfo || await this._loadStoreInfo()
+            const rawStoreInfo = homeContent.storeInfo || await this._loadStoreInfo()
+            const storeInfo = await this._normalizeStoreAssets(rawStoreInfo)
 
             // 推拿师信息：优先从门店数据获取，否则使用默认
             const therapist = (storeInfo && storeInfo.therapist) || {
@@ -97,11 +132,14 @@ Page({
                 serviceCount: '3000+',
                 rating: '99%',
                 bio: '毕业于中医药大学，专注小儿推拿领域。擅长运用传统中医手法结合现代理疗技术，为宝宝提供温和有效的调理方案。',
-                specialties: ['小儿推拿', '脾胃调理', '体质辨识', '生长发育']
+                specialties: this.data.isReviewMode
+                    ? ['小儿推拿', '脾胃调理', '日常护理', '生长发育']
+                    : ['小儿推拿', '脾胃调理', '体质辨识', '生长发育']
             }
 
             this.setData({
                 storeInfo: storeInfo,
+                brandLogoUrl: (storeInfo && storeInfo.logo && !String(storeInfo.logo).startsWith('cloud://')) ? storeInfo.logo : '',
                 banners: (storeInfo && storeInfo.banners) || [],
                 fissionCampaigns: homeContent.fissionCampaigns || [],
                 hotProducts: homeContent.hotProducts || [],
@@ -163,6 +201,61 @@ Page({
             console.error('加载门店信息失败:', err)
             return null
         }
+    },
+
+    _normalizeStoreAssets: async function (storeInfo) {
+        if (!storeInfo) return null
+
+        const fileList = []
+        if (storeInfo.logo && String(storeInfo.logo).startsWith('cloud://')) {
+            fileList.push(String(storeInfo.logo))
+        }
+        if (Array.isArray(storeInfo.banners)) {
+            storeInfo.banners.forEach(item => {
+                if (item && String(item).startsWith('cloud://')) {
+                    fileList.push(String(item))
+                }
+            })
+        }
+
+        if (!fileList.length) {
+            return this._stripUnresolvedStoreAssets(storeInfo)
+        }
+
+        try {
+            const res = await wx.cloud.getTempFileURL({
+                fileList: [...new Set(fileList)]
+            })
+            const urlMap = {}
+            ;(res.fileList || []).forEach(item => {
+                if (item.fileID && item.tempFileURL) {
+                    urlMap[item.fileID] = item.tempFileURL
+                }
+            })
+
+            return {
+                ...this._stripUnresolvedStoreAssets(storeInfo),
+                logo: urlMap[storeInfo.logo] || storeInfo.logo,
+                banners: Array.isArray(storeInfo.banners)
+                    ? storeInfo.banners.map(item => urlMap[item] || item)
+                    : []
+            }
+        } catch (err) {
+            console.warn('转换门店云存储资源失败，回退原始地址:', err)
+            return this._stripUnresolvedStoreAssets(storeInfo)
+        }
+    },
+
+    _stripUnresolvedStoreAssets: function (storeInfo) {
+        if (!storeInfo) return null
+        const next = { ...storeInfo }
+        if (next.logo && String(next.logo).startsWith('cloud://')) {
+            next.logo = ''
+        }
+        if (Array.isArray(next.banners)) {
+            next.banners = next.banners.filter(item => item && !String(item).startsWith('cloud://'))
+        }
+        return next
     },
 
     // ---- 页面导航 ----

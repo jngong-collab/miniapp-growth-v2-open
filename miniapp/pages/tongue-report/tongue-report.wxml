@@ -6,7 +6,7 @@
   <!-- 加载状态 -->
   <view class="loader-wrap" wx:if="{{loading}}">
     <view class="loader-spinner"></view>
-    <text class="loader-text">正在加载报告…</text>
+    <text class="loader-text">{{mode === 'history' ? '正在加载记录…' : '正在加载内容…'}}</text>
   </view>
 
   <block wx:if="{{!loading && mode === 'report' && report}}">
@@ -15,7 +15,7 @@
       <!-- 顶部信息区 -->
       <view class="hero-section animate-fade-up">
         <view class="hero-header">
-          <text class="hero-label">舌象分析报告</text>
+          <text class="hero-label">{{reportTitle}}</text>
           <text class="hero-date">{{createdAtStr}}</text>
         </view>
 
@@ -26,15 +26,25 @@
           <view class="hero-info">
             <view class="hero-badge">
               <text class="hero-badge-icon">✨</text>
-              <text class="hero-badge-text">AI 智能分析</text>
+              <text class="hero-badge-text">{{safeReportView ? '照片记录' : 'AI 智能分析'}}</text>
             </view>
-            <text class="hero-conclusion">{{report.result.conclusion || '分析完成'}}</text>
+            <text class="hero-conclusion">{{safeReportView ? reportTitle : (report.result.conclusion || '分析完成')}}</text>
           </view>
         </view>
       </view>
 
+      <view class="section animate-fade-up" style="animation-delay:.08s" wx:if="{{safeReportView}}">
+        <view class="section-header">
+          <text class="section-title">记录说明</text>
+          <text class="section-subtitle">Photo Record</text>
+        </view>
+        <view class="analysis-card">
+          <text class="analysis-text">{{isReviewMode ? '当前为照片记录模式，仅展示拍摄图片与时间信息。' : '这条记录拍摄于审核期间，暂未生成 AI 报告。可在下方手动发起一次正式分析。'}}</text>
+        </view>
+      </view>
+
       <!-- 四维舌象特征 -->
-      <view class="section animate-fade-up" style="animation-delay:.08s">
+      <view class="section animate-fade-up" style="animation-delay:.08s" wx:if="{{!safeReportView}}">
         <view class="section-header">
           <text class="section-title">舌象特征</text>
           <text class="section-subtitle">基于 AI 识别的四大维度</text>
@@ -80,7 +90,7 @@
       </view>
 
       <!-- 分析详情 -->
-      <view class="section animate-fade-up" style="animation-delay:.14s" wx:if="{{report.result.analysis_details}}">
+      <view class="section animate-fade-up" style="animation-delay:.14s" wx:if="{{!safeReportView && report.result.analysis_details}}">
         <view class="section-header">
           <text class="section-title">分析详情</text>
           <text class="section-subtitle">AI 综合研判</text>
@@ -92,7 +102,7 @@
       </view>
 
       <!-- 产品推荐 -->
-      <view class="section animate-fade-up" style="animation-delay:.20s" wx:if="{{recommendGroups.length > 0}}">
+      <view class="section animate-fade-up" style="animation-delay:.20s" wx:if="{{!safeReportView && recommendGroups.length > 0}}">
         <view class="section-header">
           <text class="section-title">为您甄选</text>
           <text class="section-subtitle">根据舌象匹配的调理方案</text>
@@ -141,7 +151,7 @@
       </view>
 
       <!-- 调理建议 -->
-      <view class="section animate-fade-up" style="animation-delay:.28s" wx:if="{{report.result.suggestions.length > 0}}">
+      <view class="section animate-fade-up" style="animation-delay:.28s" wx:if="{{!safeReportView && report.result.suggestions.length > 0}}">
         <view class="section-header">
           <text class="section-title">调理建议</text>
           <text class="section-subtitle">日常生活中的改善方向</text>
@@ -157,7 +167,7 @@
       </view>
 
       <!-- 免责声明 -->
-      <view class="disclaimer animate-fade-up" style="animation-delay:.32s">
+      <view class="disclaimer animate-fade-up" style="animation-delay:.32s" wx:if="{{!safeReportView}}">
         <text class="disclaimer-icon">⚕️</text>
         <text class="disclaimer-text">本报告由 AI 辅助分析，仅供参考，不作为医疗诊断依据。如有不适请及时就医。</text>
       </view>
@@ -168,31 +178,35 @@
   <!-- 底部操作栏 -->
   <view class="bottom-bar animate-fade-up" style="animation-delay:.36s" wx:if="{{!loading && mode === 'report' && report}}">
     <view class="btn-retry card-press" bindtap="goAnalyzeAgain">
-      <text>重新分析</text>
+      <text>{{safeReportView ? '继续拍照' : '重新分析'}}</text>
     </view>
-    <button class="btn-share card-press" open-type="share">
-      <text>分享给好友</text>
+    <button class="btn-share card-press" open-type="share" wx:if="{{!canReanalyze}}">
+      <text>{{safeReportView ? '分享记录' : '分享给好友'}}</text>
     </button>
+    <view class="btn-share card-press" wx:if="{{canReanalyze}}" bindtap="reanalyzeReport">
+      <text>{{reviewConfig.detailCtaText}}</text>
+    </view>
   </view>
 
   <!-- 历史列表 -->
   <block wx:if="{{!loading && mode === 'history'}}">
     <view class="report-content">
       <view class="section-header animate-fade-up" style="margin-top:40rpx">
-        <text class="section-title">分析记录</text>
-        <text class="section-subtitle">History</text>
+        <text class="section-title">{{historyTitle}}</text>
+        <text class="section-subtitle">{{historySubtitle}}</text>
       </view>
       <view class="hist-list">
         <view class="hist-item card-float card-press animate-fade-up" wx:for="{{historyList}}" wx:key="_id" bindtap="viewHistoryReport" data-id="{{item._id}}" style="animation-delay:{{index*0.05}}s">
           <image class="hist-img" src="{{item.imageFileId}}" mode="aspectFill"></image>
           <view class="hist-info">
-            <text class="hist-name">舌象分析报告</text>
+            <text class="hist-name">{{item.isPendingReanalyze ? reviewConfig.reportTitle : (isReviewMode ? reviewConfig.reportTitle : '舌象分析报告')}}</text>
             <text class="hist-date">{{item.createdAtStr}}</text>
           </view>
+          <text wx:if="{{!isReviewMode && item.isPendingReanalyze}}" style="font-size:22rpx;color:#B45309;background:#FEF3C7;border-radius:999rpx;padding:8rpx 14rpx;margin-right:12rpx;">{{reviewConfig.listTagText}}</text>
           <text class="hist-arrow">›</text>
         </view>
         <view class="hist-empty" wx:if="{{historyList.length === 0}}">
-          <text>暂无分析记录</text>
+          <text>{{reviewConfig.historyEmptyText}}</text>
         </view>
       </view>
     </view>

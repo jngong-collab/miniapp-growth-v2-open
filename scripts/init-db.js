@@ -61,6 +61,46 @@ const DEFAULT_ROLE_TEMPLATES = [
   }
 ]
 
+const INDEX_SPECS = [
+  { collectionName: 'users', indexName: 'users__openid_unique', keys: [{ field: '_openid', order: 'asc' }], unique: true },
+  { collectionName: 'orders', indexName: 'orders__orderNo_unique', keys: [{ field: 'orderNo', order: 'asc' }], unique: true },
+  { collectionName: 'admin_accounts', indexName: 'admin_accounts__uid_unique', keys: [{ field: 'uid', order: 'asc' }], unique: true },
+  { collectionName: 'tongue_reports', indexName: 'tongue_reports__openid_createdAt', keys: [{ field: '_openid', order: 'asc' }, { field: 'createdAt', order: 'desc' }], unique: false },
+  { collectionName: 'tongue_reports', indexName: 'tongue_reports__openid_isReviewMode_createdAt', keys: [{ field: '_openid', order: 'asc' }, { field: 'isReviewMode', order: 'asc' }, { field: 'createdAt', order: 'desc' }], unique: false }
+]
+
+function buildDefaultRoleTemplates(storeId = DEFAULT_STORE_ID) {
+  return DEFAULT_ROLE_TEMPLATES.map(template => ({
+    ...template,
+    storeId
+  }))
+}
+
+function requireEnvValue(source, key) {
+  const value = trimValue(source[key])
+  if (!value) {
+    throw new Error(`缺少必填环境变量: ${key}`)
+  }
+  return value
+}
+
+function resolveBootstrapConfig(env = {}) {
+  return {
+    envId: requireEnvValue(env, 'TCB_ENV_ID'),
+    secretId: requireEnvValue(env, 'CLOUDBASE_SECRET_ID'),
+    secretKey: requireEnvValue(env, 'CLOUDBASE_SECRET_KEY'),
+    admin: {
+      uid: requireEnvValue(env, 'ADMIN_UID'),
+      username: requireEnvValue(env, 'ADMIN_USERNAME'),
+      displayName: requireEnvValue(env, 'ADMIN_DISPLAY_NAME')
+    },
+    store: {
+      id: requireEnvValue(env, 'ADMIN_STORE_ID'),
+      name: requireEnvValue(env, 'ADMIN_STORE_NAME')
+    }
+  }
+}
+
 function trimValue(value) {
   return String(value || '').trim()
 }
@@ -473,6 +513,8 @@ if (require.main === module) {
 
 module.exports = {
   CORE_COLLECTIONS,
+  INDEX_SPECS,
+  ADMIN_PERMISSION_KEYS,
   DEFAULT_ROLE_TEMPLATES,
   DEFAULT_ENV_ID,
   DEFAULT_STORE_ID,
@@ -481,6 +523,8 @@ module.exports = {
   DEFAULT_ADMIN_PASSWORD,
   DEFAULT_ADMIN_UID,
   DEFAULT_ADMIN_DISPLAY_NAME,
+  buildDefaultRoleTemplates,
+  resolveBootstrapConfig,
   resolveEnvId,
   findPublishableKey,
   runBootstrap
