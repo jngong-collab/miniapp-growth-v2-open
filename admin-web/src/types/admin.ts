@@ -253,7 +253,27 @@ export interface ProductRecord {
 export interface PackageRecord {
   _id: string
   productId: string
+  name: string
   productName: string
+  type: string
+  category: string
+  price: number
+  originalPrice: number
+  priceYuan: string
+  originalPriceYuan: string
+  stock: number
+  stockLabel: string | number
+  soldCount: number
+  status: string
+  statusLabel: string
+  showInMall: boolean
+  sortOrder: number
+  deliveryType: string
+  description: string
+  detail: string
+  efficacy: string
+  tags: string[]
+  images: string[]
   validDays: number
   items: Array<{ name: string; count: number }>
   itemsText: string
@@ -297,6 +317,9 @@ export interface AiConfig {
   apiUrl: string
   apiKey: string
   model: string
+  imageApiUrl: string
+  imageApiKey: string
+  imageModel: string
   dailyLimit: number
   userDailyLimit: number
   systemPrompt: string

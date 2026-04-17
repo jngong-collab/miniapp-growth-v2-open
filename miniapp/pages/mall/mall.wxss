@@ -249,21 +249,24 @@
   margin-left: 4rpx;
 }
 
-.package-scroll {
+.package-swiper {
   width: 100%;
+  height: 228rpx;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
-.package-list {
-  display: inline-flex;
-  gap: var(--spacing-md);
-  padding: 4rpx 4rpx 12rpx;
+.package-swiper-item {
+  box-sizing: border-box;
+  padding: 4rpx 4rpx 20rpx;
 }
 
 .package-card {
-  width: 520rpx;
-  height: 220rpx;
+  width: 100%;
+  height: 200rpx;
+  box-sizing: border-box;
   border-radius: var(--radius-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: 32rpx 32rpx;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -285,17 +288,44 @@
   background: linear-gradient(135deg, #E8C39E 0%, #D4A574 100%);
 }
 
+.pkg-spleen::after {
+  content: "☀️";
+}
+
 .pkg-sleep {
   background: linear-gradient(135deg, #C5B9E0 0%, #A99BD4 100%);
+}
+
+.pkg-sleep::after {
+  content: "🌙";
 }
 
 .pkg-growth {
   background: linear-gradient(135deg, #F4C495 0%, #E8A868 100%);
 }
 
+.pkg-growth::after {
+  content: "🌱";
+}
+
+.package-card::after {
+  position: absolute;
+  right: -20rpx;
+  top: -30rpx;
+  font-size: 160rpx;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .package-top {
   position: relative;
   z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .package-name {
@@ -304,13 +334,21 @@
   display: block;
   margin-bottom: var(--spacing-xs);
   text-shadow: 0 2rpx 4rpx rgba(0,0,0,0.1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .package-desc {
   font-size: var(--font-sm);
   opacity: 0.95;
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.5;
+  max-width: 90%;
 }
 
 .package-footer {
@@ -319,6 +357,7 @@
   justify-content: space-between;
   position: relative;
   z-index: 1;
+  margin-top: auto;
 }
 
 .package-price-row {

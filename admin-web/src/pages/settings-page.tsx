@@ -84,12 +84,17 @@ export function SettingsPage() {
   const longitude = Number(Form.useWatch('longitude', storeForm) || 0)
   const logoValue = String(Form.useWatch('logo', storeForm) || '')
   const currentAiModel = String(Form.useWatch('model', aiForm) || '')
+  const imageApiUrlValue = String(Form.useWatch('imageApiUrl', aiForm) || '')
   const apiV3KeyValue = String(Form.useWatch('apiV3Key', payForm) || '')
   const privateKeyValue = String(Form.useWatch('privateKey', payForm) || '')
   const certificateValue = String(Form.useWatch('certificatePem', payForm) || '')
   const apiV3KeyConfigured = Boolean(apiV3KeyValue.trim())
   const privateKeyConfigured = Boolean(privateKeyValue.trim())
   const certificateConfigured = Boolean(certificateValue.trim())
+  const fetchedImageModels = useMemo(
+    () => fetchedAiModels.filter(model => /(image|imagen)/i.test(model)),
+    [fetchedAiModels]
+  )
 
   const settingsQuery = useQuery({
     queryKey: ['settings'],
@@ -518,6 +523,33 @@ export function SettingsPage() {
                   </Button>
                 </Space.Compact>
               </Form.Item>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
+                文本分析默认使用上面的对话接口。如果你的 AI 网关只支持 <code>/chat/completions</code>，主图生成通常需要单独配置一个支持图片生成的接口地址。
+              </Typography.Paragraph>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="imageApiUrl" label="图片生成接口地址" style={{ marginBottom: 12 }}>
+                    <Input placeholder="支持 /v1/images/generations 的图片接口，可留空复用上方地址" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="imageApiKey" label="图片生成 API Key" style={{ marginBottom: 12 }}>
+                    <Input.Password placeholder="留空代表复用上方 API Key" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item label="图片模型" style={{ marginBottom: 12 }}>
+                <Form.Item name="imageModel" noStyle>
+                  <AutoComplete
+                    options={(fetchedImageModels.length ? fetchedImageModels : fetchedAiModels).map(model => ({ value: model }))}
+                    placeholder="例如：imagen-4.0-fast-generate-001，可留空复用上方模型"
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </Form.Item>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
+                当前图片接口：{imageApiUrlValue.trim() || '未单独配置，默认复用文本接口'}
+              </Typography.Paragraph>
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item name="dailyLimit" label="每日总限制" style={{ marginBottom: 12 }}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>

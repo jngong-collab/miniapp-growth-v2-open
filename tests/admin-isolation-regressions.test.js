@@ -478,7 +478,7 @@ test('settings AI tooling actions reuse stored apiKey when the form submits a ma
   }
 })
 
-test('catalog savePackage update path rejects cross-store packages and non-package products', async () => {
+test('catalog savePackage update path rejects cross-store packages and migrates legacy product bindings into dedicated package products', async () => {
   const catalogPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-catalog.js')
   const dataPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'data.js')
   const contextPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'context.js')
@@ -486,21 +486,20 @@ test('catalog savePackage update path rejects cross-store packages and non-packa
   unloadModule(catalogPath)
 
   let updateCalled = false
+  let addCalled = false
+  const packageDocs = {
+    'pkg-cross': { _id: 'pkg-cross', storeId: 'store-b', productId: 'prod-package' },
+    'pkg-own': { _id: 'pkg-own', storeId: 'store-a', productId: 'prod-service', items: [{ name: '推拿', count: 1 }] }
+  }
+  const productDocs = {
+    'prod-package': { _id: 'prod-package', storeId: 'store-a', type: 'package', name: '套餐商品' },
+    'prod-service': { _id: 'prod-service', storeId: 'store-a', type: 'service', name: '服务商品' }
+  }
   const restoreData = mockModule(dataPath, {
     getAccessStoreId: (access) => access.account.storeId,
     safeGetById: async (collection, id) => {
-      if (collection === 'packages' && id === 'pkg-cross') {
-        return { _id: 'pkg-cross', storeId: 'store-b', productId: 'prod-package' }
-      }
-      if (collection === 'packages' && id === 'pkg-own') {
-        return { _id: 'pkg-own', storeId: 'store-a', productId: 'prod-service' }
-      }
-      if (collection === 'products' && id === 'prod-package') {
-        return { _id: 'prod-package', storeId: 'store-a', type: 'package', name: '套餐商品' }
-      }
-      if (collection === 'products' && id === 'prod-service') {
-        return { _id: 'prod-service', storeId: 'store-a', type: 'service', name: '服务商品' }
-      }
+      if (collection === 'packages') return packageDocs[id] || null
+      if (collection === 'products') return productDocs[id] || null
       return null
     },
     safeList: async () => [],
@@ -513,10 +512,15 @@ test('catalog savePackage update path rejects cross-store packages and non-packa
         doc: () => ({
           update: async () => {
             updateCalled = true
+            packageDocs['pkg-own'] = { ...packageDocs['pkg-own'], productId: 'pkg-new' }
             return { stats: { updated: 1 } }
           }
         }),
-        add: async () => ({ _id: 'pkg-new' })
+        add: async () => {
+          addCalled = true
+          productDocs['pkg-new'] = { _id: 'pkg-new', storeId: 'store-a', type: 'package', name: '历史套餐迁移' }
+          return { _id: 'pkg-new' }
+        }
       })
     },
     _cmd: dbCommand
@@ -529,6 +533,7 @@ test('catalog savePackage update path rejects cross-store packages and non-packa
     const crossStoreRes = await savePackage(access, {
       payload: {
         _id: 'pkg-cross',
+        name: '跨店套餐',
         productId: 'prod-package',
         items: [{ name: '推拿', count: 1 }]
       }
@@ -536,16 +541,18 @@ test('catalog savePackage update path rejects cross-store packages and non-packa
     assert.equal(crossStoreRes.code, -1)
     assert.match(crossStoreRes.msg, /无权限|门店/)
 
-    const wrongTypeRes = await savePackage(access, {
+    const legacyRes = await savePackage(access, {
       payload: {
         _id: 'pkg-own',
         productId: 'prod-service',
+        name: '历史套餐迁移',
         items: [{ name: '推拿', count: 1 }]
       }
     })
-    assert.equal(wrongTypeRes.code, -1)
-    assert.match(wrongTypeRes.msg, /套餐|type=package|商品类型/)
-    assert.equal(updateCalled, false)
+    assert.equal(legacyRes.code, 0)
+    assert.equal(addCalled, true)
+    assert.equal(updateCalled, true)
+    assert.equal(legacyRes.data.productId, 'pkg-new')
   } finally {
     restoreData()
     restoreContext()

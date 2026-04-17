@@ -1,0 +1,32 @@
+--- miniapp/pages/mall/mall.wxss
++++ miniapp/pages/mall/mall.wxss
+@@ -285,12 +285,18 @@
+ .pkg-spleen {
+   background: linear-gradient(135deg, #E8C39E 0%, #D4A574 100%);
+ }
++.pkg-spleen::after {
++  content: "☀️";
++}
+ 
+ .pkg-sleep {
+   background: linear-gradient(135deg, #C5B9E0 0%, #A99BD4 100%);
+ }
++.pkg-sleep::after {
++  content: "🌙";
++}
+ 
+ .pkg-growth {
+   background: linear-gradient(135deg, #F4C495 0%, #E8A868 100%);
+ }
++.pkg-growth::after {
++  content: "🌱";
++}
++
++.package-card::after {
++  position: absolute;
++  right: -20rpx;
++  top: -20rpx;
++  font-size: 160rpx;
++  opacity: 0.15;
++  pointer-events: none;
++}

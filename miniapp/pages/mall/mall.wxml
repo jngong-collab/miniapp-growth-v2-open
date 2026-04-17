@@ -80,9 +80,18 @@
           <text class="section-tag">到店核销</text>
         </view>
       </view>
-      <scroll-view class="package-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="package-list">
-          <view class="package-card card-press {{item.name === '脾胃养护调理套餐' ? 'pkg-spleen' : item.name === '安神助眠调理套餐' ? 'pkg-sleep' : 'pkg-growth'}}" wx:for="{{packages}}" wx:key="_id" bindtap="goToProduct" data-id="{{item._id}}">
+      <swiper
+        class="package-swiper"
+        indicator-dots="{{packages.length > 1}}"
+        indicator-color="rgba(255,255,255,0.36)"
+        indicator-active-color="#fff"
+        circular="{{packages.length > 1}}"
+        autoplay="{{packages.length > 1}}"
+        interval="{{4200}}"
+        duration="{{420}}"
+      >
+        <swiper-item class="package-swiper-item" wx:for="{{packages}}" wx:key="_id">
+          <view class="package-card card-press {{index % 3 === 0 ? 'pkg-spleen' : index % 3 === 1 ? 'pkg-sleep' : 'pkg-growth'}}" bindtap="goToProduct" data-id="{{item._id}}">
             <view class="package-top">
               <text class="package-name">{{item.name}}</text>
               <text class="package-desc" wx:if="{{item.description}}">{{item.description}}</text>
@@ -95,8 +104,8 @@
               <view class="package-btn">去购买</view>
             </view>
           </view>
-        </view>
-      </scroll-view>
+        </swiper-item>
+      </swiper>
     </view>
 
     <!-- 商品列表 -->

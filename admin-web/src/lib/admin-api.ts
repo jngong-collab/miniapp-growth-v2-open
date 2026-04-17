@@ -81,6 +81,8 @@ export const adminApi = {
   toggleProductStatus: (productId: string, status: 'on' | 'off') =>
     callAdminApi<ProductRecord>('catalog.toggleProductStatus', { productId, status }),
   savePackage: (payload: Record<string, unknown>) => callAdminApi<PackageRecord>('catalog.savePackage', { payload }),
+  deletePackage: (packageId: string, productId: string) =>
+    callAdminApi<{ productId: string; removedPackageCount: number }>('catalog.deletePackage', { packageId, productId }),
   listCampaigns: () => callAdminApi<CampaignListResult>('campaigns.list'),
   saveFission: (payload: Record<string, unknown>) => callAdminApi<Record<string, unknown>>('campaigns.saveFission', { payload }),
   saveLottery: (payload: Record<string, unknown>) => callAdminApi<Record<string, unknown>>('campaigns.saveLottery', { payload }),
@@ -131,5 +133,7 @@ export const adminApi = {
     callAdminApi<PagedResult<FissionRecord>>('campaigns.listFissionRecords', { campaignId, page, pageSize }),
   updateNotificationConfig: (payload: Record<string, unknown>) =>
     callAdminApi<NotificationConfig>('settings.updateNotificationConfig', { payload }),
+  generateImage: (prompt: string) =>
+    callAdminApi<{ url: string }>('settings.generateImage', { prompt }),
   getSystemHealth: () => callAdminApi<SystemHealth>('settings.getSystemHealth')
 }

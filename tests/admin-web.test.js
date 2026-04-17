@@ -647,6 +647,18 @@ test('phase-d admin api exposes finance, customer, catalog, campaigns, and ops a
   assert.match(apiSource, /case 'settings\.getSystemHealth'/)
 })
 
+test('settings.generateImage reads ai_config via shared store-scoped helpers', () => {
+  const apiSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'index.js'),
+    'utf8'
+  )
+
+  assert.match(apiSource, /const \{ getAccessStoreId, safeGetFirstByStore \} = require\('\.\/lib\/data'\)/)
+  assert.match(apiSource, /const storeId = getAccessStoreId\(access\)/)
+  assert.match(apiSource, /const aiConfig = await safeGetFirstByStore\('ai_config', storeId\) \|\| \{\}/)
+  assert.doesNotMatch(apiSource, /access\.db\.collection\('ai_config'\)/)
+})
+
 test('admin web api and types expose phase-d finance and customer contracts', () => {
   const apiSource = fs.readFileSync(
     path.join(repoRoot, 'admin-web', 'src', 'lib', 'admin-api.ts'),
@@ -742,9 +754,13 @@ test('catalog page groups products by category for management', () => {
   )
 
   assert.match(catalogSource, /按分类管理商品/)
+  assert.match(catalogSource, /超值套餐/)
   assert.match(catalogSource, /未分类/)
+  assert.match(catalogSource, /套餐管理/)
   assert.match(catalogSource, /catalog-category-list/)
   assert.match(catalogSource, /catalog-category-block/)
+  assert.match(catalogSource, /compareCategoryOrder/)
+  assert.match(catalogSource, /PRIORITY_CATEGORIES = \['超值套餐'\]/)
   assert.match(catalogSource, /请选择商品分类/)
   assert.match(catalogSource, /stock: -1/)
   assert.match(catalogSource, /deliveryType: 'instore'/)
@@ -753,8 +769,10 @@ test('catalog page groups products by category for management', () => {
   assert.match(catalogSource, /上传图片/)
   assert.match(catalogSource, /商品图片/)
   assert.match(catalogSource, /Drawer/)
-  assert.match(catalogSource, /商品发布设置/)
+  assert.match(catalogSource, /价格与发布/)
   assert.match(catalogSource, /设为主图/)
+  assert.match(catalogSource, /deletePackage/)
+  assert.match(catalogSource, /套餐在这里直接完成商品信息、套餐内容、有效期、上下架和删除/)
   assert.match(catalogSource, /catalog-editor-layout/)
   assert.match(catalogSource, /fenToYuanInput/)
   assert.match(catalogSource, /yuanToFen/)

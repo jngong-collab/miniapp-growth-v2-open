@@ -201,6 +201,9 @@ test('mall page and content API use category-based mall taxonomy', () => {
   assert.match(mallJs, /category,\s*\n\s*page,/);
   assert.match(contentApi, /showInMall:\s*true/);
   assert.match(contentApi, /productCondition\.category\s*=\s*resolvedCategory/);
+  assert.match(contentApi, /excludeCampaignLinkedPackages/);
+  assert.match(contentApi, /item\.type !== 'package'/);
+  assert.match(contentApi, /featuredProducts:\s*visibleFeaturedProducts/);
 });
 
 test('product detail share action uses native share button', () => {

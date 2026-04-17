@@ -29,7 +29,7 @@ async function getHomeContent(openid, event = {}) {
 
     const [storeInfo, featuredProducts, fissionCampaigns, lotteryCampaigns] = await Promise.all([
         safeGetFirst('stores', storeCondition),
-        safeList('products', productCondition, { orderBy: ['sortOrder', 'asc'], limit: 6 }),
+        safeList('products', productCondition, { orderBy: ['sortOrder', 'asc'], limit: 12 }),
         safeList('fission_campaigns', {
             status: 'active',
             startTime: _.lte(now),
@@ -43,12 +43,13 @@ async function getHomeContent(openid, event = {}) {
     ])
 
     const safeStoreInfo = storeInfo ? await sanitizeStore(storeInfo, runtime.reviewConfig) : null
+    const visibleFeaturedProducts = excludeCampaignLinkedPackages(featuredProducts, fissionCampaigns).slice(0, 6)
 
     return {
         code: 0,
         data: {
             storeInfo: safeStoreInfo,
-            featuredProducts,
+            featuredProducts: visibleFeaturedProducts,
             fissionCampaigns,
             lotteryCampaigns,
             shareImageUrl: runtime.reviewConfig.safeShareImageUrl || ''
@@ -90,11 +91,12 @@ async function getMallContent(event) {
     fissionCampaigns.forEach(item => {
         campaignMap[item.productId] = item
     })
+    const visibleProducts = excludeCampaignLinkedPackages(products, fissionCampaigns)
 
     return {
         code: 0,
         data: {
-            products: products.map(item => ({
+            products: visibleProducts.map(item => ({
                 ...item,
                 hasCashback: !!campaignMap[item._id]
             })),
@@ -133,6 +135,19 @@ function resolveMallCategory(category, legacyType) {
     if (MALL_CATEGORIES.includes(normalizedLegacyType)) return normalizedLegacyType
 
     return ''
+}
+
+function excludeCampaignLinkedPackages(products = [], fissionCampaigns = []) {
+    const linkedPackageIds = new Set(
+        (fissionCampaigns || [])
+            .map(item => String(item && item.productId || '').trim())
+            .filter(Boolean)
+    )
+
+    return (products || []).filter(item => {
+        if (!item || item.type !== 'package') return true
+        return !linkedPackageIds.has(String(item._id || '').trim())
+    })
 }
 
 async function loadReviewRuntime(openid, event = {}) {

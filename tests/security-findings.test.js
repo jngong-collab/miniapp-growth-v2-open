@@ -337,7 +337,7 @@ test('dashboard getTrends scopes orders and lead collections by storeId', async 
   delete require.cache[dashboardPath]
 })
 
-test('catalog listPackages scopes packages through store products', async () => {
+test('catalog listPackages scopes package queries to the current store and hydrates legacy bindings', async () => {
   const catalogPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-catalog.js')
   delete require.cache[catalogPath]
 
@@ -352,7 +352,13 @@ test('catalog listPackages scopes packages through store products', async () => 
     safeList: async (collection, condition, options) => {
       calls.push({ type: 'safeList', collection, condition, options })
       if (collection === 'products') {
-        return [{ _id: 'prod-1', name: '测试套餐商品', type: 'package' }]
+        if (condition.type === 'package') {
+          return [{ _id: 'prod-1', name: '测试套餐商品', type: 'package', storeId: 'store-789' }]
+        }
+        return [{ _id: 'legacy-1', name: '历史套餐商品', type: 'service', storeId: 'store-789' }]
+      }
+      if (collection === 'packages') {
+        return [{ _id: 'pkg-legacy', productId: 'legacy-1', storeId: 'store-789', items: [{ name: '推拿', count: 1 }] }]
       }
       return []
     },
@@ -380,7 +386,10 @@ test('catalog listPackages scopes packages through store products', async () => 
 
   const packagesCall = calls.find(c => c.collection === 'packages')
   assert.ok(packagesCall)
-  assert.ok(packagesCall.condition.productId, 'packages should be scoped by productIds from store')
+  assert.equal(packagesCall.condition.storeId, 'store-789')
+
+  const legacyProductsCall = calls.find(c => c.collection === 'products' && c.condition && c.condition._id)
+  assert.ok(legacyProductsCall, 'legacy package bindings should fetch referenced store products')
 
   delete require.cache[dataPath]
   if (originalDataModule) require.cache[dataPath] = originalDataModule
@@ -443,12 +452,12 @@ test('catalog savePackage writes storeId and validates product ownership', async
   const { savePackage } = require(catalogPath)
 
   // Reject cross-store product
-  const rejectRes = await savePackage({ account: { storeId: 'store-abc' } }, { payload: { productId: 'prod-other', items: [{ name: 'A', count: 1 }] } })
+  const rejectRes = await savePackage({ account: { storeId: 'store-abc' } }, { payload: { name: '跨店套餐', productId: 'prod-other', items: [{ name: 'A', count: 1 }] } })
   assert.equal(rejectRes.code, -1)
   assert.ok(rejectRes.msg.includes('无权限'))
 
   // Accept same-store product and include storeId
-  const acceptRes = await savePackage({ account: { storeId: 'store-abc' } }, { payload: { productId: 'prod-owned', items: [{ name: 'A', count: 1 }] } })
+  const acceptRes = await savePackage({ account: { storeId: 'store-abc' } }, { payload: { name: '同店套餐', productId: 'prod-owned', items: [{ name: 'A', count: 1 }] } })
   assert.equal(acceptRes.code, 0)
   assert.equal(addPayload.storeId, 'store-abc')
 

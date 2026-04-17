@@ -25,7 +25,7 @@ const menuItems: Array<{ key: string; icon: ReactNode; label: string; permission
   { key: '/dashboard', icon: <AreaChartOutlined />, label: '经营看板', permission: 'dashboard.view' },
   { key: '/orders', icon: <WalletOutlined />, label: '订单退款', permission: 'orders.view' },
   { key: '/verification', icon: <CheckCircleOutlined />, label: '核销台', permission: 'orders.view' },
-  { key: '/catalog', icon: <ShoppingOutlined />, label: '商品套餐', permission: 'catalog.manage' },
+  { key: '/catalog', icon: <ShoppingOutlined />, label: '商品 / 套餐', permission: 'catalog.manage' },
   { key: '/campaigns', icon: <NotificationOutlined />, label: '活动管理', permission: 'campaigns.manage' },
   { key: '/customers', icon: <CustomerServiceOutlined />, label: '客户运营', permission: 'crm.view' },
   { key: '/finance', icon: <DollarOutlined />, label: '财务中心', permission: 'orders.refund.review' },

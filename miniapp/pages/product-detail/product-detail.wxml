@@ -84,16 +84,18 @@
       <view class="package-card card-float animate-fade-up" style="animation-delay:.24s"
             wx:if="{{product.type === 'package' && packageItems}}">
         <view class="package-header">
-          <text class="package-icon">📦</text>
-          <text class="package-title">套餐包含</text>
+          <view class="package-header-left">
+            <text class="package-icon">🎁</text>
+            <text class="package-title">套餐包含</text>
+          </view>
+          <view class="package-valid-tag">有效期 {{packageValidDays}} 天</view>
         </view>
         <view class="package-list">
-          <view class="package-chip" wx:for="{{packageItems}}" wx:key="name">
-            <text class="package-chip-name">{{item.name}}</text>
-            <text class="package-chip-count">×{{item.count}}</text>
+          <view class="package-row" wx:for="{{packageItems}}" wx:key="name">
+            <text class="package-row-name">{{item.name}}</text>
+            <text class="package-row-count">×{{item.count}}</text>
           </view>
         </view>
-        <text class="package-valid">有效期：购买后 {{packageValidDays}} 天内使用</text>
       </view>
 
       <!-- 服务保障 -->
@@ -113,33 +115,49 @@
           </view>
         </view>
       </view>
+
+      <!-- 图文详情 -->
+      <view class="detail-card card-float animate-fade-up" style="animation-delay:.36s"
+            wx:if="{{product.detail || product.images.length > 1}}">
+        <view class="detail-header">
+          <text class="detail-title">图文详情</text>
+        </view>
+        <view class="detail-content">
+          <text class="detail-text" wx:if="{{product.detail}}">{{product.detail}}</text>
+          <block wx:if="{{product.images.length > 1}}">
+            <image class="detail-img" wx:for="{{product.images}}" wx:key="*this" src="{{item}}" mode="widthFix" wx:if="{{index > 0}}"></image>
+          </block>
+        </view>
+      </view>
     </view>
 
   </block>
 
-  <!-- 底部操作栏 -->
-  <view class="bottom-bar" wx:if="{{!loading && product}}">
-    <view class="bar-icon-wrap">
-      <button class="share-btn" open-type="share"></button>
-      <image class="bar-icon-img" src="/assets/icons/share.svg" mode="aspectFit"></image>
-      <text class="bar-icon-label">分享</text>
-    </view>
-    <view class="bar-icon-wrap" bindtap="goToCart">
-      <view class="bar-cart-badge" wx:if="{{cartCount > 0}}">{{cartCount > 99 ? '99+' : cartCount}}</view>
-      <image class="bar-icon-img" src="/assets/icons/cart.svg" mode="aspectFit"></image>
-      <text class="bar-icon-label">购物车</text>
-    </view>
-
-    <block wx:if="{{cartEligible}}">
-      <view class="btn-cart" bindtap="addToCart">加入购物车</view>
-      <view class="btn-buy" bindtap="onBuy">立即购买</view>
-    </block>
-    <block wx:else>
-      <view class="btn-buy btn-buy--full" bindtap="onBuy">
-        {{campaign ? '¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
+    <!-- 底部操作栏 -->
+    <view class="bottom-bar" wx:if="{{!loading && product}}">
+      <view class="bar-icon-wrap">
+        <button class="share-btn" open-type="share"></button>
+        <image class="bar-icon-img" src="/assets/icons/share.svg" mode="aspectFit"></image>
+        <text class="bar-icon-label">分享</text>
       </view>
-    </block>
-  </view>
+      <view class="bar-icon-wrap" bindtap="goToCart">
+        <view class="bar-cart-badge" wx:if="{{cartCount > 0}}">{{cartCount > 99 ? '99+' : cartCount}}</view>
+        <image class="bar-icon-img" src="/assets/icons/cart.svg" mode="aspectFit"></image>
+        <text class="bar-icon-label">购物车</text>
+      </view>
+
+      <view class="action-btns-wrap">
+        <block wx:if="{{cartEligible}}">
+          <view class="btn-cart card-press" bindtap="addToCart">加入购物车</view>
+          <view class="btn-buy card-press" bindtap="onBuy">立即购买</view>
+        </block>
+        <block wx:else>
+          <view class="btn-buy btn-buy--full card-press" bindtap="onBuy">
+            {{campaign ? '¥' + campaign.activityPriceYuan + ' 裂变购买' : '立即购买 ¥' + product.priceYuan}}
+          </view>
+        </block>
+      </view>
+    </view>
 
   <!-- 购买确认弹窗 -->
   <view class="modal-mask" wx:if="{{showBuyModal}}" bindtap="closeBuyModal">

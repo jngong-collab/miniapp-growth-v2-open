@@ -1,10 +1,27 @@
 import { Card, Col, Row, Segmented, Table, Typography } from 'antd'
-import ReactECharts from 'echarts-for-react'
+import ReactEChartsCore from 'echarts-for-react/esm/core'
+import { BarChart, LineChart } from 'echarts/charts'
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import * as echarts from 'echarts/core'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { adminApi } from '../lib/admin-api'
 import { StatCard } from '../components/stat-card'
+
+echarts.use([
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+  LineChart,
+  BarChart,
+  CanvasRenderer
+])
 
 function formatMoney(fen: number) {
   return `¥${(Number(fen || 0) / 100).toFixed(2)}`
@@ -104,7 +121,7 @@ export function DashboardPage() {
       </Row>
 
       <Card className="panel-card" title="经营趋势" bordered={false} loading={overviewQuery.isLoading || trendsQuery.isLoading}>
-        <ReactECharts option={chartOption} style={{ height: 360 }} />
+        <ReactEChartsCore echarts={echarts} option={chartOption} style={{ height: 360 }} />
       </Card>
 
       <Row gutter={[16, 16]}>

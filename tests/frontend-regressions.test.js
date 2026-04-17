@@ -52,6 +52,14 @@ test('catalog edit flow round-trips newline text into trimmed arrays', () => {
   assert.match(catalogSource, /getTempFileUrl/)
 })
 
+test('catalog product and package editors both wire AI image generation callbacks', () => {
+  const catalogSource = readSource('admin-web/src/pages/catalog-page.tsx')
+
+  assert.match(catalogSource, /onGenerateImage=\{\(\) => handleGenerateImage\(watchedProductName, watchedProductDescription\)\}/)
+  assert.match(catalogSource, /onGenerateImage=\{\(\) => handleGenerateImage\(watchedPackageName, watchedPackageDescription\)\}/)
+  assert.match(catalogSource, /generatingImage=\{generatingImage\}/)
+})
+
 test('catalog and campaign money inputs use yuan labels while preserving fen payload conversion', () => {
   const catalogSource = readSource('admin-web/src/pages/catalog-page.tsx')
   const campaignsSource = readSource('admin-web/src/pages/campaigns-page.tsx')

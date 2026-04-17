@@ -1,6 +1,7 @@
 const { db } = require('./context')
 const http = require('node:http')
 const https = require('node:https')
+const tcb = require('@cloudbase/node-sdk')
 const {
   getAccessStoreId,
   safeGetById,
@@ -77,6 +78,10 @@ async function requestRemoteJson(url, options = {}) {
           try {
             payload = JSON.parse(responseBody)
           } catch (error) {
+            if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+              reject(new Error(extractRemoteErrorMessage(null, responseBody, response.statusCode)))
+              return
+            }
             reject(new Error(`接口返回了无效 JSON：${responseBody.slice(0, 200)}`))
             return
           }
@@ -211,10 +216,11 @@ function normalizeStorePayload(payload) {
 }
 
 function normalizeSecretPayload(payload, secretField) {
+  const secretFields = Array.isArray(secretField) ? secretField : [secretField]
   const next = {}
   Object.keys(payload || {}).forEach(key => {
     const value = payload[key]
-    if (key === secretField && (!value || value === SECRET_MASK)) {
+    if (secretFields.includes(key) && (!value || value === SECRET_MASK)) {
       return
     }
     next[key] = typeof value === 'string' ? value.trim() : value
@@ -240,6 +246,9 @@ function buildDefaultAiConfig() {
     apiUrl: '',
     apiKey: '',
     model: '',
+    imageApiUrl: '',
+    imageApiKey: '',
+    imageModel: '',
     dailyLimit: 0,
     userDailyLimit: 0,
     systemPrompt: '',
@@ -328,7 +337,7 @@ function normalizeReviewConfig(payload) {
 }
 
 function normalizeAiConfigPayload(payload) {
-  const source = normalizeSecretPayload(payload || {}, 'apiKey')
+  const source = normalizeSecretPayload(payload || {}, ['apiKey', 'imageApiKey'])
   const next = { ...source }
   if (Object.prototype.hasOwnProperty.call(source, 'enabled')) {
     next.enabled = source.enabled === true
@@ -355,6 +364,7 @@ function maskAiConfigSecrets(aiConfig) {
     ...buildDefaultAiConfig(),
     ...aiConfig,
     apiKey: aiConfig.apiKey ? '••••••••' : '',
+    imageApiKey: aiConfig.imageApiKey ? '••••••••' : '',
     reviewConfig: normalizeReviewConfig(aiConfig.reviewConfig)
   }
 }
@@ -390,31 +400,43 @@ function buildAiEndpointCandidates(apiUrl) {
 
   let chatPaths = []
   let modelPaths = []
+  let imagePaths = []
 
   if (pathname === '/' || pathname === '') {
     chatPaths = ['/v1/chat/completions', '/chat/completions']
     modelPaths = ['/v1/models', '/models']
+    imagePaths = ['/v1/images/generations', '/images/generations']
   } else if (pathname.endsWith('/chat/completions')) {
     const prefix = pathname.slice(0, -'/chat/completions'.length)
     chatPaths = [pathname]
     modelPaths = [`${prefix || ''}/models`, '/v1/models', '/models']
+    imagePaths = [`${prefix || ''}/images/generations`, '/v1/images/generations', '/images/generations']
   } else if (pathname.endsWith('/models')) {
     const prefix = pathname.slice(0, -'/models'.length)
     chatPaths = [`${prefix || ''}/chat/completions`, '/v1/chat/completions', '/chat/completions']
     modelPaths = [pathname]
+    imagePaths = [`${prefix || ''}/images/generations`, '/v1/images/generations', '/images/generations']
+  } else if (pathname.endsWith('/images/generations')) {
+    const prefix = pathname.slice(0, -'/images/generations'.length)
+    chatPaths = [`${prefix || ''}/chat/completions`, '/v1/chat/completions', '/chat/completions']
+    modelPaths = [`${prefix || ''}/models`, '/v1/models', '/models']
+    imagePaths = [pathname]
   } else if (pathname.endsWith('/v1')) {
     chatPaths = [`${pathname}/chat/completions`]
     modelPaths = [`${pathname}/models`]
+    imagePaths = [`${pathname}/images/generations`]
   } else {
     const lastSlashIndex = pathname.lastIndexOf('/')
     const parentPath = lastSlashIndex > 0 ? pathname.slice(0, lastSlashIndex) : ''
     chatPaths = [pathname]
     modelPaths = [parentPath ? `${parentPath}/models` : '/v1/models', '/v1/models', '/models']
+    imagePaths = [parentPath ? `${parentPath}/images/generations` : '/v1/images/generations', '/v1/images/generations', '/images/generations']
   }
 
   return {
     chatUrls: buildAbsoluteUrls(parsedUrl, chatPaths),
-    modelUrls: buildAbsoluteUrls(parsedUrl, modelPaths)
+    modelUrls: buildAbsoluteUrls(parsedUrl, modelPaths),
+    imageUrls: buildAbsoluteUrls(parsedUrl, imagePaths)
   }
 }
 
@@ -477,6 +499,9 @@ async function resolveAiConfigForAction(access, event) {
   merged.apiUrl = trimText(merged.apiUrl)
   merged.apiKey = trimText(merged.apiKey)
   merged.model = trimText(merged.model)
+  merged.imageApiUrl = trimText(merged.imageApiUrl)
+  merged.imageApiKey = trimText(merged.imageApiKey)
+  merged.imageModel = trimText(merged.imageModel)
   merged.systemPrompt = trimText(merged.systemPrompt)
   merged.reviewConfig = normalizeReviewConfig(merged.reviewConfig)
 
@@ -544,6 +569,280 @@ async function runAiConnectionTest(aiConfig) {
   }
 
   throw lastError || new Error('AI 接口测试失败')
+}
+
+function buildImageModelCandidates(aiConfig, event) {
+  return Array.from(new Set([
+    trimText(event.imageModel || (event.payload && event.payload.imageModel)),
+    trimText(aiConfig.imageModel),
+    'gemini-3-pro-image-preview',
+    'gpt-image-1',
+    trimText(aiConfig.model),
+    ''
+  ]))
+}
+
+function resolveImageGenerationConfig(aiConfig, event) {
+  const payload = event && event.payload && typeof event.payload === 'object' ? event.payload : {}
+  return {
+    imageApiUrl: trimText(event.imageApiUrl || payload.imageApiUrl || aiConfig.imageApiUrl || aiConfig.apiUrl),
+    imageApiKey: trimText(event.imageApiKey || payload.imageApiKey || aiConfig.imageApiKey || aiConfig.apiKey),
+    imageModel: trimText(event.imageModel || payload.imageModel || aiConfig.imageModel || aiConfig.model)
+  }
+}
+
+function isImageEndpointNotFoundError(error) {
+  const message = trimText(error && error.message).toLowerCase()
+  return message === '404 page not found' || message.includes('404 page not found') || message.startsWith('http 404')
+}
+
+function buildImageEndpointNotSupportedMessage(imageApiUrl, aiConfig) {
+  const currentUrl = trimText(imageApiUrl || aiConfig.imageApiUrl || aiConfig.apiUrl)
+  const targetLabel = aiConfig.imageApiUrl
+    ? `当前图片接口地址 ${currentUrl}`
+    : `当前 AI 接口地址 ${currentUrl}`
+  return `${targetLabel} 不支持图片生成接口。请在系统设置里单独填写“图片生成接口地址”，并使用支持 /v1/images/generations 的网关；图片 Key 留空时会自动复用主 API Key。`
+}
+
+function extractGeneratedImageSource(payload) {
+  const candidates = []
+
+  if (Array.isArray(payload && payload.data)) {
+    candidates.push(...payload.data)
+  }
+  if (Array.isArray(payload && payload.images)) {
+    candidates.push(...payload.images)
+  }
+  if (Array.isArray(payload && payload.result && payload.result.data)) {
+    candidates.push(...payload.result.data)
+  }
+
+  const first = candidates[0]
+  if (first && typeof first.url === 'string' && trimText(first.url)) {
+    return {
+      kind: 'url',
+      value: trimText(first.url)
+    }
+  }
+
+  const base64 = trimText(
+    (first && (first.b64_json || first.base64 || first.b64)) ||
+    payload?.b64_json ||
+    payload?.base64 ||
+    payload?.image_base64 ||
+    ''
+  )
+
+  if (base64) {
+    return {
+      kind: 'base64',
+      value: base64,
+      mimeType: trimText((first && (first.mime_type || first.mimeType)) || payload?.mime_type || payload?.mimeType || '')
+    }
+  }
+
+  return null
+}
+
+function inferImageExtension(sourceUrl, contentType) {
+  const normalizedType = trimText(contentType).toLowerCase()
+  if (normalizedType.includes('png')) return '.png'
+  if (normalizedType.includes('webp')) return '.webp'
+  if (normalizedType.includes('gif')) return '.gif'
+  if (normalizedType.includes('jpeg') || normalizedType.includes('jpg')) return '.jpg'
+
+  const pathname = (() => {
+    try {
+      return new URL(sourceUrl).pathname.toLowerCase()
+    } catch (error) {
+      return ''
+    }
+  })()
+
+  if (pathname.endsWith('.png')) return '.png'
+  if (pathname.endsWith('.webp')) return '.webp'
+  if (pathname.endsWith('.gif')) return '.gif'
+  if (pathname.endsWith('.jpeg') || pathname.endsWith('.jpg')) return '.jpg'
+  return '.png'
+}
+
+async function downloadRemoteBinary(url, depth = 0) {
+  const parsedUrl = new URL(url)
+  const transport = parsedUrl.protocol === 'https:' ? https : http
+
+  return new Promise((resolve, reject) => {
+    const request = transport.request({
+      protocol: parsedUrl.protocol,
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+      path: `${parsedUrl.pathname}${parsedUrl.search || ''}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'liebian-admin/1.0'
+      }
+    }, response => {
+      const statusCode = response.statusCode || 500
+      const location = trimText(response.headers.location)
+
+      if (statusCode >= 300 && statusCode < 400 && location) {
+        response.resume()
+        if (depth >= 3) {
+          reject(new Error('下载生成图片时跳转次数过多'))
+          return
+        }
+        const redirectUrl = new URL(location, parsedUrl).toString()
+        resolve(downloadRemoteBinary(redirectUrl, depth + 1))
+        return
+      }
+
+      if (statusCode < 200 || statusCode >= 300) {
+        response.resume()
+        reject(new Error(`下载生成图片失败（HTTP ${statusCode}）`))
+        return
+      }
+
+      const chunks = []
+      response.on('data', chunk => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      })
+      response.on('end', () => {
+        resolve({
+          buffer: Buffer.concat(chunks),
+          contentType: trimText(response.headers['content-type'])
+        })
+      })
+    })
+
+    request.on('error', error => {
+      reject(error)
+    })
+    request.setTimeout(30000, () => {
+      request.destroy(new Error('下载生成图片超时'))
+    })
+    request.end()
+  })
+}
+
+async function uploadGeneratedImage(fileBuffer, extension) {
+  const envId = trimText(process.env.TCB_ENV) || trimText(process.env.SCF_NAMESPACE) || trimText(process.env.TCB_ENV_ID)
+  if (!envId) {
+    throw new Error('云函数未获取到环境信息，无法上传生成图片')
+  }
+
+  const app = tcb.init({ env: envId })
+  const cloudPath = `products/generated/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extension || '.png'}`
+  const uploadResult = await app.uploadFile({
+    cloudPath,
+    fileContent: fileBuffer
+  })
+  const fileID = trimText(uploadResult && uploadResult.fileID)
+  if (!fileID) {
+    throw new Error('生成图片上传成功但未返回云存储地址')
+  }
+  return { cloudPath, fileID }
+}
+
+async function generateImage(access, event) {
+  const { aiConfig, storeId } = await resolveAiConfigForAction(access, event)
+  const prompt = trimText(event.prompt || (event.payload && event.payload.prompt))
+  const imageConfig = resolveImageGenerationConfig(aiConfig, event)
+
+  if (!prompt) {
+    return { code: -1, msg: '请先提供主图描述' }
+  }
+  if (!imageConfig.imageApiUrl) {
+    return { code: -1, msg: '请先在系统设置里填写 AI 接口地址或图片生成接口地址' }
+  }
+  if (!imageConfig.imageApiKey) {
+    return { code: -1, msg: '请先在系统设置里填写 AI API Key 或图片生成 API Key' }
+  }
+
+  const generationConfig = {
+    ...aiConfig,
+    apiUrl: imageConfig.imageApiUrl,
+    apiKey: imageConfig.imageApiKey,
+    imageModel: imageConfig.imageModel || aiConfig.imageModel,
+    model: imageConfig.imageModel || aiConfig.model
+  }
+
+  const { imageUrls } = buildAiEndpointCandidates(generationConfig.apiUrl)
+  const modelCandidates = buildImageModelCandidates(generationConfig, event)
+  let lastError = null
+
+  for (const requestUrl of imageUrls) {
+    for (const candidateModel of modelCandidates) {
+      const requestBody = {
+        prompt,
+        n: 1,
+        size: '1024x1024'
+      }
+      if (candidateModel) {
+        requestBody.model = candidateModel
+      }
+
+      try {
+        const payload = await requestRemoteJson(requestUrl, {
+          method: 'POST',
+          headers: buildAiAuthHeaders(generationConfig.apiKey, {
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify(requestBody),
+          timeout: 30000
+        })
+
+        const imageSource = extractGeneratedImageSource(payload)
+        if (!imageSource) {
+          throw new Error('接口已响应，但没有返回可用图片')
+        }
+
+        let fileBuffer = null
+        let extension = '.png'
+
+        if (imageSource.kind === 'url') {
+          const downloaded = await downloadRemoteBinary(imageSource.value)
+          fileBuffer = downloaded.buffer
+          extension = inferImageExtension(imageSource.value, downloaded.contentType)
+        } else {
+          fileBuffer = Buffer.from(imageSource.value, 'base64')
+          extension = inferImageExtension('', imageSource.mimeType)
+        }
+
+        if (!fileBuffer || !fileBuffer.length) {
+          throw new Error('生成图片为空，无法上传')
+        }
+
+        const uploaded = await uploadGeneratedImage(fileBuffer, extension)
+
+        await writeAuditLog(access, {
+          action: 'settings.generateImage',
+          module: 'settings',
+          targetType: 'ai_image',
+          targetId: storeId,
+          summary: '生成商品主图',
+          detail: {
+            requestUrl,
+            model: candidateModel || '(provider default)',
+            promptLength: prompt.length,
+            cloudPath: uploaded.cloudPath
+          }
+        })
+
+        return {
+          code: 0,
+          data: { url: uploaded.fileID },
+          msg: '主图生成成功'
+        }
+      } catch (error) {
+        lastError = error
+      }
+    }
+  }
+
+  if (isImageEndpointNotFoundError(lastError)) {
+    throw new Error(buildImageEndpointNotSupportedMessage(imageConfig.imageApiUrl, aiConfig))
+  }
+
+  throw lastError || new Error('主图生成失败，请检查 AI 图片接口配置')
 }
 
 async function getSettings(access) {
@@ -835,6 +1134,7 @@ module.exports = {
   updateAiConfig,
   fetchAiModels,
   testAiConfig,
+  generateImage,
   updateNotificationConfig,
   getSystemHealth,
   geocodeAddress

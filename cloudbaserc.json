@@ -8,7 +8,7 @@
   "functions": [
     {
       "name": "adminApi",
-      "timeout": 20,
+      "timeout": 60,
       "memorySize": 512,
       "runtime": "Nodejs18.15",
       "handler": "index.main",
