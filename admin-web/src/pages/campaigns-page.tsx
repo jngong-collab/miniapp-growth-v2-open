@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { adminApi } from '../lib/admin-api'
+import { fenToYuanInput, yuanToFen } from '../lib/money'
 import type { GenericCampaign } from '../types/admin'
 
 export function CampaignsPage() {
@@ -90,6 +91,8 @@ export function CampaignsPage() {
                             onClick={() => {
                               fissionForm.setFieldsValue({
                                 ...record,
+                                activityPrice: fenToYuanInput(record.activityPrice),
+                                cashbackAmount: fenToYuanInput(record.cashbackAmount),
                                 dateRange: [dayjs(record.startTime as string | number | Date | undefined), dayjs(record.endTime as string | number | Date | undefined)]
                               })
                               setFissionOpen(true)
@@ -174,14 +177,20 @@ export function CampaignsPage() {
           layout="vertical"
           onFinish={values => {
             const [startTime, endTime] = values.dateRange || []
-            saveFissionMutation.mutate({ ...values, startTime, endTime })
+            saveFissionMutation.mutate({
+              ...values,
+              activityPrice: yuanToFen(values.activityPrice) || 0,
+              cashbackAmount: yuanToFen(values.cashbackAmount) || 0,
+              startTime,
+              endTime
+            })
           }}
         >
           <Form.Item name="_id" hidden><Input /></Form.Item>
           <Form.Item name="productId" label="关联商品" rules={[{ required: true }]}><Select options={productOptions} /></Form.Item>
           <Space.Compact block>
-            <Form.Item name="activityPrice" label="活动价（分）" style={{ flex: 1 }} rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
-            <Form.Item name="cashbackAmount" label="返现金额（分）" style={{ flex: 1 }} rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="activityPrice" label="活动价（元）" style={{ flex: 1 }} rules={[{ required: true }]}><InputNumber min={0} precision={2} step={0.01} style={{ width: '100%' }} placeholder="如 99.00" /></Form.Item>
+            <Form.Item name="cashbackAmount" label="返现金额（元）" style={{ flex: 1 }} rules={[{ required: true }]}><InputNumber min={0} precision={2} step={0.01} style={{ width: '100%' }} placeholder="如 20.00" /></Form.Item>
             <Form.Item name="limitPerUser" label="每人限购" style={{ flex: 1 }}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="totalStock" label="活动库存" style={{ flex: 1 }}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
           </Space.Compact>

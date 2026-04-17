@@ -63,9 +63,13 @@
 | `_id` | string | 文档 ID |
 | `storeId` | string | 关联门店 |
 | `mchId` | string | 微信支付商户号 |
-| `mchKey` | string | 商户 API 密钥（加密存储） |
-| `certFileId` | string | 证书文件 ID（云存储） |
-| `notifyUrl` | string | 支付回调地址 |
+| `apiV3Key` | string | API_V3_KEY（后台只脱敏回显） |
+| `certSerialNo` | string | 商户 API 证书序列号 |
+| `privateKey` | string | `apiclient_key.pem` 私钥内容（后台明文回显） |
+| `privateKeyFileName` | string | 私钥文件名 |
+| `certificatePem` | string | `apiclient_cert.pem` 证书内容（后台明文回显） |
+| `certificateFileName` | string | 证书文件名 |
+| `notifyUrl` | string | 兼容旧数据的遗留字段，当前云支付回调链路不再使用 |
 | `enabled` | boolean | 是否启用 |
 | `createdAt` | date | 创建时间 |
 | `updatedAt` | date | 更新时间 |

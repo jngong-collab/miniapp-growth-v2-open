@@ -61,10 +61,18 @@ function generateRefundNo() {
   return `RFD${Date.now()}${randomToken(8)}`
 }
 
+function hasCompletePayConfig(payConfig) {
+  if (!payConfig || payConfig.enabled === false) return false
+  return Boolean(payConfig.mchId && payConfig.apiV3Key && payConfig.certSerialNo && payConfig.privateKey && payConfig.certificatePem)
+}
+
 async function approveRefundRequest({ request, order, reviewerUid }) {
   const payConfig = await safeGetFirstByStore('pay_config', String(order && order.storeId || '').trim())
   if (!payConfig || !payConfig.mchId) {
     return { code: -1, msg: '支付商户号未配置，无法处理退款' }
+  }
+  if (!hasCompletePayConfig(payConfig)) {
+    return { code: -1, msg: '支付配置不完整，请先在后台补充 API_V3_KEY、证书序列号、证书私钥和证书文件' }
   }
 
   const refundAmount = Number(request.refundAmount || order.payAmount || order.totalAmount || 0)

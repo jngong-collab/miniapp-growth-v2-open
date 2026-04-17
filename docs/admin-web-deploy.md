@@ -241,7 +241,10 @@ Phase D 在后台新增了以下页面， Hosting 路由回退同样需要覆盖
 
 此外，以下能力已在现有页面内补完：
 
-- `/settings` 新增了「通知配置」卡片，数据写入 `notification_settings` 集合。
+- `/settings` 现已同时维护「通知配置」与「支付配置」。
+- 支付配置支持维护 `mchId`、`API_V3_KEY`、证书序列号、`apiclient_key.pem` 私钥和证书文件；其中 `API_V3_KEY` 继续脱敏，私钥与证书内容按明文回显。
+- 支付与退款运行时会按订单 `storeId` 读取对应门店的 `pay_config`，缺少商户号、API_V3_KEY、证书序列号或私钥时会直接阻止支付/退款。
+- 通知配置数据写入 `notification_settings` 集合。
 - `/catalog` 商品列表和编辑已补 `storeId` 隔离；后台新增 `catalog.getProductDetail` 用于详情抽屉反查。
 - `/campaigns` 裂变活动已补 `storeId` 隔离；后台新增 `campaigns.getFissionDetail` 和 `campaigns.listFissionRecords` 用于活动详情与参与明细。
 
@@ -269,5 +272,5 @@ Phase D 在后台新增了以下页面， Hosting 路由回退同样需要覆盖
 - 网页核销后会扣减 `order_items.packageRemaining` 或标记单次服务已用，并新增 `package_usage` 记录
 - 订单详情抽屉若存在履约数据，应能显示“履约记录”卡片并回看该订单下的核销历史
 - 商品与活动修改后，小程序前台数据同步生效
-- 支付、AI 配置字段依然脱敏回显
+- AI 配置字段依然脱敏回显；支付配置中仅 `API_V3_KEY` 脱敏
 - 运营和门店同学知道：当前 slice 以直接查码/核销为主，后续若需要完整履约报表需另行规划

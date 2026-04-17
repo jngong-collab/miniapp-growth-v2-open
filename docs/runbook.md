@@ -87,7 +87,6 @@ VITE_CLOUDBASE_PUBLISHABLE_KEY=your-publishable-key
 - `pay_config` 集合：
   - `storeId`
   - `mchId`
-  - `notifyUrl`
   - `enabled`
 - `payApi` 云函数环境变量：
   - `API_V3_KEY`
@@ -100,6 +99,7 @@ VITE_CLOUDBASE_PUBLISHABLE_KEY=your-publishable-key
 - `MCH_ID` 可按门店写入 `pay_config.mchId`，便于后台读取与门店隔离。
 - `API_V3_KEY`、`CERT_SERIAL_NO`、`PRIVATE_KEY` 不得写入仓库、前端环境变量或普通集合文档。
 - `PRIVATE_KEY` / `apiclient_key.pem` 是退款和分账签名的关键材料，必须只存在于服务端受控环境。
+- 当前支付结果回调由云支付直接回调 `payApi`，后台不需要手填支付回调地址。
 
 支付架构告警：
 

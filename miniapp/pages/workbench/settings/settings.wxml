@@ -24,7 +24,10 @@
       <text class="list-tag tag-primary">支付</text>
     </view>
     <text class="list-desc">商户号 {{settings.payConfig.mchId || '未设置'}}</text>
-    <text class="list-desc">密钥 {{settings.payConfig.mchKey ? '已配置' : '未配置'}}</text>
+    <text class="list-desc">API_V3_KEY {{settings.payConfig.apiV3Key ? '已配置' : '未配置'}}</text>
+    <text class="list-desc">证书序列号 {{settings.payConfig.certSerialNo || '未设置'}}</text>
+    <text class="list-desc">私钥 {{settings.payConfig.privateKey ? '已配置' : '未配置'}}</text>
+    <text class="list-desc">证书文件 {{settings.payConfig.certificatePem ? '已配置' : '未配置'}}</text>
   </view>
 
   <view class="list-card">

@@ -285,10 +285,34 @@ export interface LeadRecord {
 
 export interface SettingsData {
   storeInfo: Record<string, unknown> | null
-  aiConfig: Record<string, unknown> | null
-  payConfig: Record<string, unknown> | null
+  aiConfig: AiConfig | null
+  payConfig: PayConfig | null
   adminAccounts: AdminAccount[]
   notificationConfig: NotificationConfig | null
+}
+
+export interface AiConfig {
+  _id?: string
+  enabled: boolean
+  apiUrl: string
+  apiKey: string
+  model: string
+  dailyLimit: number
+  userDailyLimit: number
+  systemPrompt: string
+  reviewConfig?: Record<string, unknown>
+}
+
+export interface AiModelListResult {
+  models: string[]
+  selectedModel: string
+  requestUrl: string
+}
+
+export interface AiConnectionTestResult {
+  models: string[]
+  selectedModel: string
+  requestUrl: string
 }
 
 export interface StaffRecord {
@@ -448,6 +472,22 @@ export interface FissionRecord {
   cashbackAmountYuan: string
   status: string
   createdAt: unknown
+}
+
+export interface PayConfig {
+  _id?: string
+  enabled: boolean
+  mchId: string
+  notifyUrl: string
+  apiV3Key: string
+  certSerialNo: string
+  privateKey: string
+  privateKeyFileName: string
+  certificatePem: string
+  certificateFileName: string
+  apiV3KeyConfigured: boolean
+  privateKeyConfigured: boolean
+  certificateConfigured: boolean
 }
 
 export interface NotificationConfig {

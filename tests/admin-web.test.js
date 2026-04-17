@@ -719,6 +719,55 @@ test('finance page renders payment records, refund records, and reconciliation s
   assert.match(financeSource, /getReconciliationSummary/)
 })
 
+test('campaign forms use yuan labels while converting back to fen payloads', () => {
+  const campaignsSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'pages', 'campaigns-page.tsx'),
+    'utf8'
+  )
+
+  assert.match(campaignsSource, /活动价（元）/)
+  assert.match(campaignsSource, /返现金额（元）/)
+  assert.match(campaignsSource, /fenToYuanInput/)
+  assert.match(campaignsSource, /yuanToFen/)
+})
+
+test('catalog page groups products by category for management', () => {
+  const catalogSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'pages', 'catalog-page.tsx'),
+    'utf8'
+  )
+  const indexCssSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'index.css'),
+    'utf8'
+  )
+
+  assert.match(catalogSource, /按分类管理商品/)
+  assert.match(catalogSource, /未分类/)
+  assert.match(catalogSource, /catalog-category-list/)
+  assert.match(catalogSource, /catalog-category-block/)
+  assert.match(catalogSource, /请选择商品分类/)
+  assert.match(catalogSource, /stock: -1/)
+  assert.match(catalogSource, /deliveryType: 'instore'/)
+  assert.match(catalogSource, /售价（元）/)
+  assert.match(catalogSource, /原价（元）/)
+  assert.match(catalogSource, /上传图片/)
+  assert.match(catalogSource, /商品图片/)
+  assert.match(catalogSource, /Drawer/)
+  assert.match(catalogSource, /商品发布设置/)
+  assert.match(catalogSource, /设为主图/)
+  assert.match(catalogSource, /catalog-editor-layout/)
+  assert.match(catalogSource, /fenToYuanInput/)
+  assert.match(catalogSource, /yuanToFen/)
+  assert.match(catalogSource, /uploadFileToCloud/)
+  assert.match(catalogSource, /getTempFileUrl/)
+  assert.match(indexCssSource, /\.catalog-category-summary/)
+  assert.match(indexCssSource, /\.catalog-category-header/)
+  assert.match(indexCssSource, /\.catalog-image-grid/)
+  assert.match(indexCssSource, /\.catalog-editor-layout/)
+  assert.match(indexCssSource, /\.catalog-editor-cover-shell/)
+  assert.match(indexCssSource, /\.catalog-editor-summary-metrics/)
+})
+
 test('customers page renders customer list and detail drawer with followup timeline', () => {
   const customersSource = fs.readFileSync(
     path.join(repoRoot, 'admin-web', 'src', 'pages', 'customers-page.tsx'),
@@ -754,12 +803,79 @@ test('settings page includes notification config card', () => {
   assert.match(settingsSource, /updateNotificationConfig/)
   assert.match(settingsSource, /orderNotifyEnabled/)
   assert.match(settingsSource, /refundNotifyEnabled/)
-  assert.match(settingsSource, /一键解析地址/)
-  assert.match(settingsSource, /地图选点/)
-  assert.match(settingsSource, /门店地图位置/)
+  assert.match(settingsSource, /一键解析位置/)
+  assert.match(settingsSource, /手动地图选点/)
+  assert.match(settingsSource, /门店地图选点/)
   assert.match(settingsSource, /openstreetmap/)
-  assert.match(settingsSource, /上传 Logo/)
+  assert.match(settingsSource, /门店 Logo/)
   assert.match(settingsSource, /uploadFileToCloud/)
+  assert.match(settingsSource, /API_V3_KEY/)
+  assert.match(settingsSource, /certSerialNo/)
+  assert.match(settingsSource, /apiclient_key\.pem/)
+  assert.match(settingsSource, /私钥文件已载入/)
+})
+
+test('payment settings expose API_V3_KEY inputs and store-scoped runtime checks', () => {
+  const typeSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'types', 'admin.ts'),
+    'utf8'
+  )
+  const settingsModuleSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-settings.js'),
+    'utf8'
+  )
+  const payApiSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'payApi', 'index.js'),
+    'utf8'
+  )
+
+  assert.match(typeSource, /export interface PayConfig/)
+  assert.match(typeSource, /apiV3KeyConfigured: boolean/)
+  assert.match(typeSource, /certSerialNo: string/)
+  assert.match(typeSource, /privateKey: string/)
+  assert.match(settingsModuleSource, /normalizePayConfigPayload/)
+  assert.match(settingsModuleSource, /maskPayConfigSecrets/)
+  assert.match(payApiSource, /getPayConfigForStore/)
+  assert.match(payApiSource, /where\(\{ storeId: normalizedStoreId \}\)/)
+  assert.match(payApiSource, /支付配置不完整/)
+})
+
+test('AI settings expose connection test and model-fetch actions', () => {
+  const apiSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'lib', 'admin-api.ts'),
+    'utf8'
+  )
+  const typeSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'types', 'admin.ts'),
+    'utf8'
+  )
+  const settingsPageSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'pages', 'settings-page.tsx'),
+    'utf8'
+  )
+  const adminApiSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'index.js'),
+    'utf8'
+  )
+  const settingsModuleSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-settings.js'),
+    'utf8'
+  )
+
+  assert.match(apiSource, /fetchAiModels/)
+  assert.match(apiSource, /testAiConfig/)
+  assert.match(typeSource, /export interface AiConfig/)
+  assert.match(typeSource, /export interface AiModelListResult/)
+  assert.match(typeSource, /export interface AiConnectionTestResult/)
+  assert.match(settingsPageSource, /拉取模型/)
+  assert.match(settingsPageSource, /测试接口/)
+  assert.match(settingsPageSource, /AutoComplete/)
+  assert.match(settingsPageSource, /可直接选择/)
+  assert.match(adminApiSource, /case 'settings\.fetchAiModels'/)
+  assert.match(adminApiSource, /case 'settings\.testAiConfig'/)
+  assert.match(settingsModuleSource, /async function fetchAiModels/)
+  assert.match(settingsModuleSource, /async function testAiConfig/)
+  assert.match(settingsModuleSource, /\/models/)
 })
 
 test('phase-d docs describe new collections and page routes', () => {

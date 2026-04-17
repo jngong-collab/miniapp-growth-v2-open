@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Switch, Typography } from 'antd'
+import { App, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Switch, Typography } from 'antd'
 import L from 'leaflet'
 import { adminApi } from '../lib/admin-api'
 import { getTempFileUrl, uploadFileToCloud } from '../lib/cloudbase'
 
 const DEFAULT_MAP_CENTER: [number, number] = [23.1291, 113.2644]
+
+async function readPemFile(file: File) {
+  return file.text()
+}
 
 function LocationMapPreview(props: {
   center: [number, number]
@@ -75,9 +79,17 @@ export function SettingsPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [draftLocation, setDraftLocation] = useState<[number, number] | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState('')
+  const [fetchedAiModels, setFetchedAiModels] = useState<string[]>([])
   const latitude = Number(Form.useWatch('latitude', storeForm) || 0)
   const longitude = Number(Form.useWatch('longitude', storeForm) || 0)
   const logoValue = String(Form.useWatch('logo', storeForm) || '')
+  const currentAiModel = String(Form.useWatch('model', aiForm) || '')
+  const apiV3KeyValue = String(Form.useWatch('apiV3Key', payForm) || '')
+  const privateKeyValue = String(Form.useWatch('privateKey', payForm) || '')
+  const certificateValue = String(Form.useWatch('certificatePem', payForm) || '')
+  const apiV3KeyConfigured = Boolean(apiV3KeyValue.trim())
+  const privateKeyConfigured = Boolean(privateKeyValue.trim())
+  const certificateConfigured = Boolean(certificateValue.trim())
 
   const settingsQuery = useQuery({
     queryKey: ['settings'],
@@ -150,6 +162,46 @@ export function SettingsPage() {
     },
     onError: (error: Error) => message.error(error.message)
   })
+  const fetchAiModelsMutation = useMutation({
+    mutationFn: adminApi.fetchAiModels,
+    onSuccess: result => {
+      setFetchedAiModels(result.models)
+      if (result.selectedModel && result.selectedModel !== currentAiModel) {
+        aiForm.setFieldValue('model', result.selectedModel)
+      }
+      message.success(`已拉取 ${result.models.length} 个模型，可直接选择`)
+    },
+    onError: (error: Error) => message.error(error.message)
+  })
+  const testAiMutation = useMutation({
+    mutationFn: adminApi.testAiConfig,
+    onSuccess: result => {
+      setFetchedAiModels(result.models)
+      if (result.selectedModel && result.selectedModel !== currentAiModel) {
+        aiForm.setFieldValue('model', result.selectedModel)
+      }
+      Modal.info({
+        title: 'AI 接口测试通过',
+        content: (
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <Typography.Text>返回模型数：{result.models.length}</Typography.Text>
+            <Typography.Text>当前选中：{result.selectedModel || '未匹配到可用模型'}</Typography.Text>
+            <Typography.Paragraph copyable={{ text: result.requestUrl }} style={{ marginBottom: 0 }}>
+              请求地址：{result.requestUrl}
+            </Typography.Paragraph>
+            <div style={{ maxHeight: 220, overflow: 'auto', padding: 12, border: '1px solid #f0f0f0', borderRadius: 8 }}>
+              {result.models.map(model => (
+                <Typography.Text key={model} style={{ display: 'block' }}>
+                  {model}
+                </Typography.Text>
+              ))}
+            </div>
+          </Space>
+        )
+      })
+    },
+    onError: (error: Error) => message.error(error.message)
+  })
   const updateNotifyMutation = useMutation({
     mutationFn: adminApi.updateNotificationConfig,
     onSuccess: () => {
@@ -195,294 +247,331 @@ export function SettingsPage() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={12}>
-          <Card className="panel-card" title="门店基础信息" bordered={false} loading={settingsQuery.isLoading}>
+          <Card size="small" className="panel-card" title="门店基础信息" bordered={false} loading={settingsQuery.isLoading}>
             <Form form={storeForm} layout="vertical" onFinish={values => updateStoreMutation.mutate(values)}>
-              <div className="settings-card-copy">
+              <div className="settings-card-copy" style={{ marginBottom: 12 }}>
                 <Typography.Text strong>前台展示素材</Typography.Text>
-                <Typography.Paragraph type="secondary">
+                <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
                   用于首页、门店介绍和导航信息展示。这里的内容会直接影响用户看到的门店形象。
                 </Typography.Paragraph>
               </div>
-              <Form.Item name="name" label="门店名称"><Input /></Form.Item>
-              <Form.Item name="phone" label="联系电话"><Input /></Form.Item>
-              <Form.Item
-                name="address"
-                label="门店地址"
-                extra="先输入完整门店地址，再点击“一键解析地址”自动定位门店位置。"
-              >
-                <Input.TextArea rows={2} />
-              </Form.Item>
-              <div className="settings-inline-actions">
-                <Button
-                  onClick={() => {
-                    const address = String(storeForm.getFieldValue('address') || '').trim()
-                    if (!address) {
-                      message.warning('请先输入门店地址')
-                      return
-                    }
-                    setDraftLocation(currentLocation)
-                    setPickerOpen(true)
-                    message.info('请在地图上点击门店位置')
-                  }}
-                >
-                  一键解析地址
-                </Button>
-                <Button
-                  onClick={() => {
-                    setDraftLocation(currentLocation)
-                    setPickerOpen(true)
-                  }}
-                >
-                  地图选点
-                </Button>
-              </div>
-              <Form.Item name="latitude" hidden>
-                <Input />
-              </Form.Item>
-              <Form.Item name="longitude" hidden>
-                <Input />
-              </Form.Item>
-              <div className="settings-map-preview">
-                <div className="settings-map-copy">
-                  <Typography.Text strong>门店地图位置</Typography.Text>
-                  <Typography.Paragraph type="secondary">
-                    {hasMapLocation
-                      ? '当前已定位到门店地图位置，保存后小程序可直接导航到这里。'
-                      : '还没有地图位置。请先输入门店地址并点击“一键解析地址”。'}
-                  </Typography.Paragraph>
-                </div>
-                {hasMapLocation ? (
-                  <div className="settings-map-frame">
-                    <LocationMapPreview center={currentLocation as [number, number]} marker={currentLocation} />
-                  </div>
-                ) : (
-                  <div className="settings-map-empty">等待地址解析后显示地图位置</div>
-                )}
-                {hasMapLocation && (
-                  <a className="settings-map-link" href={mapOpenUrl} target="_blank" rel="noreferrer">
-                    在新窗口查看地图位置
-                  </a>
-                )}
-              </div>
-              <Form.Item name="description" label="门店简介"><Input.TextArea rows={3} /></Form.Item>
-              <Form.Item name="logo" hidden>
-                <Input />
-              </Form.Item>
-              <div className="settings-upload-block">
-                <div className="settings-upload-copy">
-                  <Typography.Text strong>门店 Logo</Typography.Text>
-                  <Typography.Paragraph type="secondary">
-                    直接上传到当前云开发环境，保存后小程序会使用这张 Logo。
-                  </Typography.Paragraph>
-                </div>
-                <div className="settings-upload-actions">
-                  <label className="settings-upload-trigger">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async event => {
-                        const file = event.target.files?.[0]
-                        if (!file) return
-                        uploadLogoMutation.mutate(file)
-                        event.currentTarget.value = ''
-                      }}
-                    />
-                    <span>{uploadLogoMutation.isPending ? '上传中...' : '上传 Logo'}</span>
-                  </label>
-                  {logoValue ? (
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="name" label="门店名称" style={{ marginBottom: 12 }}><Input /></Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="phone" label="联系电话" style={{ marginBottom: 12 }}><Input /></Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="address"
+                    label="门店地址"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Input.TextArea rows={3} placeholder="输入完整门店地址后，点击解析位置" />
+                  </Form.Item>
+                  <Space style={{ marginBottom: 16 }}>
                     <Button
+                      size="small"
                       onClick={() => {
-                        storeForm.setFieldValue('logo', '')
-                        setLogoPreviewUrl('')
+                        const address = String(storeForm.getFieldValue('address') || '').trim()
+                        if (!address) {
+                          message.warning('请先输入门店地址')
+                          return
+                        }
+                        setDraftLocation(currentLocation)
+                        setPickerOpen(true)
+                        message.info('请在地图上点击门店位置')
                       }}
                     >
-                      清空 Logo
+                      一键解析位置
                     </Button>
-                  ) : null}
-                </div>
-                {logoPreviewUrl ? (
-                  <div className="settings-upload-preview">
-                    <img src={logoPreviewUrl} alt="门店 Logo 预览" />
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setDraftLocation(currentLocation)
+                        setPickerOpen(true)
+                      }}
+                    >
+                      手动地图选点
+                    </Button>
+                  </Space>
+                  <Form.Item name="latitude" hidden><Input /></Form.Item>
+                  <Form.Item name="longitude" hidden><Input /></Form.Item>
+                </Col>
+                <Col span={12}>
+                  <div className="settings-map-preview" style={{ marginTop: 0, padding: 8, background: '#f5f5f5', borderRadius: 8, height: 120, display: 'flex', flexDirection: 'column' }}>
+                    {hasMapLocation ? (
+                      <>
+                        <div className="settings-map-frame" style={{ flex: 1, borderRadius: 4, overflow: 'hidden', minHeight: 0 }}>
+                          <LocationMapPreview center={currentLocation as [number, number]} marker={currentLocation} />
+                        </div>
+                        <a className="settings-map-link" href={mapOpenUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                          在新窗口查看
+                        </a>
+                      </>
+                    ) : (
+                      <div className="settings-map-empty" style={{ margin: 'auto', fontSize: 12, color: '#999' }}>等待解析地址...</div>
+                    )}
                   </div>
-                ) : (
-                  <div className="settings-upload-empty">尚未上传 Logo</div>
-                )}
-              </div>
-              <Form.Item name="banners" label="Banner 地址（每行一个）"><Input.TextArea rows={3} /></Form.Item>
-              <div className="settings-actions">
-                <Space>
-                  <Button
-                    onClick={() => {
-                      setDraftLocation(currentLocation)
-                      setPickerOpen(true)
-                      message.info('请在地图上点击门店位置')
-                    }}
-                  >
-                    重新解析位置
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setDraftLocation(currentLocation)
-                      setPickerOpen(true)
-                    }}
-                  >
-                    手动调整位置
-                  </Button>
-                  <Button type="primary" htmlType="submit" loading={updateStoreMutation.isPending}>保存门店信息</Button>
-                </Space>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="description" label="门店简介" style={{ marginBottom: 12 }}><Input.TextArea rows={2} /></Form.Item>
+                  <Form.Item name="banners" label="Banner 地址（每行一个）" style={{ marginBottom: 12 }}><Input.TextArea rows={2} /></Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="logo" hidden><Input /></Form.Item>
+                  <div className="settings-upload-block" style={{ marginTop: 28, padding: 12 }}>
+                    <div className="settings-upload-actions" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontWeight: 500 }}>门店 Logo</span>
+                      <Space>
+                        <label className="settings-upload-trigger" style={{ margin: 0, padding: '4px 12px', fontSize: 12 }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async event => {
+                              const file = event.target.files?.[0]
+                              if (!file) return
+                              uploadLogoMutation.mutate(file)
+                              event.currentTarget.value = ''
+                            }}
+                          />
+                          <span>{uploadLogoMutation.isPending ? '上传中...' : '上传'}</span>
+                        </label>
+                        {logoValue ? (
+                          <Button size="small" onClick={() => {
+                            storeForm.setFieldValue('logo', '')
+                            setLogoPreviewUrl('')
+                          }}>清除</Button>
+                        ) : null}
+                      </Space>
+                    </div>
+                    {logoPreviewUrl ? (
+                      <div className="settings-upload-preview" style={{ height: 60, width: 60, padding: 0 }}>
+                        <img src={logoPreviewUrl} alt="Logo 预览" style={{ height: '100%', width: '100%', objectFit: 'contain' }} />
+                      </div>
+                    ) : (
+                      <div className="settings-upload-empty" style={{ height: 60, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>未上传</div>
+                    )}
+                  </div>
+                </Col>
+              </Row>
+              <div className="settings-actions" style={{ marginTop: 12 }}>
+                <Button type="primary" htmlType="submit" loading={updateStoreMutation.isPending}>保存门店信息</Button>
               </div>
             </Form>
           </Card>
 
-          <Card className="panel-card" title="通知配置" bordered={false} loading={settingsQuery.isLoading}>
+          <Card size="small" className="panel-card" title="通知配置" bordered={false} loading={settingsQuery.isLoading} style={{ marginTop: 16 }}>
             <Form form={notifyForm} layout="vertical" onFinish={values => updateNotifyMutation.mutate(values)}>
-              <div className="settings-card-copy">
-                <Typography.Text strong>管理员提醒</Typography.Text>
-                <Typography.Paragraph type="secondary">
-                  控制订单、退款和跟进通知。适合分开管理老板和运营同学的消息接收范围。
-                </Typography.Paragraph>
-              </div>
-              <Form.Item name="orderNotifyEnabled" label="订单通知" valuePropName="checked">
-                <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="orderNotifyEnabled" label="订单通知" valuePropName="checked" style={{ marginBottom: 12 }}>
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="refundNotifyEnabled" label="退款通知" valuePropName="checked" style={{ marginBottom: 12 }}>
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="followupNotifyEnabled" label="跟进通知" valuePropName="checked" style={{ marginBottom: 12 }}>
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="adminPhones" label="管理员手机号（每行一个）" style={{ marginBottom: 12 }}>
+                <Input.TextArea rows={2} />
               </Form.Item>
-              <Form.Item name="refundNotifyEnabled" label="退款通知" valuePropName="checked">
-                <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-              </Form.Item>
-              <Form.Item name="followupNotifyEnabled" label="跟进通知" valuePropName="checked">
-                <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-              </Form.Item>
-              <Form.Item name="adminPhones" label="管理员手机号（每行一个）">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-              <div className="settings-actions">
+              <div className="settings-actions" style={{ marginTop: 12 }}>
                 <Button type="primary" htmlType="submit" loading={updateNotifyMutation.isPending}>保存通知配置</Button>
               </div>
             </Form>
           </Card>
         </Col>
         <Col xs={24} xl={12}>
-          <Card className="panel-card" title="支付配置" bordered={false} loading={settingsQuery.isLoading}>
+          <Card size="small" className="panel-card" title="支付配置" bordered={false} loading={settingsQuery.isLoading}>
             <Form form={payForm} layout="vertical" onFinish={values => updatePayMutation.mutate(values)}>
-              <div className="settings-card-copy">
-                <Typography.Text strong>交易基础参数</Typography.Text>
-                <Typography.Paragraph type="secondary">
-                  支付回调、商户号和密钥都在这里维护。敏感值继续支持脱敏回显。
-                </Typography.Paragraph>
-              </div>
-              <Form.Item name="mchId" label="商户号"><Input /></Form.Item>
-              <Form.Item name="mchKey" label="商户密钥"><Input.Password placeholder="保持脱敏值代表不修改" /></Form.Item>
-              <Form.Item name="notifyUrl" label="支付回调地址"><Input /></Form.Item>
-              <div className="settings-actions">
+              <Form.Item name="enabled" label="启用支付能力" valuePropName="checked" style={{ marginBottom: 12 }}>
+                <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+              </Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="mchId" label="商户号" style={{ marginBottom: 12 }}><Input /></Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="certSerialNo" label="证书序列号" style={{ marginBottom: 12 }}>
+                    <Input placeholder="填写商户平台中的证书序列号" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="apiV3Key" label="API_V3_KEY" style={{ marginBottom: 12 }}>
+                <Input.Password placeholder="保持脱敏值代表不修改" />
+              </Form.Item>
+              <Form.Item name="privateKeyFileName" hidden><Input /></Form.Item>
+              <Form.Item name="certificateFileName" hidden><Input /></Form.Item>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="privateKey" label={
+                    <Space>
+                      <span>证书私钥</span>
+                      <label className="settings-upload-trigger" style={{ margin: 0, padding: '2px 8px', fontSize: 12 }}>
+                        <input
+                          type="file"
+                          accept=".pem,.key,.txt"
+                          onChange={async event => {
+                            const file = event.target.files?.[0]
+                            if (!file) return
+                            try {
+                              const content = await readPemFile(file)
+                              payForm.setFieldsValue({ privateKey: content, privateKeyFileName: file.name })
+                              message.success('私钥文件已载入')
+                            } catch (error) {
+                              message.error(error instanceof Error ? error.message : '私钥文件读取失败')
+                            } finally {
+                              event.currentTarget.value = ''
+                            }
+                          }}
+                        />
+                        <span>导入</span>
+                      </label>
+                    </Space>
+                  } style={{ marginBottom: 12 }}>
+                    <Input.TextArea rows={4} placeholder="apiclient_key.pem 内容" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="certificatePem" label={
+                    <Space>
+                      <span>API 证书内容</span>
+                      <label className="settings-upload-trigger" style={{ margin: 0, padding: '2px 8px', fontSize: 12 }}>
+                        <input
+                          type="file"
+                          accept=".pem,.crt,.txt"
+                          onChange={async event => {
+                            const file = event.target.files?.[0]
+                            if (!file) return
+                            try {
+                              const content = await readPemFile(file)
+                              payForm.setFieldsValue({ certificatePem: content, certificateFileName: file.name })
+                              message.success('证书文件已载入')
+                            } catch (error) {
+                              message.error(error instanceof Error ? error.message : '证书文件读取失败')
+                            } finally {
+                              event.currentTarget.value = ''
+                            }
+                          }}
+                        />
+                        <span>导入</span>
+                      </label>
+                    </Space>
+                  } style={{ marginBottom: 12 }}>
+                    <Input.TextArea rows={4} placeholder="apiclient_cert.pem 内容" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
+                状态：API_V3_KEY {apiV3KeyConfigured ? '已配置' : '未配置'} | 私钥 {privateKeyConfigured ? '已配置' : '未配置'} | 证书 {certificateConfigured ? '已配置' : '未配置'}
+              </Typography.Paragraph>
+              <div className="settings-actions" style={{ marginTop: 12 }}>
                 <Button type="primary" htmlType="submit" loading={updatePayMutation.isPending}>保存支付配置</Button>
               </div>
             </Form>
           </Card>
 
-          <Card className="panel-card" title="AI 基础配置" bordered={false} loading={settingsQuery.isLoading}>
+          <Card size="small" className="panel-card" title="AI 基础配置" bordered={false} loading={settingsQuery.isLoading} style={{ marginTop: 16 }}>
             <Form form={aiForm} layout="vertical" onFinish={values => updateAiMutation.mutate(values)}>
-              <div className="settings-card-copy">
-                <Typography.Text strong>正式分析链路</Typography.Text>
-                <Typography.Paragraph type="secondary">
-                  控制 AI 接口、模型和调用额度。这里只负责正常模式的分析能力。
-                </Typography.Paragraph>
-              </div>
-              <Form.Item name="enabled" label="启用 AI 分析" valuePropName="checked">
+              <Form.Item name="enabled" label="启用 AI 分析" valuePropName="checked" style={{ marginBottom: 12 }}>
                 <Switch checkedChildren="开启" unCheckedChildren="关闭" />
               </Form.Item>
-              <Form.Item name="apiUrl" label="AI 接口地址"><Input /></Form.Item>
-              <Form.Item name="apiKey" label="API Key"><Input.Password placeholder="保持脱敏值代表不修改" /></Form.Item>
-              <Form.Item name="model" label="模型名称"><Input /></Form.Item>
-              <Form.Item name="dailyLimit" label="每日总限制"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name="userDailyLimit" label="用户每日限制"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name="systemPrompt" label="系统 Prompt"><Input.TextArea rows={4} /></Form.Item>
-              <div className="settings-actions">
-                <Button type="primary" htmlType="submit" loading={updateAiMutation.isPending}>保存 AI 基础配置</Button>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="apiUrl" label="AI 接口地址" style={{ marginBottom: 12 }}>
+                    <Input placeholder="OpenAI 兼容接口" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="apiKey" label="API Key" style={{ marginBottom: 12 }}><Input.Password placeholder="保持脱敏值代表不修改" /></Form.Item>
+                </Col>
+              </Row>
+              <Form.Item label="模型名称" style={{ marginBottom: 12 }}>
+                <Space.Compact style={{ width: '100%' }}>
+                  <Form.Item name="model" noStyle>
+                    <AutoComplete
+                      options={fetchedAiModels.map(model => ({ value: model }))}
+                      placeholder="可手填，拉取后也可以直接选择模型"
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                  <Button
+                    onClick={() => fetchAiModelsMutation.mutate(aiForm.getFieldsValue(true))}
+                    loading={fetchAiModelsMutation.isPending}
+                  >
+                    拉取模型
+                  </Button>
+                </Space.Compact>
+              </Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="dailyLimit" label="每日总限制" style={{ marginBottom: 12 }}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="userDailyLimit" label="用户每日限制" style={{ marginBottom: 12 }}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="systemPrompt" label="系统 Prompt" style={{ marginBottom: 12 }}><Input.TextArea rows={2} /></Form.Item>
+              <div className="settings-actions" style={{ marginTop: 12 }}>
+                <Space>
+                  <Button onClick={() => testAiMutation.mutate(aiForm.getFieldsValue(true))} loading={testAiMutation.isPending}>测试接口</Button>
+                  <Button type="primary" htmlType="submit" loading={updateAiMutation.isPending}>保存 AI 基础配置</Button>
+                </Space>
               </div>
             </Form>
           </Card>
 
-          <Card className="panel-card" title="审核模式" bordered={false} loading={settingsQuery.isLoading}>
+          <Card size="small" className="panel-card" title="审核模式" bordered={false} loading={settingsQuery.isLoading} style={{ marginTop: 16 }}>
             <Form form={aiForm} layout="vertical" onFinish={values => updateAiMutation.mutate(values)}>
-              <div className="settings-card-copy">
-                <Typography.Text strong>提审安全配置</Typography.Text>
-                <Typography.Paragraph type="secondary">
-                  开启后，前台读取 <code>reviewConfig</code> 降级舌象能力，切换安全文案和安全素材。
-                </Typography.Paragraph>
-              </div>
-              <Form.Item name={['reviewConfig', 'enabled']} label="启用审核模式" valuePropName="checked">
-                <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-              </Form.Item>
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'entryTitle']} label="入口标题">
-                    <Input placeholder="例如：宝宝日常" />
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Form.Item name={['reviewConfig', 'enabled']} label="启用审核模式" valuePropName="checked" style={{ marginBottom: 12 }}>
+                    <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'pageTitle']} label="页面标题">
-                    <Input placeholder="例如：健康打卡" />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'historyTitle']} label="历史标题">
-                    <Input placeholder="例如：照片记录" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'reportTitle']} label="详情标题">
-                    <Input placeholder="例如：记录详情" />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'submitText']} label="提交按钮文案">
-                    <Input placeholder="例如：保存记录" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'shareTitle']} label="分享文案">
-                    <Input placeholder="例如：记录宝宝健康每一天" />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'emptyText']} label="空状态文案">
-                    <Input placeholder="例如：暂无照片记录" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'listTagText']} label="列表标签文案">
-                    <Input placeholder="例如：待AI分析" />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Form.Item name={['reviewConfig', 'safeBannerUrl']} label="审核态 Banner 地址">
-                <Input placeholder="https://..." />
-              </Form.Item>
-              <Form.Item name={['reviewConfig', 'safeShareImageUrl']} label="审核态分享图地址">
-                <Input placeholder="https://..." />
-              </Form.Item>
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item name={['reviewConfig', 'hideHistoryAiRecords']} label="审核态隐藏旧 AI 历史" valuePropName="checked">
+                <Col span={9}>
+                  <Form.Item name={['reviewConfig', 'hideHistoryAiRecords']} label="隐藏旧 AI 历史" valuePropName="checked" style={{ marginBottom: 12 }}>
                     <Switch checkedChildren="隐藏" unCheckedChildren="显示" />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name={['reviewConfig', 'allowReanalyzeAfterReview']}
-                    label="审核结束后允许补分析"
-                    valuePropName="checked"
-                  >
+                <Col span={9}>
+                  <Form.Item name={['reviewConfig', 'allowReanalyzeAfterReview']} label="结束后允许补分析" valuePropName="checked" style={{ marginBottom: 12 }}>
                     <Switch checkedChildren="允许" unCheckedChildren="禁止" />
                   </Form.Item>
                 </Col>
               </Row>
-              <div className="settings-actions">
+              <Row gutter={12}>
+                <Col span={6}><Form.Item name={['reviewConfig', 'entryTitle']} label="入口标题" style={{ marginBottom: 12 }}><Input placeholder="宝宝日常" /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['reviewConfig', 'pageTitle']} label="页面标题" style={{ marginBottom: 12 }}><Input placeholder="健康打卡" /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['reviewConfig', 'historyTitle']} label="历史标题" style={{ marginBottom: 12 }}><Input placeholder="照片记录" /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['reviewConfig', 'reportTitle']} label="详情标题" style={{ marginBottom: 12 }}><Input placeholder="记录详情" /></Form.Item></Col>
+              </Row>
+              <Row gutter={12}>
+                <Col span={6}><Form.Item name={['reviewConfig', 'submitText']} label="提交按钮" style={{ marginBottom: 12 }}><Input placeholder="保存记录" /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['reviewConfig', 'shareTitle']} label="分享文案" style={{ marginBottom: 12 }}><Input placeholder="分享" /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['reviewConfig', 'emptyText']} label="空状态" style={{ marginBottom: 12 }}><Input placeholder="暂无记录" /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['reviewConfig', 'listTagText']} label="列表标签" style={{ marginBottom: 12 }}><Input placeholder="待AI分析" /></Form.Item></Col>
+              </Row>
+              <Row gutter={12}>
+                <Col span={12}><Form.Item name={['reviewConfig', 'safeBannerUrl']} label="审核态 Banner 地址" style={{ marginBottom: 12 }}><Input placeholder="https://..." /></Form.Item></Col>
+                <Col span={12}><Form.Item name={['reviewConfig', 'safeShareImageUrl']} label="审核态分享图地址" style={{ marginBottom: 12 }}><Input placeholder="https://..." /></Form.Item></Col>
+              </Row>
+              <div className="settings-actions" style={{ marginTop: 12 }}>
                 <Button type="primary" htmlType="submit" loading={updateAiMutation.isPending}>保存审核模式</Button>
               </div>
             </Form>

@@ -1,5 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+const { EventEmitter } = require('node:events')
 const Module = require('module')
 const path = require('node:path')
 
@@ -236,6 +237,15 @@ test('settings read paths scope pay, ai, and notification config by storeId', as
     safeGetFirstByStore: async (collection, storeId, condition = {}) => {
       const scopedCondition = { ...condition, storeId }
       safeGetFirstCalls.push({ collection, condition: scopedCondition })
+      if (collection === 'pay_config') {
+        return {
+          _id: 'pay-1',
+          storeId: scopedCondition.storeId,
+          apiV3Key: 'secret-v3',
+          privateKey: '-----BEGIN PRIVATE KEY-----demo-----END PRIVATE KEY-----',
+          certificatePem: '-----BEGIN CERTIFICATE-----demo-----END CERTIFICATE-----'
+        }
+      }
       return { _id: `${collection}-1`, storeId: scopedCondition.storeId }
     },
     safeGetFirst: async (collection, condition) => {
@@ -261,6 +271,9 @@ test('settings read paths scope pay, ai, and notification config by storeId', as
     assert.equal(aiCall.condition.storeId, 'store-a')
     assert.equal(payCall.condition.storeId, 'store-a')
     assert.equal(notificationCall.condition.storeId, 'store-a')
+    assert.equal(result.data.payConfig.apiV3Key, '••••••••')
+    assert.equal(result.data.payConfig.privateKey, '-----BEGIN PRIVATE KEY-----demo-----END PRIVATE KEY-----')
+    assert.equal(result.data.payConfig.certificatePem, '-----BEGIN CERTIFICATE-----demo-----END CERTIFICATE-----')
   } finally {
     restoreData()
     restoreContext()
@@ -317,7 +330,16 @@ test('settings update paths persist storeId-scoped config and do not crash on no
     } = require(settingsPath)
     const access = { uid: 'admin-1', account: { storeId, username: 'boss' } }
 
-    const payRes = await updatePayConfig(access, { payload: { mchId: '1900000109', mchKey: 'secret' } })
+    const payRes = await updatePayConfig(access, {
+      payload: {
+        enabled: true,
+        mchId: '1900000109',
+        apiV3Key: 'secret-v3',
+        certSerialNo: 'CERT-001',
+        privateKey: '-----BEGIN PRIVATE KEY-----demo-----END PRIVATE KEY-----',
+        certificatePem: '-----BEGIN CERTIFICATE-----demo-----END CERTIFICATE-----'
+      }
+    })
     const aiRes = await updateAiConfig(access, { payload: { apiUrl: 'https://ai.test', apiKey: 'secret' } })
     const notificationRes = await updateNotificationConfig(access, { payload: { adminPhones: ['13800000000'] } })
 
@@ -338,9 +360,118 @@ test('settings update paths persist storeId-scoped config and do not crash on no
     const notificationWrite = writes.find((entry) => entry.collectionName === 'notification_settings')
 
     assert.equal(payWrite.data.storeId, storeId)
+    assert.equal(payWrite.data.apiV3Key, 'secret-v3')
+    assert.equal(payWrite.data.certSerialNo, 'CERT-001')
+    assert.equal(payWrite.data.certificatePem, '-----BEGIN CERTIFICATE-----demo-----END CERTIFICATE-----')
     assert.equal(aiWrite.data.storeId, storeId)
     assert.equal(notificationWrite.data.storeId, storeId)
   } finally {
+    restoreData()
+    restoreContext()
+    unloadModule(settingsPath)
+  }
+})
+
+test('settings AI tooling actions reuse stored apiKey when the form submits a masked secret', async () => {
+  const settingsPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-settings.js')
+  const dataPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'data.js')
+  const contextPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'context.js')
+
+  unloadModule(settingsPath)
+
+  const restoreData = mockModule(dataPath, {
+    getAccessStoreId: (access) => access.account.storeId,
+    safeGetById: async () => null,
+    safeGetFirstByStore: async (collection, storeId) => {
+      if (collection === 'ai_config') {
+        return {
+          _id: 'ai-1',
+          storeId,
+          enabled: true,
+          apiUrl: 'https://ai.example/v1/chat/completions',
+          apiKey: 'stored-secret',
+          model: '',
+          systemPrompt: 'demo'
+        }
+      }
+      return null
+    },
+    safeList: async () => [],
+    writeAuditLog: async () => null
+  })
+  const restoreContext = mockModule(contextPath, {
+    db: { serverDate: () => new Date('2026-04-15T00:00:00Z') }
+  })
+
+  const https = require('node:https')
+  const originalRequest = https.request
+  const requests = []
+
+  https.request = (options, callback) => {
+    const response = new EventEmitter()
+    response.statusCode = 200
+    response.setEncoding = () => {}
+
+    const request = new EventEmitter()
+    request.setTimeout = () => {}
+    request.destroy = (error) => {
+      if (error) {
+        request.emit('error', error)
+      }
+    }
+    request.write = (chunk) => {
+      request.body = (request.body || '') + chunk
+    }
+    request.end = () => {
+      requests.push({
+        path: options.path,
+        method: options.method,
+        headers: options.headers,
+        body: request.body || ''
+      })
+      process.nextTick(() => {
+        callback(response)
+        process.nextTick(() => {
+          response.emit('data', JSON.stringify({ data: [{ id: 'model-a' }, { id: 'model-b' }] }))
+          response.emit('end')
+        })
+      })
+    }
+
+    return request
+  }
+
+  try {
+    const { fetchAiModels, testAiConfig } = require(settingsPath)
+    const access = { uid: 'admin-1', account: { storeId: 'store-a', username: 'boss' } }
+
+    const modelsRes = await fetchAiModels(access, {
+      payload: {
+        apiUrl: 'https://ai.example/v1/chat/completions',
+        apiKey: '••••••••'
+      }
+    })
+    const testRes = await testAiConfig(access, {
+      payload: {
+        apiUrl: 'https://ai.example/v1/chat/completions',
+        apiKey: '••••••••'
+      }
+    })
+
+    assert.equal(modelsRes.code, 0)
+    assert.deepEqual(modelsRes.data.models, ['model-a', 'model-b'])
+    assert.equal(modelsRes.data.selectedModel, 'model-a')
+
+    assert.equal(testRes.code, 0)
+    assert.deepEqual(testRes.data.models, ['model-a', 'model-b'])
+    assert.equal(testRes.data.selectedModel, 'model-a')
+
+    assert.equal(requests[0].path, '/v1/models')
+    assert.equal(requests[0].headers.Authorization, 'Bearer stored-secret')
+    assert.equal(requests[1].path, '/v1/models')
+    assert.equal(requests[1].headers.Authorization, 'Bearer stored-secret')
+  } finally {
+    https.request = originalRequest
     restoreData()
     restoreContext()
     unloadModule(settingsPath)

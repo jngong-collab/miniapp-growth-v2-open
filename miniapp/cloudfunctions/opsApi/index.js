@@ -540,7 +540,9 @@ async function getWorkbenchSettings(openid) {
 
     const safePayConfig = payConfig ? {
         ...payConfig,
-        mchKey: payConfig.mchKey ? '••••••••' : ''
+        apiV3Key: payConfig.apiV3Key ? '••••••••' : '',
+        privateKey: payConfig.privateKey ? '••••••••' : '',
+        certificatePem: payConfig.certificatePem ? '••••••••' : ''
     } : null
 
     return {

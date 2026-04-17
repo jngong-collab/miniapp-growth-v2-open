@@ -47,9 +47,24 @@ test('catalog edit flow round-trips newline text into trimmed arrays', () => {
   assert.match(catalogSource, /filter\(Boolean\)/)
   assert.match(catalogSource, /split\(\s*\/\[\\n,，\]\/\s*\)/)
   assert.match(catalogSource, /formatListText\(record\.tags\)/)
-  assert.match(catalogSource, /formatListText\(record\.images\)/)
   assert.match(catalogSource, /parseListText\(values\.tags\)/)
-  assert.match(catalogSource, /parseListText\(values\.images\)/)
+  assert.match(catalogSource, /uploadFileToCloud/)
+  assert.match(catalogSource, /getTempFileUrl/)
+})
+
+test('catalog and campaign money inputs use yuan labels while preserving fen payload conversion', () => {
+  const catalogSource = readSource('admin-web/src/pages/catalog-page.tsx')
+  const campaignsSource = readSource('admin-web/src/pages/campaigns-page.tsx')
+
+  assert.match(catalogSource, /售价（元）/)
+  assert.match(catalogSource, /原价（元）/)
+  assert.match(catalogSource, /fenToYuanInput/)
+  assert.match(catalogSource, /yuanToFen/)
+
+  assert.match(campaignsSource, /活动价（元）/)
+  assert.match(campaignsSource, /返现金额（元）/)
+  assert.match(campaignsSource, /fenToYuanInput/)
+  assert.match(campaignsSource, /yuanToFen/)
 })
 
 test('product detail omits invalid discount text when original price is missing or zero', async () => {

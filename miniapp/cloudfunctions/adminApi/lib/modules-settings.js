@@ -1,4 +1,5 @@
 const { db } = require('./context')
+const http = require('node:http')
 const https = require('node:https')
 const {
   getAccessStoreId,
@@ -8,6 +9,8 @@ const {
   writeAuditLog
 } = require('./data')
 const { sanitizeStore, splitPlainList } = require('./helpers')
+
+const SECRET_MASK = '••••••••'
 
 async function requestJson(url, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -44,6 +47,78 @@ async function requestJson(url, headers = {}) {
     })
     request.end()
   })
+}
+
+async function requestRemoteJson(url, options = {}) {
+  const parsedUrl = new URL(url)
+  const transport = parsedUrl.protocol === 'https:' ? https : http
+  const method = options.method || 'GET'
+  const body = typeof options.body === 'string' ? options.body : ''
+  const headers = options.headers || {}
+  const timeout = Number(options.timeout || 15000)
+
+  return new Promise((resolve, reject) => {
+    const request = transport.request({
+      protocol: parsedUrl.protocol,
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+      path: `${parsedUrl.pathname}${parsedUrl.search || ''}`,
+      method,
+      headers
+    }, response => {
+      let responseBody = ''
+      response.setEncoding('utf8')
+      response.on('data', chunk => {
+        responseBody += chunk
+      })
+      response.on('end', () => {
+        let payload = null
+        if (responseBody.trim()) {
+          try {
+            payload = JSON.parse(responseBody)
+          } catch (error) {
+            reject(new Error(`接口返回了无效 JSON：${responseBody.slice(0, 200)}`))
+            return
+          }
+        } else {
+          payload = {}
+        }
+
+        if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+          const message = extractRemoteErrorMessage(payload, responseBody, response.statusCode)
+          reject(new Error(message))
+          return
+        }
+
+        resolve(payload)
+      })
+    })
+
+    request.on('error', error => {
+      reject(error)
+    })
+    request.setTimeout(timeout, () => {
+      request.destroy(new Error('接口请求超时'))
+    })
+
+    if (body) {
+      request.write(body)
+    }
+    request.end()
+  })
+}
+
+function extractRemoteErrorMessage(payload, rawBody, statusCode) {
+  const payloadMessage = payload && typeof payload === 'object'
+    ? trimText(
+      payload.msg ||
+      payload.message ||
+      (payload.error && (payload.error.message || payload.error.code)) ||
+      ''
+    )
+    : ''
+  const rawMessage = typeof rawBody === 'string' ? rawBody.slice(0, 160).trim() : ''
+  return payloadMessage || rawMessage || `HTTP ${statusCode || 500}`
 }
 
 async function geocodeWithTencent(address, key) {
@@ -139,12 +214,97 @@ function normalizeSecretPayload(payload, secretField) {
   const next = {}
   Object.keys(payload || {}).forEach(key => {
     const value = payload[key]
-    if (key === secretField && (!value || value === '••••••••')) {
+    if (key === secretField && (!value || value === SECRET_MASK)) {
       return
     }
     next[key] = typeof value === 'string' ? value.trim() : value
   })
   return next
+}
+
+function trimText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeMaskedSecret(value) {
+  const next = trimText(value)
+  if (!next || next === SECRET_MASK) {
+    return undefined
+  }
+  return next
+}
+
+function buildDefaultAiConfig() {
+  return {
+    enabled: false,
+    apiUrl: '',
+    apiKey: '',
+    model: '',
+    dailyLimit: 0,
+    userDailyLimit: 0,
+    systemPrompt: '',
+    reviewConfig: normalizeReviewConfig({})
+  }
+}
+
+function buildDefaultPayConfig() {
+  return {
+    enabled: false,
+    mchId: '',
+    notifyUrl: '',
+    apiV3Key: '',
+    certSerialNo: '',
+    privateKey: '',
+    privateKeyFileName: '',
+    certificatePem: '',
+    certificateFileName: '',
+    apiV3KeyConfigured: false,
+    privateKeyConfigured: false,
+    certificateConfigured: false
+  }
+}
+
+function normalizePayConfigPayload(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {}
+  const next = {
+    enabled: source.enabled === true,
+    mchId: trimText(source.mchId),
+    notifyUrl: trimText(source.notifyUrl),
+    certSerialNo: trimText(source.certSerialNo),
+    privateKeyFileName: trimText(source.privateKeyFileName),
+    certificateFileName: trimText(source.certificateFileName)
+  }
+
+  const apiV3Key = normalizeMaskedSecret(source.apiV3Key)
+  const privateKey = normalizeMaskedSecret(source.privateKey)
+  const certificatePem = normalizeMaskedSecret(source.certificatePem)
+
+  if (apiV3Key !== undefined) {
+    next.apiV3Key = apiV3Key
+  }
+  if (privateKey !== undefined) {
+    next.privateKey = privateKey
+  }
+  if (certificatePem !== undefined) {
+    next.certificatePem = certificatePem
+  }
+
+  return next
+}
+
+function maskPayConfigSecrets(payConfig) {
+  if (!payConfig) {
+    return buildDefaultPayConfig()
+  }
+
+  return {
+    ...buildDefaultPayConfig(),
+    ...payConfig,
+    apiV3Key: payConfig.apiV3Key ? SECRET_MASK : '',
+    apiV3KeyConfigured: Boolean(payConfig.apiV3Key),
+    privateKeyConfigured: Boolean(payConfig.privateKey),
+    certificateConfigured: Boolean(payConfig.certificatePem)
+  }
 }
 
 function normalizeReviewConfig(payload) {
@@ -189,22 +349,201 @@ function normalizeAiConfigPayload(payload) {
 
 function maskAiConfigSecrets(aiConfig) {
   if (!aiConfig) {
-    return {
-      enabled: false,
-      apiUrl: '',
-      apiKey: '',
-      model: '',
-      dailyLimit: 0,
-      userDailyLimit: 0,
-      systemPrompt: '',
-      reviewConfig: normalizeReviewConfig({})
-    }
+    return buildDefaultAiConfig()
   }
   return {
+    ...buildDefaultAiConfig(),
     ...aiConfig,
     apiKey: aiConfig.apiKey ? '••••••••' : '',
     reviewConfig: normalizeReviewConfig(aiConfig.reviewConfig)
   }
+}
+
+function buildAiAuthHeaders(apiKey, extraHeaders = {}) {
+  const next = {
+    Accept: 'application/json',
+    'User-Agent': 'liebian-admin/1.0',
+    ...extraHeaders
+  }
+  const token = trimText(apiKey)
+  if (token) {
+    next.Authorization = `Bearer ${token}`
+  }
+  return next
+}
+
+function buildAbsoluteUrls(parsedUrl, paths) {
+  return Array.from(new Set(paths
+    .filter(Boolean)
+    .map(path => new URL(path, `${parsedUrl.protocol}//${parsedUrl.host}`).toString())
+  ))
+}
+
+function buildAiEndpointCandidates(apiUrl) {
+  const parsedUrl = new URL(trimText(apiUrl))
+  const pathname = (() => {
+    const next = trimText(parsedUrl.pathname || '/')
+    if (!next) return '/'
+    if (next !== '/' && next.endsWith('/')) return next.slice(0, -1)
+    return next
+  })()
+
+  let chatPaths = []
+  let modelPaths = []
+
+  if (pathname === '/' || pathname === '') {
+    chatPaths = ['/v1/chat/completions', '/chat/completions']
+    modelPaths = ['/v1/models', '/models']
+  } else if (pathname.endsWith('/chat/completions')) {
+    const prefix = pathname.slice(0, -'/chat/completions'.length)
+    chatPaths = [pathname]
+    modelPaths = [`${prefix || ''}/models`, '/v1/models', '/models']
+  } else if (pathname.endsWith('/models')) {
+    const prefix = pathname.slice(0, -'/models'.length)
+    chatPaths = [`${prefix || ''}/chat/completions`, '/v1/chat/completions', '/chat/completions']
+    modelPaths = [pathname]
+  } else if (pathname.endsWith('/v1')) {
+    chatPaths = [`${pathname}/chat/completions`]
+    modelPaths = [`${pathname}/models`]
+  } else {
+    const lastSlashIndex = pathname.lastIndexOf('/')
+    const parentPath = lastSlashIndex > 0 ? pathname.slice(0, lastSlashIndex) : ''
+    chatPaths = [pathname]
+    modelPaths = [parentPath ? `${parentPath}/models` : '/v1/models', '/v1/models', '/models']
+  }
+
+  return {
+    chatUrls: buildAbsoluteUrls(parsedUrl, chatPaths),
+    modelUrls: buildAbsoluteUrls(parsedUrl, modelPaths)
+  }
+}
+
+function normalizeAiModelList(payload) {
+  const sourceList = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload && payload.data)
+      ? payload.data
+      : Array.isArray(payload && payload.models)
+        ? payload.models
+        : []
+
+  return Array.from(new Set(sourceList
+    .map(item => {
+      if (typeof item === 'string') return trimText(item)
+      if (!item || typeof item !== 'object') return ''
+      return trimText(item.id || item.model || item.name || item.value || '')
+    })
+    .filter(Boolean)
+  ))
+}
+
+function extractAiReply(payload) {
+  const primaryChoice = payload && Array.isArray(payload.choices) ? payload.choices[0] : null
+  const messageContent = primaryChoice && primaryChoice.message ? primaryChoice.message.content : ''
+
+  if (typeof messageContent === 'string') {
+    return messageContent.trim()
+  }
+  if (Array.isArray(messageContent)) {
+    return messageContent
+      .map(item => {
+        if (typeof item === 'string') return item.trim()
+        if (item && typeof item.text === 'string') return item.text.trim()
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+  }
+  if (primaryChoice && typeof primaryChoice.text === 'string') {
+    return primaryChoice.text.trim()
+  }
+  if (typeof payload.output_text === 'string') {
+    return payload.output_text.trim()
+  }
+  return ''
+}
+
+async function resolveAiConfigForAction(access, event) {
+  const storeId = getAccessStoreId(access)
+  const existing = await safeGetFirstByStore('ai_config', storeId)
+  const payload = normalizeAiConfigPayload(event.payload || {})
+  const merged = {
+    ...buildDefaultAiConfig(),
+    ...(existing || {}),
+    ...payload
+  }
+
+  merged.apiUrl = trimText(merged.apiUrl)
+  merged.apiKey = trimText(merged.apiKey)
+  merged.model = trimText(merged.model)
+  merged.systemPrompt = trimText(merged.systemPrompt)
+  merged.reviewConfig = normalizeReviewConfig(merged.reviewConfig)
+
+  return {
+    storeId,
+    existing,
+    aiConfig: merged
+  }
+}
+
+async function fetchAiModelsFromConfig(aiConfig) {
+  const { modelUrls } = buildAiEndpointCandidates(aiConfig.apiUrl)
+  let lastError = null
+
+  for (const requestUrl of modelUrls) {
+    try {
+      const payload = await requestRemoteJson(requestUrl, {
+        method: 'GET',
+        headers: buildAiAuthHeaders(aiConfig.apiKey),
+        timeout: 15000
+      })
+      const models = normalizeAiModelList(payload)
+      if (models.length > 0) {
+        return { models, requestUrl }
+      }
+      lastError = new Error('接口已响应，但没有返回可用模型')
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError || new Error('模型列表拉取失败')
+}
+
+async function runAiConnectionTest(aiConfig) {
+  const { chatUrls } = buildAiEndpointCandidates(aiConfig.apiUrl)
+  const requestBody = JSON.stringify({
+    model: aiConfig.model,
+    messages: [
+      { role: 'system', content: '你是接口联调助手。' },
+      { role: 'user', content: '请只回复“连接成功”。' }
+    ],
+    max_tokens: 32
+  })
+  let lastError = null
+
+  for (const requestUrl of chatUrls) {
+    try {
+      const payload = await requestRemoteJson(requestUrl, {
+        method: 'POST',
+        headers: buildAiAuthHeaders(aiConfig.apiKey, {
+          'Content-Type': 'application/json'
+        }),
+        body: requestBody,
+        timeout: 20000
+      })
+      const reply = extractAiReply(payload)
+      if (!reply) {
+        throw new Error('接口已响应，但没有返回可读取的回复内容')
+      }
+      return { reply, requestUrl }
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError || new Error('AI 接口测试失败')
 }
 
 async function getSettings(access) {
@@ -222,7 +561,7 @@ async function getSettings(access) {
     data: {
       storeInfo: storeInfo ? sanitizeStore(storeInfo) : null,
       aiConfig: maskAiConfigSecrets(aiConfig),
-      payConfig: payConfig ? { ...payConfig, mchKey: payConfig.mchKey ? '••••••••' : '' } : null,
+      payConfig: maskPayConfigSecrets(payConfig),
       adminAccounts,
       notificationConfig: notificationConfig || {
         orderNotifyEnabled: true,
@@ -256,9 +595,45 @@ async function updateStore(access, event) {
 
 async function updatePayConfig(access, event) {
   const storeId = getAccessStoreId(access)
-  const payload = normalizeSecretPayload(event.payload || {}, 'mchKey')
+  const payload = normalizePayConfigPayload(event.payload || {})
   const existing = await safeGetFirstByStore('pay_config', storeId)
-  const data = { ...payload, storeId, updatedAt: db.serverDate() }
+  const merged = {
+    ...(existing || buildDefaultPayConfig()),
+    ...payload
+  }
+
+  if (merged.enabled) {
+    if (!merged.mchId) {
+      return { code: -1, msg: '请先填写商户号' }
+    }
+    if (!merged.apiV3Key) {
+      return { code: -1, msg: '请先填写 API_V3_KEY' }
+    }
+    if (!merged.certSerialNo) {
+      return { code: -1, msg: '请先填写证书序列号' }
+    }
+    if (!merged.privateKey) {
+      return { code: -1, msg: '请先导入或粘贴 apiclient_key.pem 私钥内容' }
+    }
+    if (!merged.certificatePem) {
+      return { code: -1, msg: '请先导入或粘贴 apiclient_cert.pem 证书内容' }
+    }
+  }
+
+  const data = {
+    enabled: merged.enabled === true,
+    mchId: trimText(merged.mchId),
+    notifyUrl: trimText(merged.notifyUrl),
+    apiV3Key: trimText(merged.apiV3Key),
+    certSerialNo: trimText(merged.certSerialNo),
+    privateKey: trimText(merged.privateKey),
+    privateKeyFileName: trimText(merged.privateKeyFileName),
+    certificatePem: trimText(merged.certificatePem),
+    certificateFileName: trimText(merged.certificateFileName),
+    storeId,
+    updatedAt: db.serverDate()
+  }
+
   if (existing) {
     await db.collection('pay_config').doc(existing._id).update({ data })
   } else {
@@ -275,7 +650,7 @@ async function updatePayConfig(access, event) {
   })
   return {
     code: 0,
-    data: updated ? { ...updated, mchKey: updated.mchKey ? '••••••••' : '' } : null,
+    data: maskPayConfigSecrets(updated),
     msg: '支付配置已更新'
   }
 }
@@ -303,6 +678,75 @@ async function updateAiConfig(access, event) {
     code: 0,
     data: maskAiConfigSecrets(updated),
     msg: 'AI 配置已更新'
+  }
+}
+
+async function fetchAiModels(access, event) {
+  const { aiConfig, storeId } = await resolveAiConfigForAction(access, event)
+  if (!aiConfig.apiUrl) {
+    return { code: -1, msg: '请先填写 AI 接口地址' }
+  }
+
+  const result = await fetchAiModelsFromConfig(aiConfig)
+  await writeAuditLog(access, {
+    action: 'settings.fetchAiModels',
+    module: 'settings',
+    targetType: 'ai_config',
+    targetId: storeId,
+    summary: '拉取 AI 模型列表',
+    detail: {
+      apiUrl: aiConfig.apiUrl,
+      requestUrl: result.requestUrl,
+      modelCount: result.models.length
+    }
+  })
+
+  return {
+    code: 0,
+    data: {
+      models: result.models,
+      selectedModel: aiConfig.model && result.models.includes(aiConfig.model) ? aiConfig.model : (result.models[0] || ''),
+      requestUrl: result.requestUrl
+    },
+    msg: `已拉取 ${result.models.length} 个模型`
+  }
+}
+
+async function testAiConfig(access, event) {
+  const { aiConfig, storeId } = await resolveAiConfigForAction(access, event)
+  if (!aiConfig.apiUrl) {
+    return { code: -1, msg: '请先填写 AI 接口地址' }
+  }
+
+  const result = await fetchAiModelsFromConfig(aiConfig)
+  const selectedModel = aiConfig.model && result.models.includes(aiConfig.model) ? aiConfig.model : (result.models[0] || '')
+
+  if (!selectedModel) {
+    return { code: -1, msg: '接口没有返回可用模型，请先检查地址或点击“拉取模型”' }
+  }
+
+  await writeAuditLog(access, {
+    action: 'settings.testAiConfig',
+    module: 'settings',
+    targetType: 'ai_config',
+    targetId: storeId,
+    summary: '测试 AI 模型接口返回',
+    detail: {
+      apiUrl: aiConfig.apiUrl,
+      requestUrl: result.requestUrl,
+      modelCount: result.models.length,
+      selectedModel
+    }
+  })
+
+  return {
+    code: 0,
+    data: {
+      models: result.models,
+      selectedModel,
+      requestUrl: result.requestUrl
+    },
+    msg: 'AI 接口测试通过'
   }
 }
 
@@ -389,6 +833,8 @@ module.exports = {
   updateStore,
   updatePayConfig,
   updateAiConfig,
+  fetchAiModels,
+  testAiConfig,
   updateNotificationConfig,
   getSystemHealth,
   geocodeAddress

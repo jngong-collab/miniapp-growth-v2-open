@@ -189,9 +189,12 @@ tcb api tcb DescribeCloudBaseGWService --body '{"ServiceId":"your-cloud-env-id",
 - `pay_config` 集合存储：
   - `storeId`
   - `mchId`
-  - `notifyUrl`
   - `enabled`
   - 以及必要的脱敏描述字段
+
+说明：
+
+- 当前支付结果回调由云支付直接回调 `payApi` 云函数，不需要在后台单独填写“支付回调地址”。
 - `payApi` 云函数环境变量存储：
   - `API_V3_KEY`
   - `CERT_SERIAL_NO`

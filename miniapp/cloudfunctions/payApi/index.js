@@ -11,6 +11,36 @@ function normalizeEventString(value) {
     return typeof value === 'string' ? value.trim() : ''
 }
 
+function isPayConfigComplete(payConfig) {
+    if (!payConfig || payConfig.enabled === false) return false
+    return Boolean(
+        normalizeEventString(payConfig.mchId) &&
+        normalizeEventString(payConfig.apiV3Key) &&
+        normalizeEventString(payConfig.certSerialNo) &&
+        normalizeEventString(payConfig.privateKey) &&
+        normalizeEventString(payConfig.certificatePem)
+    )
+}
+
+async function getPayConfigForStore(storeId) {
+    const normalizedStoreId = normalizeEventString(storeId)
+    const query = normalizedStoreId
+        ? db.collection('pay_config').where({ storeId: normalizedStoreId })
+        : db.collection('pay_config')
+    const payConfigRes = await query.limit(1).get().catch(() => ({ data: [] }))
+    const payConfig = (payConfigRes.data || [])[0] || null
+
+    if (!payConfig || !normalizeEventString(payConfig.mchId)) {
+        return { code: -1, msg: '支付功能未配置，请联系门店' }
+    }
+
+    if (!isPayConfigComplete(payConfig)) {
+        return { code: -1, msg: '支付配置不完整，请在后台补充 API_V3_KEY、证书序列号、证书私钥和证书文件' }
+    }
+
+    return { code: 0, data: payConfig }
+}
+
 function isLikelyCloudPayNotify(event, wxContext) {
     const callerOpenid = normalizeEventString(wxContext && wxContext.OPENID)
     if (callerOpenid) return false
@@ -384,11 +414,11 @@ async function requestPay(event, openid) {
     }
 
     // 读取支付配置
-    const payConfigRes = await db.collection('pay_config').limit(1).get()
-    if (!payConfigRes.data.length || !payConfigRes.data[0].mchId) {
-        return { code: -1, msg: '支付功能未配置，请联系门店' }
+    const payConfigResult = await getPayConfigForStore(order.storeId)
+    if (payConfigResult.code !== 0) {
+        return payConfigResult
     }
-    const payConfig = payConfigRes.data[0]
+    const payConfig = payConfigResult.data
 
     try {
         // 使用微信云开发内置云支付（推荐方式）
