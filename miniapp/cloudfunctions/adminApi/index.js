@@ -73,6 +73,8 @@ exports.main = async (event = {}) => {
       return withAdmin('viewLeads', access => leadsModule.getCustomerDetail(access, event))
     case 'leads.listFollowupEvents':
       return withAdmin('viewLeads', access => leadsModule.listFollowupEvents(access, event))
+    case 'leads.updateCustomer':
+      return withAdmin('manageCustomers', access => leadsModule.updateCustomer(access, event))
     case 'settings.get':
       return withAdmin('manageSettings', access => settingsModule.getSettings(access))
     case 'settings.updateStore':

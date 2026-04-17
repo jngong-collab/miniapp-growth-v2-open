@@ -1,5 +1,5 @@
 // pages/product-detail/product-detail.js
-const { callCloud } = require('../../utils/cloud-api')
+const { callCloud, callCloudWithLogin } = require('../../utils/cloud-api')
 const { addCartItem, canAddProductToCart, getCartBadgeCount } = require('../../utils/cart')
 
 Page({
@@ -93,8 +93,7 @@ Page({
 
     onBuy: function () {
         const app = getApp()
-        if (!app.globalData.openid) {
-            wx.showToast({ title: '请稍候，正在登录...', icon: 'none' })
+        if (!app.requireCustomerLogin(`/pages/product-detail/product-detail?id=${this.data.product && this.data.product._id}`, { content: '请先绑定手机号后再购买' })) {
             return
         }
         this.setData({ showBuyModal: true, quantity: 1 })
@@ -133,8 +132,7 @@ Page({
     confirmBuy: async function () {
         if (this.data.paying) return
         const app = getApp()
-        if (!app.globalData.openid) {
-            wx.showToast({ title: '请先登录', icon: 'none' })
+        if (!app.requireCustomerLogin(`/pages/product-detail/product-detail?id=${this.data.product && this.data.product._id}`, { content: '请先绑定手机号后再支付' })) {
             return
         }
         const { product, campaign, quantity, inviterOpenid } = this.data
@@ -143,7 +141,7 @@ Page({
 
         try {
             // Step 1：创建订单
-            const createRes = await callCloud('commerceApi', {
+            const createRes = await callCloudWithLogin('commerceApi', {
                 action: 'createOrder',
                 productId: product._id,
                 quantity,
@@ -158,7 +156,7 @@ Page({
             // Step 2：发起微信支付
             let payRes
             try {
-                payRes = await callCloud('commerceApi', {
+                payRes = await callCloudWithLogin('commerceApi', {
                     action: 'requestPay',
                     orderId
                 })

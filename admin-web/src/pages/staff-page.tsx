@@ -27,7 +27,8 @@ const adminPermissionOptions: Array<{ label: string; value: PermissionKey }> = [
   { label: '退款审核', value: 'orders.refund.review' },
   { label: '商品管理', value: 'catalog.manage' },
   { label: '活动管理', value: 'campaigns.manage' },
-  { label: '客户查看', value: 'crm.view' },
+  { label: '客户查看（只读）', value: 'crm.view' },
+  { label: '客户管理（可编辑）', value: 'crm.manage' },
   { label: '门店设置', value: 'settings.manage' },
   { label: '员工管理', value: 'staff.manage' },
   { label: '审计查看', value: 'audit.view' }

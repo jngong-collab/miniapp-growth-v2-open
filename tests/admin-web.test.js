@@ -39,6 +39,7 @@ test('admin contract exposes dotted permission keys, route map, and deny-by-defa
     'catalog.manage',
     'campaigns.manage',
     'crm.view',
+    'crm.manage',
     'settings.manage',
     'staff.manage',
     'audit.view'
@@ -370,6 +371,18 @@ test('staff page exposes admin-account creation, status controls, role templates
   assert.match(staffPageSource, /listAdminLoginEvents/)
 })
 
+test('staff page admin permission options include crm.manage alongside crm.view', () => {
+  const staffPageSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'pages', 'staff-page.tsx'),
+    'utf8'
+  )
+
+  assert.match(staffPageSource, /crm\.view/)
+  assert.match(staffPageSource, /crm\.manage/)
+  assert.match(staffPageSource, /客户查看/)
+  assert.match(staffPageSource, /客户管理/)
+})
+
 test('admin refund implementation uses shared refunding transition before finalize', () => {
   const refundSource = fs.readFileSync(
     path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'refund.js'),
@@ -648,15 +661,18 @@ test('phase-d admin api exposes finance, customer, catalog, campaigns, and ops a
 })
 
 test('settings.generateImage reads ai_config via shared store-scoped helpers', () => {
-  const apiSource = fs.readFileSync(
-    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'index.js'),
+  const settingsSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-settings.js'),
     'utf8'
   )
 
-  assert.match(apiSource, /const \{ getAccessStoreId, safeGetFirstByStore \} = require\('\.\/lib\/data'\)/)
-  assert.match(apiSource, /const storeId = getAccessStoreId\(access\)/)
-  assert.match(apiSource, /const aiConfig = await safeGetFirstByStore\('ai_config', storeId\) \|\| \{\}/)
-  assert.doesNotMatch(apiSource, /access\.db\.collection\('ai_config'\)/)
+  assert.match(settingsSource, /getAccessStoreId/)
+  assert.match(settingsSource, /safeGetFirstByStore/)
+  assert.match(settingsSource, /require\('\.\/data'\)/)
+  assert.match(settingsSource, /const storeId = getAccessStoreId\(access\)/)
+  assert.match(settingsSource, /safeGetFirstByStore\('ai_config', storeId\)/)
+  assert.match(settingsSource, /resolveAiConfigForAction/)
+  assert.doesNotMatch(settingsSource, /access\.db\.collection\('ai_config'\)/)
 })
 
 test('admin web api and types expose phase-d finance and customer contracts', () => {
@@ -797,6 +813,105 @@ test('customers page renders customer list and detail drawer with followup timel
   assert.match(customersSource, /getCustomerDetail/)
   assert.match(customersSource, /最近订单/)
   assert.match(customersSource, /跟进时间轴/)
+})
+
+test('customers page shows member level, login status, bound status, AI舌象统计 and keyword filter entry', () => {
+  const customersSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'pages', 'customers-page.tsx'),
+    'utf8'
+  )
+  const adminApiSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'lib', 'admin-api.ts'),
+    'utf8'
+  )
+  const typeSource = fs.readFileSync(
+    path.join(repoRoot, 'admin-web', 'src', 'types', 'admin.ts'),
+    'utf8'
+  )
+
+  assert.match(customersSource, /title: '手机号'/)
+  assert.match(customersSource, /已绑定/)
+  assert.match(customersSource, /登录状态/)
+  assert.match(customersSource, /会员等级/)
+  assert.match(customersSource, /AI舌象/)
+  assert.match(customersSource, /Input\.Search/)
+  assert.match(customersSource, /搜索昵称、手机号、OpenID、负责人、标签/)
+  assert.match(customersSource, /会员等级/)
+  assert.match(customersSource, /编辑资料/)
+  assert.match(customersSource, /会员等级/)
+  assert.match(customersSource, /会员标签/)
+
+  assert.match(adminApiSource, /listCustomers/)
+  assert.match(adminApiSource, /getCustomerDetail/)
+  assert.match(adminApiSource, /updateCustomer/)
+  assert.match(typeSource, /interface CustomerRecord/)
+  assert.match(typeSource, /memberLevelLabel/)
+  assert.match(typeSource, /loginStatus/)
+  assert.match(typeSource, /tongueCount/)
+  assert.match(typeSource, /lastTongueAt/)
+  assert.match(typeSource, /memberNote/)
+  assert.match(typeSource, /CustomerUpdatePayload/)
+})
+
+test('admin customers backend module remains store-scoped for listCustomers', () => {
+  const leadsSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'modules-leads.js'),
+    'utf8'
+  )
+  const contextSource = fs.readFileSync(
+    path.join(repoRoot, 'miniapp', 'cloudfunctions', 'adminApi', 'lib', 'context.js'),
+    'utf8'
+  )
+
+  assert.match(leadsSource, /async function listCustomers/)
+  assert.match(leadsSource, /safeList\('users',\s*{ storeId }/)
+  assert.match(leadsSource, /safeList\('tongue_reports'/)
+  assert.match(leadsSource, /safeList\('customer_followups'/)
+  assert.match(leadsSource, /_cmd\.in\(openids\)/)
+  assert.match(contextSource, /account\.storeId/)
+  assert.match(contextSource, /后台账号未绑定门店/)
+})
+
+test('admin docs include login session persistence, first-login restore and manual logout matrix', () => {
+  const schemaSource = fs.readFileSync(
+    path.join(repoRoot, 'docs', 'database_schema.md'),
+    'utf8'
+  )
+
+  assert.match(schemaSource, /miniapp_user_session/)
+  assert.match(schemaSource, /_initLoginSession|loginSession/)
+  assert.match(schemaSource, /manualLogout/)
+  assert.match(schemaSource, /登录态/)
+  assert.match(schemaSource, /首次登录/)
+  assert.match(schemaSource, /自动恢复/)
+  assert.match(schemaSource, /手动退出/)
+  assert.match(schemaSource, /测试回归矩阵|可回归的测试矩阵|测试矩阵/)
+  assert.match(schemaSource, /未登录访问 AI 舌象/)
+  assert.match(schemaSource, /AI 舌象权限边界/)
+  assert.match(schemaSource, /会员字段展示与筛选/)
+  assert.match(schemaSource, /关键词搜索/)
+})
+
+test('database schema documents extended member fields, auth sessions, and customer events for this login rebuild', () => {
+  const schemaSource = fs.readFileSync(
+    path.join(repoRoot, 'docs', 'database_schema.md'),
+    'utf8'
+  )
+
+  assert.match(schemaSource, /auth_sessions/)
+  assert.match(schemaSource, /customer_events/)
+  assert.match(schemaSource, /registerSource/)
+  assert.match(schemaSource, /loginStatus/)
+  assert.match(schemaSource, /lastLoginAt/)
+  assert.match(schemaSource, /firstTongueAt/)
+  assert.match(schemaSource, /lastTongueAt/)
+  assert.match(schemaSource, /tongueCount/)
+  assert.match(schemaSource, /memberTags/)
+  assert.match(schemaSource, /memberOwnerStaffOpenid/)
+  assert.match(schemaSource, /lastFollowupAt/)
+  assert.match(schemaSource, /phone_bound/)
+  assert.match(schemaSource, /tongue_analyzed/)
+  assert.match(schemaSource, /followup_created/)
 })
 
 test('ops page renders system health and audit logs', () => {

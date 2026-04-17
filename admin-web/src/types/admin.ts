@@ -5,6 +5,7 @@ export type PermissionKey =
   | 'catalog.manage'
   | 'campaigns.manage'
   | 'crm.view'
+  | 'crm.manage'
   | 'settings.manage'
   | 'staff.manage'
   | 'audit.view'
@@ -450,6 +451,9 @@ export interface CustomerRecord {
   nickName: string
   avatarUrl: string
   phone: string
+  phoneBound: boolean
+  phoneBoundAt: unknown
+  profileCompleted: boolean
   balance: number
   balanceYuan: string
   totalEarned: number
@@ -457,8 +461,31 @@ export interface CustomerRecord {
   totalInvited: number
   memberLevel: string
   memberLevelLabel: string
+  memberNote: string
+  memberTagsText: string
+  memberTags: string[]
+  memberOwnerStaffOpenid: string
+  memberOwnerStaffName: string
+  loginStatus: string
+  loginStatusLabel: string
+  isLoggedIn: boolean
+  lastLoginAt: unknown
+  tongueCount: number
+  lastTongueAt: unknown
   invitedBy: string
+  followupStatus: string
+  followupStatusLabel: string
+  followupLastAt: unknown
+  followupLastNote: string
   createdAt: unknown
+}
+
+export interface CustomerTongueReport {
+  _id: string
+  createdAt: unknown
+  isReviewMode: boolean
+  conclusion: string
+  analysisDetails: string
 }
 
 export interface FollowupEvent {
@@ -472,6 +499,16 @@ export interface FollowupEvent {
 export interface CustomerDetail extends CustomerRecord {
   recentOrders: OrderSummary[]
   followupEvents: FollowupEvent[]
+  recentTongueReports: CustomerTongueReport[]
+}
+
+export interface CustomerUpdatePayload {
+  openid: string
+  memberLevel?: string
+  memberNote?: string
+  memberTags?: string[] | string
+  memberOwnerStaffOpenid?: string
+  memberOwnerStaffName?: string
 }
 
 export interface ProductDetail extends ProductRecord {

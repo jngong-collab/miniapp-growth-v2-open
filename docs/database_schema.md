@@ -275,11 +275,94 @@
 | `balance` | number | 余额（分） |
 | `totalEarned` | number | 累计赚取返现（分） |
 | `totalInvited` | number | 累计邀请人数 |
-| `memberLevel` | string | 会员等级：`normal` / `vip` |
+| `memberLevel` | string | 会员等级：`normal` / `vip` / `svip` |
+| `memberNote` | string | 后台备注（管理员填写） |
+| `memberTags` | array\<string\> | 会员标签，如 `["AI舌象", "待回访"]` |
+| `registerSource` | string | 首次登录/建档来源，如 `profile` / `tongue` / `checkout` / `invite` |
+| `memberOwnerStaffOpenid` | string | 会员负责人 OpenID（可空） |
+| `memberOwnerStaffName` | string | 会员负责人展示名称（可空） |
+| `phoneBoundAt` | date | 手机号绑定时间 |
+| `profileCompleted` | boolean | 基础资料是否完善（至少绑定了手机号） |
+| `loginStatus` | string | 登录状态快照：`logged_in` / `logged_out` / `inactive` |
+| `lastLoginAt` | date | 最近一次登录时间 |
+| `firstTongueAt` | date | 首次完成 AI 舌象/照片记录的时间 |
+| `lastTongueAt` | date | 最近一次 AI 舌象/照片记录时间 |
+| `tongueCount` | number | 累计 AI 舌象/照片记录次数 |
+| `lastFollowupAt` | date | 最近一次人工跟进时间 |
 | `createdAt` | date | 创建时间 |
 | `updatedAt` | date | 更新时间 |
 
 > **余额规则**：余额可用于购买小程序内所有商品，暂不支持提现。
+
+## auth_sessions（前端登录会话）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `_id` | string | 文档 ID |
+| `token` | string | 会话令牌 |
+| `_openid` | string | 绑定用户 openid |
+| `userId` | string | 用户文档 `_id`（冗余） |
+| `phone` | string | 会话绑定手机号 |
+| `storeId` | string | 会话所属门店 |
+| `status` | string | 会话状态：`active` / `revoked` / `expired` |
+| `createdAt` | date | 会话创建时间 |
+| `lastActiveAt` | date | 最近刷新时间 |
+| `expiresAt` | date | 过期时间（默认 30 天后） |
+| `revokedAt` | date | 手动注销时间 |
+| `expiredAt` | date | 系统过期时间 |
+| `updatedAt` | date | 更新时间 |
+| `ip` | string | 可选，接入侧可写 |
+| `userAgent` | string | 可选，接入侧可写 |
+
+> **会话生命周期**：`opsApi` 在手机号绑定/登录时调用 `rotateSession` 生成新会话，写入 `active`；同一 openid 会先将历史 `active` 会话置为 `revoked`。`ensureAuth` 会校验 `status=active` 且 `expiresAt` 未过期；过期会写入 `expired`，随后返回登录提示。`logout` 会将会话置为 `revoked` 并附带 `revokedAt`。
+
+## customer_events（会员行为事件）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `_id` | string | 文档 ID |
+| `_openid` | string | 用户 openid |
+| `userId` | string | 用户文档 `_id`（冗余） |
+| `storeId` | string | 所属门店 |
+| `eventType` | string | 事件类型：`login` / `logout` / `phone_bound` / `tongue_analyzed` / `tongue_reanalyzed` / `order_created` / `order_paid` / `followup_created` / `member_updated` |
+| `eventSource` | string | 事件来源页面或链路，如 `profile` / `tongue` / `cart` / `orders` / `admin` |
+| `sessionToken` | string | 关联会话令牌（可空，通常只在登录事件写入） |
+| `relatedId` | string | 关联业务单据 ID，如 `reportId` / `orderId` / `followupId` |
+| `summary` | string | 面向后台的摘要说明 |
+| `detail` | object | 结构化事件详情，如登录来源、会员等级变更前后、舌象结果摘要 |
+| `staffOpenid` | string | 操作员工 OpenID（可空） |
+| `staffName` | string | 操作员工展示名称（可空） |
+| `createdAt` | date | 事件创建时间 |
+
+> **用途说明**：该集合用于串联“首次手机号登录、自动恢复登录、手动退出、AI 舌象分析、下单支付、后台跟进、会员资料编辑”等关键会员行为，供后台客户详情页时间线与后续运营筛选使用。它不是订单、舌象、跟进表的替代品，而是跨模块事件流。
+
+## miniapp 登录态（本地）
+
+> 小程序端会把会话恢复状态写入本地缓存键 `miniapp_user_session`（`openid / isLoggedIn / manualLogout`）。`onLaunch` 时通过 `_initLoginSession` 读取该键并恢复 `manualLogout`/`isLoggedIn`；`setCustomerLoginSuccess` 与 `logoutCustomer` 会更新该键。该键用于控制“未手动退出时页面可恢复登录态”以及“手动退出后不自动恢复手机号状态”。
+
+> **恢复策略**：`isLoggedIn` 仅作为会话恢复标记；最终可见态仍以 `userInfo.phone` 是否存在为准，确保“手动退出后即使本地存在旧会话仍不恢复手机号状态”。
+
+## 后台会员与 AI 舌象列表展示字段映射（客户管理页）
+
+> `leads.listCustomers` / `leads.getCustomerDetail` 输出会补齐以下展示字段：  
+> - 手机与绑定态：`phone`、`phoneBound`
+> - 登录态：`loginStatus`、`loginStatusLabel`、`isLoggedIn`、`lastLoginAt`  
+> - 会员信息：`memberLevel`、`memberLevelLabel`（普通会员 / VIP / SVIP）、`memberNote`、`memberTags`、`memberTagsText`、`memberOwnerStaffOpenid`、`memberOwnerStaffName`
+> - AI 舌象：`tongueCount`、`lastTongueAt`
+> - 跟进信息：`followupStatus`、`followupStatusLabel`、`followupLastAt`、`followupLastNote`
+> - 详情页附加：`recentTongueReports`（含 `isReviewMode` / `conclusion` / `analysisDetails`）、`recentOrders`、`followupEvents`
+
+## 测试回归矩阵（可回归）
+
+| 序号 | 用例 | 校验点 |
+|---|---|---|
+| 1 | 未登录访问 AI 舌象（/tongue、/tongue-report） | 页面入口与关键动作（历史/再次分析）必须命中 `requireCustomerLogin` 并不触发 `growthApi`/`analyzeTongue` |
+| 2 | 未登录访问订单与支付（/orders） | `onShow`、列表加载、支付动作、退款动作均需被拦截 |
+| 3 | 首次登录后自动恢复 | 手机号绑定成功后写入 `miniapp_user_session`，再次启动应恢复登录态并继续走业务态（前置鉴权通过） |
+| 4 | 手动退出登录 | `logoutCustomer` 标记 `manualLogout=true` 并清空手机号；后续不会因旧 session 自动恢复 |
+| 5 | 后台会员字段展示与筛选 | 客户页必须展示手机号绑定状态、会员等级、AI 舌象、登录状态、备注/负责人，并支持关键词搜索（昵称、手机号、OpenID、标签）筛选 |
+| 6 | 后台门店隔离 | 客户列表与详情均通过 `storeId` 查询用户与舌象/跟进数据，不可跨店读取 |
+| 7 | AI 舌象权限边界 | 同一用户不同页面（舌象首页、报告页、历史页）均执行同一登录门槛，确保登录链路闭环 |
 
 ---
 
@@ -411,6 +494,8 @@
 
 ```
 users:          _openid (唯一)
+auth_sessions:  token (唯一), _openid + status, expiresAt
+customer_events: _openid + createdAt, storeId + createdAt, eventType + createdAt
 orders:         _openid + status, orderNo (唯一), createdAt
 order_items:    orderId, _openid + productType, verifyCode
 fission_records: inviterOpenid, inviteeOpenid, campaignId

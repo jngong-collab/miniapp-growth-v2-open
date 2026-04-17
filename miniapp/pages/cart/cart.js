@@ -1,4 +1,4 @@
-const { callCloud } = require('../../utils/cloud-api')
+const { callCloudWithLogin } = require('../../utils/cloud-api')
 const {
     getCartItems,
     getCartSummary,
@@ -88,7 +88,11 @@ Page({
         if (this.data.submitting || !this.data.selectedCount) return
 
         const app = getApp()
-        if (!app.globalData.openid) {
+        if (app && typeof app.requireCustomerLogin === 'function') {
+            if (!app.requireCustomerLogin('/pages/cart/cart?from=checkout', { content: '请先绑定手机号后再去支付' })) {
+                return
+            }
+        } else if (!app?.globalData?.openid) {
             wx.showToast({ title: '请稍候，正在登录...', icon: 'none' })
             return
         }
@@ -102,7 +106,7 @@ Page({
         wx.showLoading({ title: '创建订单...', mask: true })
 
         try {
-            const createRes = await callCloud('commerceApi', {
+            const createRes = await callCloudWithLogin('commerceApi', {
                 action: 'createCartOrder',
                 items: checkoutItems
             })
@@ -110,7 +114,7 @@ Page({
             wx.showLoading({ title: '拉起支付...', mask: true })
             let payRes
             try {
-                payRes = await callCloud('commerceApi', {
+                payRes = await callCloudWithLogin('commerceApi', {
                     action: 'requestPay',
                     orderId: createRes.orderId
                 })

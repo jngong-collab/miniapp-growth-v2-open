@@ -5,6 +5,7 @@ const ADMIN_PERMISSION_KEYS = [
   'catalog.manage',
   'campaigns.manage',
   'crm.view',
+  'crm.manage',
   'settings.manage',
   'staff.manage',
   'audit.view'

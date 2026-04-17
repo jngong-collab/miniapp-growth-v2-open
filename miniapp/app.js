@@ -2,6 +2,33 @@
 const config = require('./config')
 const { callCloud } = require('./utils/cloud-api')
 
+const LOGIN_SESSION_KEY = 'miniapp_user_session'
+const LOGIN_SESSION_DEFAULT = {
+  openid: '',
+  isLoggedIn: false,
+  manualLogout: false
+}
+
+function getPathBase(path) {
+  return (path || '').split('?')[0] || ''
+}
+
+function buildRedirectTarget(url) {
+  if (!url) return ''
+  const trimUrl = String(url).trim()
+  return trimUrl.startsWith('/') ? trimUrl : `/${trimUrl}`
+}
+
+function isTabPage(url) {
+  const basePath = getPathBase(url)
+  return [
+    '/pages/index/index',
+    '/pages/tongue/tongue',
+    '/pages/mall/mall',
+    '/pages/profile/profile'
+  ].indexOf(basePath) !== -1
+}
+
 App({
   _buildDefaultReviewConfig() {
     return {
@@ -201,6 +228,165 @@ App({
     }
   },
 
+  _readLoginSession() {
+    try {
+      const saved = wx.getStorageSync(LOGIN_SESSION_KEY) || {}
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
+        return { ...LOGIN_SESSION_DEFAULT }
+      }
+      return {
+        openid: typeof saved.openid === 'string' ? saved.openid : '',
+        isLoggedIn: !!saved.isLoggedIn,
+        manualLogout: !!saved.manualLogout
+      }
+    } catch (error) {
+      return { ...LOGIN_SESSION_DEFAULT }
+    }
+  },
+
+  _writeLoginSession(state) {
+    try {
+      wx.setStorageSync(LOGIN_SESSION_KEY, {
+        ...state,
+        updatedAt: Date.now()
+      })
+    } catch (error) {
+      console.warn('写入登录态失败:', error)
+    }
+  },
+
+  _clearLoginSessionCache() {
+    try {
+      wx.removeStorageSync(LOGIN_SESSION_KEY)
+    } catch (error) {
+      console.warn('清理登录态失败:', error)
+    }
+  },
+
+  _hasBoundPhone(userInfo) {
+    const phone = userInfo && typeof userInfo.phone === 'string'
+      ? userInfo.phone.trim()
+      : ''
+    return !!phone
+  },
+
+  _shouldShowAsLoggedIn() {
+    const { isLoggedIn, manualLogout } = this.globalData.loginSession || LOGIN_SESSION_DEFAULT
+    return !manualLogout && isLoggedIn
+  },
+
+  _syncLoginStateFromUserInfo(userInfo) {
+    const hasPhone = this._hasBoundPhone(userInfo)
+    const manualLogout = !!(this.globalData.loginSession && this.globalData.loginSession.manualLogout)
+    const shouldExposePhone = !manualLogout && hasPhone
+
+    this.globalData.userInfo = shouldExposePhone
+      ? (userInfo || {})
+      : { ...(userInfo || {}), phone: '' }
+
+    this.globalData.isLoggedIn = !!shouldExposePhone
+    this.globalData.loginSession = {
+      openid: this.globalData.openid || '',
+      isLoggedIn: !!shouldExposePhone,
+      manualLogout: !!manualLogout
+    }
+    this._writeLoginSession(this.globalData.loginSession)
+
+    return this.globalData.isLoggedIn
+  },
+
+  _buildLoginSessionAfterAction() {
+    const loginSession = this._readLoginSession()
+    const shouldKeepManualLogout = !!loginSession.manualLogout
+    return {
+      ...loginSession,
+      manualLogout: shouldKeepManualLogout
+    }
+  },
+
+  _initLoginSession() {
+    this.globalData.loginSession = this._buildLoginSessionAfterAction()
+    this.globalData.isLoggedIn = this._shouldShowAsLoggedIn()
+  },
+
+  isCustomerLoggedIn() {
+    return this._shouldShowAsLoggedIn() && this._hasBoundPhone(this.globalData.userInfo)
+  },
+
+  setCustomerLoginSuccess(phone) {
+    const safePhone = (phone || '').toString().trim()
+    const currentUserInfo = this.globalData.userInfo || {}
+    const nextUserInfo = { ...currentUserInfo }
+    if (safePhone) {
+      nextUserInfo.phone = safePhone
+    } else {
+      delete nextUserInfo.phone
+    }
+
+    this.globalData.userInfo = nextUserInfo
+    this.globalData.loginSession = {
+      openid: this.globalData.openid || '',
+      isLoggedIn: !!safePhone,
+      manualLogout: false
+    }
+    this.globalData.isLoggedIn = !!safePhone
+    this._writeLoginSession(this.globalData.loginSession)
+  },
+
+  logoutCustomer() {
+    const nextUserInfo = this.globalData.userInfo ? { ...this.globalData.userInfo } : {}
+    delete nextUserInfo.phone
+    this.globalData.userInfo = nextUserInfo
+    this.globalData.loginSession = {
+      openid: this.globalData.openid || '',
+      isLoggedIn: false,
+      manualLogout: true
+    }
+    this.globalData.isLoggedIn = false
+    this._writeLoginSession(this.globalData.loginSession)
+  },
+
+  _navigateToPageOrTab(url) {
+    const target = buildRedirectTarget(url)
+    if (!target) return
+    try {
+      if (isTabPage(target)) {
+        wx.switchTab({ url: target })
+      } else {
+        wx.navigateTo({ url: target })
+      }
+    } catch (error) {
+      wx.switchTab({ url: '/pages/profile/profile' })
+    }
+  },
+
+  requireCustomerLogin(redirectTo, options = {}) {
+    if (this.isCustomerLoggedIn()) return true
+    const target = buildRedirectTarget(redirectTo)
+    const modal = options.silent
+      ? null
+      : () => wx.showModal({
+          title: options.title || '请先登录',
+          content: options.content || '请先完成手机号绑定后再使用该功能',
+          confirmText: options.confirmText || '去绑定手机号',
+          cancelText: options.cancelText || '取消',
+          success: res => {
+            if (!res.confirm) return
+            if (target) {
+              const encodedTarget = encodeURIComponent(target)
+              this._navigateToPageOrTab(`/pages/profile/profile?loginRedirect=${encodedTarget}`)
+            } else {
+              this._navigateToPageOrTab('/pages/profile/profile')
+            }
+          }
+        })
+
+    if (modal) {
+      modal()
+    }
+    return false
+  },
+
   _normalizeRoleResult(res) {
     const access = res?.data?.role ? res.data : res
     if (!access) return null
@@ -230,6 +416,7 @@ App({
     }
     this._applyRuntimeReviewConfig(this._buildDefaultReviewConfig())
     this.loadReviewConfig().catch(() => {})
+    this._initLoginSession()
 
     // 登录
     this._login()
@@ -243,6 +430,8 @@ App({
     role: 'customer',      // customer / staff / admin
     permissions: [],       // ['verify', 'viewOrders', ...]
     workbenchAccess: null,
+    loginSession: { ...LOGIN_SESSION_DEFAULT },
+    isLoggedIn: false,
     reviewConfig: null,
     _reviewConfigPromise: null,
     _roleReady: false,
@@ -313,6 +502,7 @@ App({
         }
         this.globalData.openid = normalized.openid
         this.globalData.userInfo = normalized.userInfo || {}
+        this._syncLoginStateFromUserInfo(this.globalData.userInfo)
         console.log('登录成功，openid:', normalized.openid, '来源:', res._sourceFunction)
         // 登录成功后获取角色和权限
         return this._loadRole({ preserveExistingOnError: hadSession, fallbackState: previousState })
@@ -378,6 +568,7 @@ App({
         }
         if (normalized?.userInfo) {
           this.globalData.userInfo = normalized.userInfo
+          this._syncLoginStateFromUserInfo(this.globalData.userInfo)
         }
         return normalized
       })

@@ -22,6 +22,11 @@ Page({
 
     onLoad: async function (options) {
         await this._syncReviewConfig()
+        const app = getApp()
+        const targetUrl = this._buildCurrentUrl(options)
+        if (!app.requireCustomerLogin(targetUrl, { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         const mode = options.mode || 'report'
         this.setData({ mode })
 
@@ -39,7 +44,22 @@ Page({
     },
 
     onShow: function () {
+        const app = getApp()
+        const targetUrl = this._buildCurrentUrl()
+        if (!app.requireCustomerLogin(targetUrl, { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         this._syncReviewConfig()
+    },
+
+    _buildCurrentUrl: function (options = this.data) {
+        const reportId = options.reportId || this.data.reportId || ''
+        const mode = options.mode || this.data.mode || 'report'
+        const target = '/pages/tongue-report/tongue-report'
+        const query = []
+        if (mode) query.push(`mode=${mode}`)
+        if (reportId) query.push(`reportId=${reportId}`)
+        return query.length ? `${target}?${query.join('&')}` : target
     },
 
     _syncReviewConfig: async function () {
@@ -84,6 +104,10 @@ Page({
 
     // 加载单个报告
     _loadReport: async function (reportId) {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=report', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         this.setData({ loading: true })
         try {
             const report = await callCloud('growthApi', {
@@ -130,6 +154,10 @@ Page({
 
     // 加载历史列表
     _loadHistory: async function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=history', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         this.setData({ loading: true })
         try {
             const history = await callCloud('growthApi', { action: 'getTongueHistory' })
@@ -156,12 +184,20 @@ Page({
 
     // 查看历史报告
     viewHistoryReport: function (e) {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=history', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         const id = e.currentTarget.dataset.id
         wx.navigateTo({ url: `/pages/tongue-report/tongue-report?reportId=${id}` })
     },
 
     // 跳转商品详情
     goToProduct: function (e) {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=history', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         const id = e.currentTarget.dataset.id
         if (!id) {
             wx.showToast({ title: '产品暂未上架', icon: 'none' })
@@ -173,6 +209,10 @@ Page({
 
     // 再次分析
     goAnalyzeAgain: function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=report', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         if (this.data.isReviewMode) {
             wx.switchTab({ url: '/pages/tongue/tongue' })
             return
@@ -182,12 +222,20 @@ Page({
 
     // 去拍摄
     goAnalyze: function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=report', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         wx.switchTab({ url: '/pages/tongue/tongue' })
     },
 
     reanalyzeReport: function () {
         const report = this.data.report
         if (!this._canReanalyzeReport(report) || this.data.isReanalyzing) return
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue-report/tongue-report?mode=report', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
 
         wx.showModal({
             title: '确认生成 AI 报告',

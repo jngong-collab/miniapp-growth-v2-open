@@ -1,6 +1,6 @@
 // pages/package-usage/package-usage.js
 const { enrichPackageItemState } = require('../../utils/package-state')
-const { callCloud } = require('../../utils/cloud-api')
+const { callCloudWithLogin } = require('../../utils/cloud-api')
 
 Page({
     data: {
@@ -14,16 +14,26 @@ Page({
     },
 
     onLoad: function () { /* 首次由 onShow 触发 */ },
-    onShow: function () { this._loadPackages() },
+    onShow: function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/package-usage/package-usage')) {
+            return
+        }
+        this._loadPackages()
+    },
 
     _findPackageById: function (packageId) {
         return (this.data.packages || []).find(item => item._id === packageId) || null
     },
 
     _loadPackages: async function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/package-usage/package-usage')) {
+            return
+        }
         this.setData({ loading: true })
         try {
-            const items = await callCloud('growthApi', { action: 'getMyPackages' })
+            const items = await callCloudWithLogin('growthApi', { action: 'getMyPackages' })
             const packages = (items || []).map(enrichPackageItemState)
             this.setData({ packages, loading: false })
 

@@ -29,6 +29,11 @@ const STAFF_DEFAULT_PERMISSIONS = [
 ]
 
 const STAFF_PERMISSION_WHITELIST = Array.from(new Set(ADMIN_PERMISSIONS))
+const MEMBER_LEVELS = ['normal', 'vip', 'svip']
+const AUTH_SESSION_COLLECTION = 'auth_sessions'
+const AUTH_SESSION_TTL_DAYS = 30
+const AUTH_REQUIRED_CODE = 401
+const AUTH_REQUIRED_MSG = '未登录，请先完成手机号登录'
 
 exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext()
@@ -44,6 +49,9 @@ exports.main = async (event) => {
             return ensureUser(OPENID, event)
         case 'getStoreInfo':
             return getStoreInfo(OPENID)
+        case 'getSession':
+        case 'resumeSession':
+            return getSession(event, OPENID)
         case 'getWorkbenchAccess':
             return getWorkbenchAccess(OPENID)
         case 'getWorkbenchSummary':
@@ -74,6 +82,14 @@ exports.main = async (event) => {
             return queryVerifyCode(event, OPENID)
         case 'verifyPackage':
             return verifyPackage(event, OPENID)
+        case 'loginWithPhone':
+            return loginWithPhone(event, OPENID)
+        case 'bindPhoneNumber':
+            return bindPhoneNumber(event, OPENID)
+        case 'ensureAuth':
+            return ensureAuth(event, OPENID)
+        case 'logout':
+            return logout(event, OPENID)
         default:
             return { code: -1, msg: '未知操作' }
     }
@@ -104,13 +120,30 @@ async function ensureUser(openid, event) {
             balance: 0,
             totalEarned: 0,
             totalInvited: 0,
-            memberLevel: 'normal',
+            memberLevel: normalizeMemberLevel('normal'),
+            profileCompleted: false,
+            phoneBoundAt: '',
+            loginStatus: 'logged_out',
             createdAt: db.serverDate(),
             updatedAt: db.serverDate()
         }
         const addRes = await db.collection('users').add({ data: payload })
         if (!addRes._id) return { code: -1, msg: '用户初始化失败' }
         user = await safeGetFirst('users', { _openid: openid })
+        if (!user) {
+            user = { ...payload, _id: addRes._id, openid }
+        }
+    } else if (normalizeMemberLevel(user.memberLevel) !== user.memberLevel) {
+        await db.collection('users').where({ _openid: openid }).update({
+            data: { memberLevel: normalizeMemberLevel(user.memberLevel), updatedAt: db.serverDate() }
+        })
+        user.memberLevel = normalizeMemberLevel(user.memberLevel)
+    }
+
+    if (user && !user.phoneBoundAt) {
+        await db.collection('users').where({ _openid: openid }).update({
+            data: { phoneBoundAt: '', updatedAt: db.serverDate() }
+        })
     }
 
     if (invitedBy && invitedBy !== openid && !user.inviterOpenid) {
@@ -124,6 +157,197 @@ async function ensureUser(openid, event) {
     }
 
     return { code: 0, openid, data: user }
+}
+
+async function getSession(event, openid) {
+    return ensureAuth(event, openid)
+}
+
+async function bindPhoneNumber(event, openid) {
+    const loginRes = await loginWithPhone(event, openid, { includeUser: false, includeSession: true })
+    if (loginRes.code) return loginRes
+
+    return {
+        code: 0,
+        msg: loginRes.msg || '绑定成功',
+        data: {
+            phone: loginRes.data.phone,
+            sessionToken: loginRes.data.sessionToken,
+            expiresAt: loginRes.data.expiresAt
+        }
+    }
+}
+
+async function loginWithPhone(event, openid, options = {}) {
+    if (!openid) return { code: -1, msg: '缺少用户身份' }
+
+    const { code } = event || {}
+    if (!code) return { code: -1, msg: '缺少手机号授权码' }
+
+    let phoneNumber = ''
+    try {
+        const phoneRes = await cloud.openapi.phonenumber.getPhoneNumber({ code })
+        phoneNumber = phoneRes && phoneRes.phone_info && phoneRes.phone_info.phoneNumber
+            ? String(phoneRes.phone_info.phoneNumber)
+            : ''
+    } catch (err) {
+        console.error('phonenumber.getPhoneNumber 失败:', err)
+        return { code: -1, msg: '获取手机号失败，请稍后重试' }
+    }
+
+    if (!phoneNumber) {
+        return { code: -1, msg: '未能解析手机号' }
+    }
+
+    let user = await safeGetFirst('users', { _openid: openid })
+    if (!user) {
+        const initRes = await ensureUser(openid, event)
+        if (initRes.code) return { code: -1, msg: initRes.msg || '用户初始化失败' }
+        user = initRes.data
+    }
+
+    // 重复绑定：如果已有相同手机号，直接返回成功；如果不同，允许更新（换号场景）
+    const updateData = {
+        phone: phoneNumber,
+        phoneBoundAt: db.serverDate(),
+        profileCompleted: true,
+        lastLoginAt: db.serverDate(),
+        loginStatus: 'logged_in',
+        memberLevel: normalizeMemberLevel(user.memberLevel),
+        updatedAt: db.serverDate()
+    }
+
+    try {
+        await db.collection('users').where({ _openid: openid }).update({ data: updateData })
+    } catch (err) {
+        console.error('更新用户手机号失败:', err)
+        return { code: -1, msg: '绑定失败，请稍后重试' }
+    }
+
+    const latestUser = await safeGetFirst('users', { _openid: openid })
+    if (!latestUser) return { code: -1, msg: '用户不存在' }
+
+    const session = await rotateSession({
+        openid,
+        user: latestUser,
+        phone: phoneNumber,
+        preserveUserMembership: true
+    })
+    if (!session) return { code: -1, msg: '登录态创建失败，请稍后重试' }
+
+    const payload = {
+        phone: phoneNumber,
+        sessionToken: session.token,
+        expiresAt: session.expiresAt
+    }
+
+    if (options.includeSession === false) {
+        return { code: 0, msg: '绑定成功', data: payload }
+    }
+
+    if (options.includeUser) {
+        payload.user = {
+            _id: latestUser._id || '',
+            _openid: latestUser._openid || openid,
+            phone: latestUser.phone || '',
+            phoneBoundAt: latestUser.phoneBoundAt || '',
+            profileCompleted: latestUser.profileCompleted === true,
+            memberLevel: normalizeMemberLevel(latestUser.memberLevel),
+            loginStatus: latestUser.loginStatus || 'logged_in'
+        }
+    }
+
+    return {
+        code: 0,
+        msg: '绑定成功',
+        data: payload
+    }
+}
+
+async function ensureAuth(event, openid) {
+    const sessionToken = String(((event || {}).sessionToken || '')).trim()
+    if (!sessionToken) return { code: AUTH_REQUIRED_CODE, msg: AUTH_REQUIRED_MSG }
+
+    const session = await safeGetFirst(AUTH_SESSION_COLLECTION, {
+        token: sessionToken,
+        _openid: openid,
+        status: 'active'
+    })
+    if (!session) return { code: AUTH_REQUIRED_CODE, msg: AUTH_REQUIRED_MSG }
+
+    if (isSessionExpired(session)) {
+        await markSessionExpired(session)
+        return { code: AUTH_REQUIRED_CODE, msg: '登录已过期，请重新登录' }
+    }
+
+    const user = await safeGetFirst('users', { _openid: openid })
+    if (!user) {
+        await markSessionExpired(session)
+        return { code: -1, msg: '用户不存在' }
+    }
+
+    if (!user.phone) {
+        return { code: AUTH_REQUIRED_CODE, msg: '请先绑定手机号' }
+    }
+
+    const normalizedMemberLevel = normalizeMemberLevel(user.memberLevel)
+    if (normalizedMemberLevel !== user.memberLevel) {
+        await db.collection('users').where({ _openid: openid }).update({
+            data: {
+                memberLevel: normalizedMemberLevel,
+                updatedAt: db.serverDate()
+            }
+        })
+        user.memberLevel = normalizedMemberLevel
+    }
+
+    const renewed = await refreshSession(session)
+    const sessionExpiresAt = renewed ? renewed.expiresAt : session.expiresAt
+    await db.collection('users').where({ _openid: openid }).update({
+        data: {
+            loginStatus: 'logged_in',
+            lastLoginAt: db.serverDate(),
+            updatedAt: db.serverDate()
+        }
+    })
+
+    return {
+        code: 0,
+        data: {
+            user,
+            session: {
+                token: session.token,
+                expiresAt: sessionExpiresAt
+            }
+        }
+    }
+}
+
+async function logout(event, openid) {
+    const sessionToken = String(((event || {}).sessionToken || '')).trim()
+    const baseFilter = { _openid: openid, status: 'active' }
+    if (sessionToken) baseFilter.token = sessionToken
+
+    try {
+        await db.collection(AUTH_SESSION_COLLECTION).where(baseFilter).update({
+            data: {
+                status: 'revoked',
+                revokedAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        })
+
+        await db.collection('users').where({ _openid: openid }).update({
+            data: {
+                loginStatus: 'logged_out',
+                updatedAt: db.serverDate()
+            }
+        })
+    } catch (error) {
+        console.error('退出登录失败:', error)
+    }
+
+    return { code: 0, msg: '已退出登录' }
 }
 
 async function getStoreInfo(openid) {
@@ -1044,6 +1268,114 @@ function randomToken(length = 12) {
         output += seed[Math.floor(Math.random() * seed.length)]
     }
     return output
+}
+
+function normalizeMemberLevel(memberLevel) {
+    return MEMBER_LEVELS.includes(memberLevel) ? memberLevel : 'normal'
+}
+
+function newSessionExpiresAt(baseTime = new Date()) {
+    return new Date(baseTime.getTime() + AUTH_SESSION_TTL_DAYS * 24 * 60 * 60 * 1000)
+}
+
+function isSessionExpired(session) {
+    if (!session || !session.expiresAt) return true
+    const expiresAt = parseSessionDate(session.expiresAt)
+    if (!expiresAt) return true
+    return expiresAt.getTime() <= Date.now()
+}
+
+function parseSessionDate(value) {
+    if (!value) return null
+    if (value instanceof Date) return value
+    if (typeof value === 'object' && value.$date) return new Date(value.$date)
+    return new Date(value)
+}
+
+async function markSessionExpired(session = {}) {
+    if (!session._id) return
+    try {
+        await db.collection(AUTH_SESSION_COLLECTION).doc(session._id).update({
+            data: {
+                status: 'expired',
+                expiredAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        })
+    } catch (error) {
+        console.error('标记会话过期失败:', error)
+    }
+}
+
+async function refreshSession(session) {
+    if (!session || !session._id) return null
+    const expiresAt = newSessionExpiresAt()
+    try {
+        await db.collection(AUTH_SESSION_COLLECTION).doc(session._id).update({
+            data: {
+                lastActiveAt: db.serverDate(),
+                expiresAt,
+                updatedAt: db.serverDate()
+            }
+        })
+        return { ...session, expiresAt }
+    } catch (error) {
+        console.error('刷新会话失败:', error)
+        return null
+    }
+}
+
+async function rotateSession({ openid, user, phone }) {
+    const now = db.serverDate()
+    const expireAt = newSessionExpiresAt(new Date())
+    try {
+        await db.collection(AUTH_SESSION_COLLECTION).where({
+            _openid: openid,
+            status: 'active'
+        }).update({
+            data: {
+                status: 'revoked',
+                revokedAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        })
+
+        const token = `sess_${Date.now()}_${randomToken(16)}`
+        const addRes = await db.collection(AUTH_SESSION_COLLECTION).add({
+            data: {
+                token,
+                _openid: openid,
+                userId: user && user._id ? user._id : '',
+                phone: phone || (user && user.phone) || '',
+                storeId: (user && user.storeId) || '',
+                status: 'active',
+                createdAt: now,
+                lastActiveAt: now,
+                expiresAt: expireAt,
+                updatedAt: now
+            }
+        })
+        if (!addRes._id) return null
+
+        await db.collection('users').where({ _openid: openid }).update({
+            data: {
+                phoneBoundAt: user?.phoneBoundAt || now,
+                loginStatus: 'logged_in',
+                lastLoginAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        })
+
+        return {
+            token,
+            userId: user && user._id ? user._id : '',
+            expiresAt: expireAt,
+            lastActiveAt: now
+        }
+    } catch (error) {
+        console.error('会话创建失败:', error)
+        return null
+    }
 }
 
 async function safeCount(collectionName, condition) {

@@ -18,6 +18,7 @@ const LEGACY_PERMISSION_ALIASES = {
   manageProducts: 'catalog.manage',
   manageCampaigns: 'campaigns.manage',
   viewLeads: 'crm.view',
+  manageCustomers: 'crm.manage',
   manageSettings: 'settings.manage',
   manageStaff: 'staff.manage',
   viewAuditLogs: 'audit.view'

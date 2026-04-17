@@ -6,6 +6,10 @@ const db = cloud.database()
 const _ = db.command
 const http = require('http')
 const https = require('https')
+const AUTH_SESSION_COLLECTION = 'auth_sessions'
+const MEMBER_LEVELS = ['normal', 'vip', 'svip']
+const AUTH_REQUIRED_CODE = 401
+const AUTH_REQUIRED_MSG = '未登录，请先完成手机号登录'
 
 exports.main = async (event) => {
     const { OPENID } = cloud.getWXContext()
@@ -17,43 +21,40 @@ exports.main = async (event) => {
         case 'initUser':
             return { code: 0, data: { openid: OPENID, userInfo: {} } }
         case 'getMyEarnings':
-            return getMyEarnings(OPENID)
+            return getMyEarnings(OPENID, event)
         case 'getMyFissionRecords':
-            return getMyFissionRecords(OPENID)
+            return getMyFissionRecords(OPENID, event)
         case 'getMyPackages':
-            return getMyPackages(OPENID)
+            return getMyPackages(OPENID, event)
         case 'getLotteryHome':
-            return getLotteryHome(OPENID)
+            return getLotteryHome(OPENID, event)
         case 'drawLottery':
-            return drawLottery(OPENID)
+            return drawLottery(OPENID, event)
         case 'getTongueRuntimeConfig':
-            return getTongueRuntimeConfig(event, OPENID)
+            return getTongueRuntimeConfig(OPENID, event)
         case 'analyzeTongue':
-            return analyzeTongue(event, OPENID)
+            return analyzeTongue(OPENID, event)
         case 'getTongueReport':
-            return getTongueReport(event, OPENID)
+            return getTongueReport(OPENID, event)
         case 'getTongueHistory':
-            return getTongueHistory(OPENID)
+            return getTongueHistory(OPENID, event)
         case 'reanalyzeTongueReport':
-            return reanalyzeTongueReport(event, OPENID)
+            return reanalyzeTongueReport(OPENID, event)
         default:
             return { code: -1, msg: '未知操作' }
     }
 }
 
-async function getMyEarnings(openid) {
-    const res = await safeGetFirst('users', { _openid: openid }, {
-        balance: true,
-        totalEarned: true,
-        totalInvited: true,
-        memberLevel: true,
-        leadSources: true
-    })
-    if (!res) return { code: -1, msg: '用户不存在' }
-    return { code: 0, data: res }
+async function getMyEarnings(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+    return { code: 0, data: auth.user }
 }
 
-async function getMyFissionRecords(openid) {
+async function getMyFissionRecords(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     const records = await safeList('fission_records', { inviterOpenid: openid }, {
         orderBy: ['createdAt', 'desc'],
         limit: 50
@@ -78,7 +79,10 @@ async function getMyFissionRecords(openid) {
     }
 }
 
-async function getMyPackages(openid) {
+async function getMyPackages(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     const items = await safeList('order_items', {
         _openid: openid,
         productType: _.in(['service', 'package'])
@@ -98,7 +102,10 @@ async function getMyPackages(openid) {
     }
 }
 
-async function getLotteryHome(openid) {
+async function getLotteryHome(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     const campaign = await getActiveLotteryCampaign()
     if (!campaign) {
         return { code: 0, data: { campaign: null, remainChances: 0, records: [] } }
@@ -120,7 +127,10 @@ async function getLotteryHome(openid) {
     }
 }
 
-async function drawLottery(openid) {
+async function drawLottery(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     const campaign = await getActiveLotteryCampaign()
     if (!campaign) return { code: -1, msg: '当前暂无抽奖活动' }
 
@@ -153,8 +163,11 @@ async function drawLottery(openid) {
     }
 }
 
-async function getTongueRuntimeConfig(event, openid) {
-    const runtime = await loadTongueRuntime(openid, event)
+async function getTongueRuntimeConfig(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
+    const runtime = await loadTongueRuntime(openid, event, auth.user)
     return {
         code: 0,
         data: {
@@ -165,10 +178,13 @@ async function getTongueRuntimeConfig(event, openid) {
     }
 }
 
-async function analyzeTongue(event, openid) {
+async function analyzeTongue(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     const { imageFileId, babyAge, babyGender } = event
     const symptoms = normalizeSymptoms(event.symptoms)
-    const runtime = await loadTongueRuntime(openid, event)
+    const runtime = await loadTongueRuntime(openid, event, auth.user)
 
     if (runtime.isInReview) {
         const reviewRecord = await createTongueReportRecord({
@@ -239,9 +255,12 @@ async function analyzeTongue(event, openid) {
     }
 }
 
-async function getTongueReport(event, openid) {
+async function getTongueReport(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     try {
-        const runtime = await loadTongueRuntime(openid, event)
+        const runtime = await loadTongueRuntime(openid, event, auth.user)
         const res = await db.collection('tongue_reports').doc(event.reportId).get()
         const report = res.data
         if (!report) return { code: -1, msg: '报告不存在' }
@@ -304,8 +323,11 @@ async function getTongueReport(event, openid) {
     }
 }
 
-async function getTongueHistory(openid) {
-    const runtime = await loadTongueRuntime(openid)
+async function getTongueHistory(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
+    const runtime = await loadTongueRuntime(openid, event, auth.user)
     const condition = { _openid: openid }
     if (runtime.isInReview) {
         condition.isReviewMode = true
@@ -328,11 +350,14 @@ async function getTongueHistory(openid) {
     return { code: 0, data }
 }
 
-async function reanalyzeTongueReport(event, openid) {
+async function reanalyzeTongueReport(openid, event = {}) {
+    const auth = await ensureAuth(openid, event)
+    if (auth.code) return auth
+
     const reportId = String(event.reportId || '').trim()
     if (!reportId) return { code: -1, msg: '报告不存在' }
 
-    const runtime = await loadTongueRuntime(openid, event)
+    const runtime = await loadTongueRuntime(openid, event, auth.user)
     if (runtime.isInReview) {
         return { code: -1, msg: '审核模式下不可发起 AI 分析' }
     }
@@ -398,8 +423,8 @@ async function reanalyzeTongueReport(event, openid) {
     }
 }
 
-async function loadTongueRuntime(openid, event = {}) {
-    const user = await safeGetFirst('users', { _openid: openid })
+async function loadTongueRuntime(openid, event = {}, currentUser = null) {
+    const user = currentUser || await safeGetFirst('users', { _openid: openid })
     const storeId = await resolveUserStoreId({
         openid,
         invitedBy: event.invitedBy || '',
@@ -648,6 +673,47 @@ function hasTongueResult(result) {
     return false
 }
 
+async function ensureAuth(openid, event = {}) {
+    const token = String((event || {}).sessionToken || '').trim()
+    if (!token) return { code: AUTH_REQUIRED_CODE, msg: AUTH_REQUIRED_MSG }
+
+    const session = await safeGetFirst(AUTH_SESSION_COLLECTION, {
+        token,
+        _openid: openid,
+        status: 'active'
+    })
+    if (!session) return { code: AUTH_REQUIRED_CODE, msg: AUTH_REQUIRED_MSG }
+
+    if (isSessionExpired(session)) {
+        await markSessionExpired(session)
+        return { code: AUTH_REQUIRED_CODE, msg: '登录已过期，请重新登录' }
+    }
+
+    const user = await safeGetFirst('users', { _openid: openid })
+    if (!user) {
+        await markSessionExpired(session)
+        return { code: -1, msg: '用户不存在' }
+    }
+
+    if (!user.phone) return { code: AUTH_REQUIRED_CODE, msg: '请先绑定手机号' }
+
+    const normalizedMemberLevel = normalizeMemberLevel(user.memberLevel)
+    if (normalizedMemberLevel !== user.memberLevel) {
+        await db.collection('users').where({ _openid: openid }).update({
+            data: { memberLevel: normalizedMemberLevel, updatedAt: db.serverDate() }
+        })
+        user.memberLevel = normalizedMemberLevel
+    }
+
+    await refreshSession(session)
+    return {
+        code: 0,
+        user,
+        session,
+        data: { user, session: { token: session.token, expiresAt: session.expiresAt } }
+    }
+}
+
 function buildReviewSafeHistoryItem(item = {}) {
     return {
         _id: item._id,
@@ -707,6 +773,58 @@ function pickLotteryPrize(prizes) {
         if (random <= 0) return prize
     }
     return validPrizes[validPrizes.length - 1]
+}
+
+function normalizeMemberLevel(memberLevel) {
+    return MEMBER_LEVELS.includes(memberLevel) ? memberLevel : 'normal'
+}
+
+function isSessionExpired(session) {
+    if (!session || !session.expiresAt) return true
+    const expiredAt = parseSessionDate(session.expiresAt)
+    if (!expiredAt) return true
+    return expiredAt.getTime() <= Date.now()
+}
+
+function parseSessionDate(value) {
+    if (!value) return null
+    if (value instanceof Date) return value
+    if (typeof value === 'object' && value.$date) return new Date(value.$date)
+    return new Date(value)
+}
+
+async function markSessionExpired(session = {}) {
+    if (!session._id) return
+    try {
+        await db.collection(AUTH_SESSION_COLLECTION).doc(session._id).update({
+            data: {
+                status: 'expired',
+                expiredAt: db.serverDate(),
+                updatedAt: db.serverDate()
+            }
+        })
+    } catch (error) {
+        console.error('标记会话过期失败:', error)
+    }
+}
+
+function newSessionExpiresAt(baseTime = new Date()) {
+    return new Date(baseTime.getTime() + 30 * 24 * 60 * 60 * 1000)
+}
+
+async function refreshSession(session = {}) {
+    if (!session || !session._id) return
+    try {
+        await db.collection(AUTH_SESSION_COLLECTION).doc(session._id).update({
+            data: {
+                lastActiveAt: db.serverDate(),
+                expiresAt: newSessionExpiresAt(),
+                updatedAt: db.serverDate()
+            }
+        })
+    } catch (error) {
+        console.error('刷新会话失败:', error)
+    }
 }
 
 function sanitizeLotteryCampaign(campaign) {

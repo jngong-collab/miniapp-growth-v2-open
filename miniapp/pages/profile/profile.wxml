@@ -20,6 +20,19 @@
                 <text class="badge-icon">✦</text>
                 <text>{{levelLabel}}</text>
               </view>
+              <view class="phone-badge" wx:if="{{userInfo.phone}}">
+                <text class="phone-icon">📱</text>
+                <text>{{userInfo.phone}}</text>
+              </view>
+              <view class="login-tip" wx:if="{{!isLoggedIn}}">
+                <text>绑定手机号后可查看订单、套餐和 AI 舌象</text>
+              </view>
+              <button
+                wx:if="{{!isLoggedIn}}"
+                class="phone-bind-btn"
+                open-type="getPhoneNumber"
+                bind:getphonenumber="onGetPhoneNumber"
+              >绑定手机号</button>
             </view>
           </view>
         </view>
@@ -30,6 +43,11 @@
           </view>
           <text class="card-brand">BABY SPA</text>
         </view>
+        <button
+          class="logout-btn card-press"
+          wx:if="{{isLoggedIn}}"
+          bindtap="doLogout"
+        >退出登录</button>
       </view>
     </view>
   </view>

@@ -11,6 +11,7 @@ import type {
   CampaignDetail,
   CustomerDetail,
   CustomerRecord,
+  CustomerUpdatePayload,
   DashboardOverview,
   AiConfig,
   AiConnectionTestResult,
@@ -125,6 +126,8 @@ export const adminApi = {
     callAdminApi<CustomerDetail>('leads.getCustomerDetail', { openid }),
   listFollowupEvents: (openid: string) =>
     callAdminApi<FollowupEvent[]>('leads.listFollowupEvents', { openid }),
+  updateCustomer: (payload: CustomerUpdatePayload) =>
+    callAdminApi<unknown>('leads.updateCustomer', payload as unknown as Record<string, unknown>),
   getProductDetail: (productId: string) =>
     callAdminApi<ProductDetail>('catalog.getProductDetail', { productId }),
   getFissionDetail: (campaignId: string) =>

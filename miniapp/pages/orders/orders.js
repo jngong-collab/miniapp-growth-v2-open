@@ -1,4 +1,4 @@
-const { callCloud } = require('../../utils/cloud-api')
+const { callCloudWithLogin } = require('../../utils/cloud-api')
 const { formatDate, fenToYuan, showToast } = require('../../utils/util')
 
 const FILTERS = [
@@ -24,13 +24,19 @@ Page({
     },
 
     onShow() {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/orders/orders')) {
+            return
+        }
         this.loadOrders()
     },
 
     async loadOrders() {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/orders/orders')) return
         this.setData({ loading: true })
         try {
-            const orders = await callCloud('commerceApi', {
+            const orders = await callCloudWithLogin('commerceApi', {
                 action: 'getMyOrders',
                 status: this.data.activeStatus
             })
@@ -54,6 +60,8 @@ Page({
 
     async requestRefund(e) {
         const orderId = e.currentTarget.dataset.id
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/orders/orders')) return
         try {
             const modal = await wx.showModal({
                 title: '申请退款',
@@ -64,7 +72,7 @@ Page({
 
             if (!modal.confirm) return
 
-            await callCloud('commerceApi', {
+            await callCloudWithLogin('commerceApi', {
                 action: 'requestRefund',
                 orderId,
                 reason: modal.content || ''
@@ -81,12 +89,14 @@ Page({
     async payOrder(e) {
         const orderId = e.currentTarget.dataset.id
         if (!orderId) return
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/orders/orders')) return
 
         try {
             wx.showLoading({ title: '拉起支付...', mask: true })
             let payRes
             try {
-                payRes = await callCloud('commerceApi', {
+                payRes = await callCloudWithLogin('commerceApi', {
                     action: 'requestPay',
                     orderId
                 })

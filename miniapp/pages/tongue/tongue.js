@@ -25,6 +25,10 @@ Page({
 
     onLoad: async function () {
         await this._syncReviewConfig()
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         this._loadHistory()
         // 读取上次保存的宝宝信息
         const savedAge = wx.getStorageSync('tongue_baby_age_index')
@@ -38,6 +42,10 @@ Page({
     },
 
     onShow: function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         // 从报告页返回时，重置状态
         if (this._analysisCompleted) {
             this._analysisCompleted = false
@@ -135,6 +143,10 @@ Page({
 
     // 开始分析 / 保存记录
     startAnalyze: async function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         this.setData({ state: 'analyzing', step: 0 })
 
         try {
@@ -194,6 +206,10 @@ Page({
 
     // 去历史记录页
     goToHistory: function () {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
+            return
+        }
         wx.navigateTo({ url: '/pages/tongue-report/tongue-report?mode=history' })
     },
 
