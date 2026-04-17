@@ -1,9 +1,20 @@
 #!/usr/bin/env node
 
-const CloudBaseManager = require('@cloudbase/manager-node')
-const tcb = require('@cloudbase/node-sdk')
+const fs = require('fs')
+const path = require('path')
+const { execFileSync } = require('child_process')
+const cloudbase = require('../admin-web/node_modules/@cloudbase/js-sdk/dist/index.cjs.js')
 
 const { ADMIN_PERMISSION_KEYS } = require('../miniapp/cloudfunctions/adminApi/lib/admin-contract')
+
+const DEFAULT_ENV_ID = 'yuxiaozhu111-4ga6qic990d1eb4e'
+const DEFAULT_REGION = 'ap-shanghai'
+const DEFAULT_STORE_ID = 'store_001'
+const DEFAULT_STORE_NAME = '默认总店'
+const DEFAULT_ADMIN_USERNAME = 'admin'
+const DEFAULT_ADMIN_PASSWORD = 'Admin123'
+const DEFAULT_ADMIN_UID = 'admin_store_001'
+const DEFAULT_ADMIN_DISPLAY_NAME = '系统超级管理员'
 
 const CORE_COLLECTIONS = [
   'stores',
@@ -29,323 +40,421 @@ const CORE_COLLECTIONS = [
   'admin_audit_logs'
 ]
 
-const INDEX_SPECS = [
-  { collection: 'users', indexName: 'users__openid_unique', keys: [{ name: '_openid', direction: '1' }], unique: true },
-  { collection: 'orders', indexName: 'orders__openid_status', keys: [{ name: '_openid', direction: '1' }, { name: 'status', direction: '1' }], unique: false },
-  { collection: 'orders', indexName: 'orders__orderNo_unique', keys: [{ name: 'orderNo', direction: '1' }], unique: true },
-  { collection: 'orders', indexName: 'orders__createdAt', keys: [{ name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'order_items', indexName: 'order_items__orderId', keys: [{ name: 'orderId', direction: '1' }], unique: false },
-  { collection: 'order_items', indexName: 'order_items__openid_productType', keys: [{ name: '_openid', direction: '1' }, { name: 'productType', direction: '1' }], unique: false },
-  { collection: 'order_items', indexName: 'order_items__verifyCode', keys: [{ name: 'verifyCode', direction: '1' }], unique: false },
-  { collection: 'fission_records', indexName: 'fission_records__inviterOpenid', keys: [{ name: 'inviterOpenid', direction: '1' }], unique: false },
-  { collection: 'fission_records', indexName: 'fission_records__inviteeOpenid', keys: [{ name: 'inviteeOpenid', direction: '1' }], unique: false },
-  { collection: 'fission_records', indexName: 'fission_records__campaignId', keys: [{ name: 'campaignId', direction: '1' }], unique: false },
-  { collection: 'tongue_reports', indexName: 'tongue_reports__openid_createdAt', keys: [{ name: '_openid', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'fission_campaigns', indexName: 'fission_campaigns__status_start_end', keys: [{ name: 'status', direction: '1' }, { name: 'startTime', direction: '1' }, { name: 'endTime', direction: '1' }], unique: false },
-  { collection: 'products', indexName: 'products__store_status_sort', keys: [{ name: 'storeId', direction: '1' }, { name: 'status', direction: '1' }, { name: 'sortOrder', direction: '1' }], unique: false },
-  { collection: 'package_usage', indexName: 'package_usage__orderItemId', keys: [{ name: 'orderItemId', direction: '1' }], unique: false },
-  { collection: 'admin_accounts', indexName: 'admin_accounts__uid_unique', keys: [{ name: 'uid', direction: '1' }], unique: true },
-  { collection: 'admin_accounts', indexName: 'admin_accounts__username', keys: [{ name: 'username', direction: '1' }], unique: false },
-  { collection: 'admin_accounts', indexName: 'admin_accounts__store_status', keys: [{ name: 'storeId', direction: '1' }, { name: 'status', direction: '1' }], unique: false },
-  { collection: 'admin_login_events', indexName: 'admin_login_events__uid_createdAt', keys: [{ name: 'uid', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'admin_login_events', indexName: 'admin_login_events__username_createdAt', keys: [{ name: 'username', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'admin_login_events', indexName: 'admin_login_events__store_createdAt', keys: [{ name: 'storeId', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'admin_audit_logs', indexName: 'admin_audit_logs__store_createdAt', keys: [{ name: 'storeId', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'admin_audit_logs', indexName: 'admin_audit_logs__actorUid_createdAt', keys: [{ name: 'actorUid', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'admin_audit_logs', indexName: 'admin_audit_logs__module_createdAt', keys: [{ name: 'module', direction: '1' }, { name: 'createdAt', direction: '-1' }], unique: false },
-  { collection: 'notification_settings', indexName: 'notification_settings__storeId', keys: [{ name: 'storeId', direction: '1' }], unique: false }
+const DEFAULT_ROLE_TEMPLATES = [
+  {
+    roleKey: 'store-owner',
+    roleName: '店长',
+    role: 'owner',
+    permissions: [...ADMIN_PERMISSION_KEYS]
+  },
+  {
+    roleKey: 'therapist',
+    roleName: '技师',
+    role: 'therapist',
+    permissions: ['orders.view', 'crm.view']
+  },
+  {
+    roleKey: 'finance',
+    roleName: '财务',
+    role: 'finance',
+    permissions: ['dashboard.view', 'orders.view', 'orders.refund.review', 'audit.view']
+  }
 ]
 
 function trimValue(value) {
   return String(value || '').trim()
 }
 
-function pickEnv(env, keys) {
-  for (const key of keys) {
-    const value = trimValue(env[key])
+function readTextIfExists(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8')
+  } catch (error) {
+    return ''
+  }
+}
+
+function loadEnvFile(filePath) {
+  const text = readTextIfExists(filePath)
+  const env = {}
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const eqIndex = line.indexOf('=')
+    if (eqIndex <= 0) continue
+    const key = line.slice(0, eqIndex).trim()
+    const value = line.slice(eqIndex + 1).trim()
+    env[key] = value
+  }
+  return env
+}
+
+function findPublishableKey(projectRoot) {
+  const candidates = [
+    process.env.VITE_CLOUDBASE_PUBLISHABLE_KEY,
+    loadEnvFile(path.join(projectRoot, 'admin-web', '.env.production.local')).VITE_CLOUDBASE_PUBLISHABLE_KEY,
+    loadEnvFile(path.join(projectRoot, 'admin-web', '.env.local')).VITE_CLOUDBASE_PUBLISHABLE_KEY
+  ]
+
+  for (const candidate of candidates) {
+    const value = trimValue(candidate)
+    if (value && !value.includes('your-publishable-key')) {
+      return value
+    }
+  }
+  throw new Error('未找到 CloudBase publishable key，请先在 admin-web/.env.production.local 或 admin-web/.env.local 中配置 VITE_CLOUDBASE_PUBLISHABLE_KEY')
+}
+
+function resolveEnvId(projectRoot) {
+  const envCandidates = [
+    process.env.TCB_ENV_ID,
+    process.env.CLOUDBASE_ENV_ID
+  ]
+
+  for (const candidate of envCandidates) {
+    const value = trimValue(candidate)
     if (value) return value
   }
-  return ''
-}
 
-function requireEnvValue(env, keys, label) {
-  const value = pickEnv(env, keys)
-  if (!value) {
-    throw new Error(`缺少环境变量 ${label}`)
-  }
-  return value
-}
-
-function buildDefaultRoleTemplates(storeId) {
-  const now = new Date()
-  return [
-    {
-      roleKey: 'store-owner',
-      roleName: '店长',
-      role: 'owner',
-      permissions: [...ADMIN_PERMISSION_KEYS],
-      isSystem: false,
-      storeId,
-      status: 'active',
-      createdAt: now,
-      updatedAt: now
-    },
-    {
-      roleKey: 'therapist',
-      roleName: '技师',
-      role: 'therapist',
-      permissions: ['orders.view', 'crm.view'],
-      isSystem: false,
-      storeId,
-      status: 'active',
-      createdAt: now,
-      updatedAt: now
-    },
-    {
-      roleKey: 'finance',
-      roleName: '财务',
-      role: 'finance',
-      permissions: ['dashboard.view', 'orders.view', 'orders.refund.review', 'audit.view'],
-      isSystem: false,
-      storeId,
-      status: 'active',
-      createdAt: now,
-      updatedAt: now
-    }
-  ]
-}
-
-function resolveBootstrapConfig(env = process.env) {
-  const envId = requireEnvValue(env, ['TCB_ENV_ID', 'CLOUDBASE_ENV_ID'], 'TCB_ENV_ID')
-  const secretId = requireEnvValue(env, ['CLOUDBASE_SECRET_ID', 'TENCENTCLOUD_SECRETID'], 'CLOUDBASE_SECRET_ID')
-  const secretKey = requireEnvValue(env, ['CLOUDBASE_SECRET_KEY', 'TENCENTCLOUD_SECRETKEY'], 'CLOUDBASE_SECRET_KEY')
-  const sessionToken = pickEnv(env, ['CLOUDBASE_SESSION_TOKEN', 'TENCENTCLOUD_SESSIONTOKEN'])
-  const region = pickEnv(env, ['TCB_REGION', 'CLOUDBASE_REGION']) || 'ap-shanghai'
-
-  const admin = {
-    uid: requireEnvValue(env, ['ADMIN_UID'], 'ADMIN_UID'),
-    username: requireEnvValue(env, ['ADMIN_USERNAME'], 'ADMIN_USERNAME'),
-    displayName: requireEnvValue(env, ['ADMIN_DISPLAY_NAME'], 'ADMIN_DISPLAY_NAME'),
-    storeId: requireEnvValue(env, ['ADMIN_STORE_ID'], 'ADMIN_STORE_ID'),
-    role: pickEnv(env, ['ADMIN_ROLE']) || 'owner',
-    status: 'active'
-  }
-
-  return {
-    envId,
-    secretId,
-    secretKey,
-    sessionToken,
-    region,
-    admin,
-    store: {
-      id: admin.storeId,
-      name: pickEnv(env, ['ADMIN_STORE_NAME', 'STORE_NAME']),
-      phone: pickEnv(env, ['ADMIN_STORE_PHONE', 'STORE_PHONE']),
-      address: pickEnv(env, ['ADMIN_STORE_ADDRESS', 'STORE_ADDRESS']),
-      description: pickEnv(env, ['ADMIN_STORE_DESCRIPTION', 'STORE_DESCRIPTION'])
+  const cloudbaseRcPath = path.join(projectRoot, 'cloudbaserc.json')
+  const rcText = readTextIfExists(cloudbaseRcPath)
+  if (rcText) {
+    try {
+      const rc = JSON.parse(rcText)
+      const value = trimValue(rc.envId)
+      if (value && !value.includes('your-production-env-id')) return value
+    } catch (error) {
+      // ignore malformed local config and continue fallback
     }
   }
+
+  return DEFAULT_ENV_ID
 }
 
-function createClients(config) {
-  const commonConfig = {
-    secretId: config.secretId,
-    secretKey: config.secretKey,
-    sessionToken: config.sessionToken || undefined,
-    env: config.envId,
-    envId: config.envId,
-    region: config.region
+function getTcbBin() {
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || '', 'npm', 'tcb.cmd')
   }
-
-  const manager = CloudBaseManager.init({
-    secretId: commonConfig.secretId,
-    secretKey: commonConfig.secretKey,
-    token: commonConfig.sessionToken,
-    envId: commonConfig.envId,
-    region: commonConfig.region
-  })
-  const app = tcb.init(commonConfig)
-  const db = app.database()
-
-  return { manager, db }
+  return 'tcb'
 }
 
-async function getFirstByQuery(db, collectionName, query) {
-  const res = await db.collection(collectionName).where(query).limit(1).get()
-  return Array.isArray(res.data) ? (res.data[0] || null) : null
+function quoteForPowerShell(value) {
+  return `'${String(value).replace(/'/g, "''")}'`
 }
 
-async function ensureCollections(manager) {
-  console.log(`\n[1/4] 检查并创建集合 (${CORE_COLLECTIONS.length} 个)`)
-  for (const collectionName of CORE_COLLECTIONS) {
-    const result = await manager.database.createCollectionIfNotExists(collectionName)
-    if (result.IsCreated) {
-      console.log(`  + 已创建集合: ${collectionName}`)
-    } else {
-      console.log(`  - 集合已存在: ${collectionName}`)
-    }
-  }
-}
-
-async function ensureIndexes(manager) {
-  console.log(`\n[2/4] 检查并创建建议索引 (${INDEX_SPECS.length} 个)`)
-  for (const spec of INDEX_SPECS) {
-    const exists = await manager.database.checkIndexExists(spec.collection, spec.indexName)
-    if (exists.Exists) {
-      console.log(`  - 索引已存在: ${spec.indexName}`)
-      continue
-    }
-
-    await manager.database.updateCollection(spec.collection, {
-      CreateIndexes: [
-        {
-          IndexName: spec.indexName,
-          MgoKeySchema: {
-            MgoIndexKeys: spec.keys.map(item => ({
-              Name: item.name,
-              Direction: item.direction
-            })),
-            MgoIsUnique: Boolean(spec.unique)
-          }
-        }
-      ]
+function runTcb(args) {
+  let raw
+  if (process.platform === 'win32') {
+    const command = `& ${quoteForPowerShell(getTcbBin())} ${args.map(quoteForPowerShell).join(' ')}`
+    raw = execFileSync('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      command
+    ], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
     })
-
-    console.log(`  + 已创建索引: ${spec.indexName}`)
-  }
-}
-
-async function ensureStore(db, config) {
-  console.log('\n[3/4] 检查门店基础数据')
-  let store = await getFirstByQuery(db, 'stores', { _id: config.store.id })
-  if (store) {
-    console.log(`  - 门店已存在: ${config.store.id}`)
-    return store
-  }
-
-  if (!config.store.name) {
-    throw new Error('目标门店不存在，且未提供 ADMIN_STORE_NAME，无法创建 stores 记录')
-  }
-
-  const now = new Date()
-  const payload = {
-    _id: config.store.id,
-    name: config.store.name,
-    logo: '',
-    address: config.store.address || '',
-    latitude: 0,
-    longitude: 0,
-    phone: config.store.phone || '',
-    banners: [],
-    description: config.store.description || '',
-    adminOpenids: [],
-    createdAt: now,
-    updatedAt: now
-  }
-
-  await db.collection('stores').add(payload)
-  console.log(`  + 已创建门店: ${config.store.id}`)
-  store = await getFirstByQuery(db, 'stores', { _id: config.store.id })
-  return store || payload
-}
-
-async function ensureAdminAccount(db, config) {
-  console.log('\n[4/4] 初始化首个后台管理员与角色模板')
-  const existing = await getFirstByQuery(db, 'admin_accounts', { uid: config.admin.uid })
-  const now = new Date()
-
-  if (existing) {
-    const updateData = {
-      username: config.admin.username,
-      displayName: config.admin.displayName,
-      role: config.admin.role,
-      storeId: config.admin.storeId,
-      status: 'active',
-      permissions: [...ADMIN_PERMISSION_KEYS],
-      updatedAt: now
-    }
-    await db.collection('admin_accounts').doc(existing._id).update(updateData)
-    console.log(`  - 已更新管理员账号: ${config.admin.uid}`)
   } else {
-    await db.collection('admin_accounts').add({
-      uid: config.admin.uid,
-      username: config.admin.username,
-      displayName: config.admin.displayName,
-      role: config.admin.role,
-      storeId: config.admin.storeId,
-      status: 'active',
-      permissions: [...ADMIN_PERMISSION_KEYS],
-      lastLoginAt: null,
-      createdAt: now,
-      updatedAt: now
+    raw = execFileSync(getTcbBin(), args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
     })
-    console.log(`  + 已创建管理员账号: ${config.admin.uid}`)
+  }
+  const jsonStart = raw.indexOf('{')
+  if (jsonStart >= 0) {
+    return JSON.parse(raw.slice(jsonStart))
+  }
+  return raw
+}
+
+function runNoSql(envId, items) {
+  const commandJson = JSON.stringify(items)
+
+  if (process.platform === 'win32') {
+    const psCommand = [
+      `$json = @'`,
+      commandJson,
+      `'@`,
+      `& ${quoteForPowerShell(getTcbBin())} 'db' 'nosql' 'execute' '-e' ${quoteForPowerShell(envId)} '--command' $json '--json'`
+    ].join('\n')
+
+    const raw = execFileSync('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      psCommand
+    ], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    const jsonStart = raw.indexOf('{')
+    if (jsonStart >= 0) {
+      return JSON.parse(raw.slice(jsonStart))
+    }
+    return raw
   }
 
-  const templates = buildDefaultRoleTemplates(config.admin.storeId)
-  for (const template of templates) {
-    const existingTemplate = await getFirstByQuery(db, 'admin_role_templates', {
-      storeId: config.admin.storeId,
-      roleKey: template.roleKey
-    })
+  return runTcb([
+    'db',
+    'nosql',
+    'execute',
+    '-e',
+    envId,
+    '--command',
+    commandJson,
+    '--json'
+  ])
+}
 
-    if (existingTemplate) {
-      await db.collection('admin_role_templates').doc(existingTemplate._id).update({
-        roleName: template.roleName,
-        role: template.role,
-        permissions: template.permissions,
-        isSystem: false,
-        storeId: template.storeId,
-        status: template.status,
-        updatedAt: now
-      })
-      console.log(`  - 已更新角色模板: ${template.roleName}`)
-    } else {
-      await db.collection('admin_role_templates').add(template)
-      console.log(`  + 已创建角色模板: ${template.roleName}`)
+function queryOne(envId, tableName, filter) {
+  const res = runNoSql(envId, [{
+    TableName: tableName,
+    CommandType: 'QUERY',
+    Command: JSON.stringify({
+      find: tableName,
+      filter,
+      limit: 1
+    })
+  }])
+
+  const rows = (((res || {}).data || {}).results || [[]])[0] || []
+  return rows[0] || null
+}
+
+function insertDocuments(envId, tableName, documents) {
+  return runNoSql(envId, [{
+    TableName: tableName,
+    CommandType: 'INSERT',
+    Command: JSON.stringify({
+      insert: tableName,
+      documents
+    })
+  }])
+}
+
+function updateDocuments(envId, tableName, updates) {
+  return runNoSql(envId, [{
+    TableName: tableName,
+    CommandType: 'UPDATE',
+    Command: JSON.stringify({
+      update: tableName,
+      updates
+    })
+  }])
+}
+
+function deleteDocuments(envId, tableName, deletes) {
+  return runNoSql(envId, [{
+    TableName: tableName,
+    CommandType: 'DELETE',
+    Command: JSON.stringify({
+      delete: tableName,
+      deletes
+    })
+  }])
+}
+
+function ensureCollections(envId) {
+  console.log(`\n[1/4] 创建或唤醒核心集合 (${CORE_COLLECTIONS.length} 个)`)
+  for (const tableName of CORE_COLLECTIONS) {
+    const tempId = `__bootstrap__${tableName}`
+    try {
+      insertDocuments(envId, tableName, [{ _id: tempId, __bootstrapTemp: true }])
+      console.log(`  + 已确保集合可用: ${tableName}`)
+    } catch (error) {
+      console.log(`  - 集合已存在: ${tableName}`)
+    }
+    try {
+      deleteDocuments(envId, tableName, [{ q: { _id: tempId }, limit: 1 }])
+    } catch (error) {
+      // ignore cleanup failures for non-existing temp records
     }
   }
 }
 
-async function runBootstrap(env = process.env) {
-  const config = resolveBootstrapConfig(env)
-  const { manager, db } = createClients(config)
+function getCloudbaseAuthClient(envId, publishableKey) {
+  const app = cloudbase.init({
+    env: envId,
+    region: DEFAULT_REGION,
+    accessKey: publishableKey,
+    auth: { detectSessionInUrl: false }
+  })
+  return app.auth()
+}
 
-  console.log('开始执行数据库 bootstrap...')
-  console.log(`目标环境: ${config.envId}`)
-  console.log(`目标门店: ${config.admin.storeId}`)
-  console.log(`管理员 UID: ${config.admin.uid}`)
+async function ensureAdminAuthUser(envId, publishableKey) {
+  console.log('\n[2/4] 创建或确认后台登录用户')
+  const auth = getCloudbaseAuthClient(envId, publishableKey)
 
-  await ensureCollections(manager)
-  await ensureIndexes(manager)
-  await ensureStore(db, config)
-  await ensureAdminAccount(db, config)
+  let signInRes = await auth.signInWithPassword({
+    username: DEFAULT_ADMIN_USERNAME,
+    password: DEFAULT_ADMIN_PASSWORD
+  })
 
-  console.log('\n数据库 bootstrap 完成。')
-  console.log('仍需人工补齐的敏感配置：pay_config、ai_config、notification_settings 中的真实生产参数。')
+  if (!signInRes.error) {
+    const uid = trimValue(signInRes?.data?.user?.id || signInRes?.data?.session?.user?.id)
+    console.log(`  - 后台登录用户已存在: ${DEFAULT_ADMIN_USERNAME}`)
+    return { uid: uid || DEFAULT_ADMIN_UID, username: DEFAULT_ADMIN_USERNAME, password: DEFAULT_ADMIN_PASSWORD }
+  }
+
+  const signUpRes = await auth.signUp({
+    username: DEFAULT_ADMIN_USERNAME,
+    password: DEFAULT_ADMIN_PASSWORD
+  })
+
+  if (signUpRes.error) {
+    throw new Error(`创建后台登录用户失败: ${signUpRes.error.message || '未知错误'}`)
+  }
+
+  signInRes = await auth.signInWithPassword({
+    username: DEFAULT_ADMIN_USERNAME,
+    password: DEFAULT_ADMIN_PASSWORD
+  })
+
+  if (signInRes.error) {
+    throw new Error(`创建用户后自动登录失败: ${signInRes.error.message || '未知错误'}`)
+  }
+
+  const uid = trimValue(signInRes?.data?.user?.id || signInRes?.data?.session?.user?.id)
+  console.log(`  + 已创建后台登录用户: ${DEFAULT_ADMIN_USERNAME}`)
+  return { uid: uid || DEFAULT_ADMIN_UID, username: DEFAULT_ADMIN_USERNAME, password: DEFAULT_ADMIN_PASSWORD }
+}
+
+function ensureDefaultStore(envId, nowIso) {
+  console.log('\n[3/4] 初始化默认门店')
+  updateDocuments(envId, 'stores', [{
+    q: { _id: DEFAULT_STORE_ID },
+    u: {
+      $set: {
+        name: DEFAULT_STORE_NAME,
+        phone: '',
+        address: '',
+        latitude: 0,
+        longitude: 0,
+        description: '系统初始化默认门店',
+        logo: '',
+        banners: [],
+        adminOpenids: [],
+        staff: [],
+        createdAt: nowIso,
+        updatedAt: nowIso
+      }
+    },
+    multi: false,
+    upsert: true
+  }])
+  console.log(`  + 门店已就绪: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}`)
+}
+
+function ensureAdminRecords(envId, adminUid, nowIso) {
+  console.log('\n[4/4] 写入管理员映射和角色模板')
+
+  updateDocuments(envId, 'users', [{
+    q: { _id: adminUid, uid: adminUid },
+    u: {
+      $set: {
+        _openid: '',
+        nickName: DEFAULT_ADMIN_DISPLAY_NAME,
+        avatarUrl: '',
+        phone: '',
+        invitedBy: '',
+        balance: 0,
+        totalEarned: 0,
+        totalInvited: 0,
+        memberLevel: 'vip',
+        role: 'owner',
+        permissions: [...ADMIN_PERMISSION_KEYS],
+        storeId: DEFAULT_STORE_ID,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      }
+    },
+    multi: false,
+    upsert: true
+  }])
+  console.log('  + users 已写入管理员档案')
+
+  updateDocuments(envId, 'admin_accounts', [{
+    q: { uid: adminUid },
+    u: {
+      $set: {
+        username: DEFAULT_ADMIN_USERNAME,
+        displayName: DEFAULT_ADMIN_DISPLAY_NAME,
+        role: 'owner',
+        permissions: [...ADMIN_PERMISSION_KEYS],
+        storeId: DEFAULT_STORE_ID,
+        status: 'active',
+        lastLoginAt: null,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      }
+    },
+    multi: false,
+    upsert: true
+  }])
+  console.log('  + admin_accounts 已写入管理员权限')
+
+  for (const template of DEFAULT_ROLE_TEMPLATES) {
+    updateDocuments(envId, 'admin_role_templates', [{
+      q: {
+        storeId: DEFAULT_STORE_ID,
+        roleKey: template.roleKey
+      },
+      u: {
+        $set: {
+          roleName: template.roleName,
+          role: template.role,
+          permissions: template.permissions,
+          isSystem: false,
+          status: 'active',
+          createdAt: nowIso,
+          updatedAt: nowIso
+        }
+      },
+      multi: false,
+      upsert: true
+    }])
+    console.log(`  + 角色模板已写入: ${template.roleName}`)
+  }
 }
 
 function printUsage() {
-  console.log('数据库 bootstrap 脚本')
+  console.log('数据库 bootstrap 脚本（傻瓜版）')
   console.log('')
-  console.log('运行前请配置以下环境变量：')
-  console.log('  TCB_ENV_ID / CLOUDBASE_ENV_ID')
-  console.log('  CLOUDBASE_SECRET_ID / TENCENTCLOUD_SECRETID')
-  console.log('  CLOUDBASE_SECRET_KEY / TENCENTCLOUD_SECRETKEY')
-  console.log('  ADMIN_UID')
-  console.log('  ADMIN_USERNAME')
-  console.log('  ADMIN_DISPLAY_NAME')
-  console.log('  ADMIN_STORE_ID')
+  console.log('默认行为：')
+  console.log(`  - 环境 ID: 自动识别，识别不到时回退为 ${DEFAULT_ENV_ID}`)
+  console.log(`  - 后台账号: ${DEFAULT_ADMIN_USERNAME}`)
+  console.log(`  - 后台密码: ${DEFAULT_ADMIN_PASSWORD}`)
+  console.log(`  - 默认门店: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}`)
   console.log('')
   console.log('可选环境变量：')
-  console.log('  CLOUDBASE_SESSION_TOKEN / TENCENTCLOUD_SESSIONTOKEN')
-  console.log('  TCB_REGION / CLOUDBASE_REGION')
-  console.log('  ADMIN_ROLE             默认 owner')
-  console.log('  ADMIN_STORE_NAME       门店不存在时用于自动创建 stores 记录')
-  console.log('  ADMIN_STORE_PHONE')
-  console.log('  ADMIN_STORE_ADDRESS')
-  console.log('  ADMIN_STORE_DESCRIPTION')
+  console.log('  TCB_ENV_ID / CLOUDBASE_ENV_ID')
+  console.log('  VITE_CLOUDBASE_PUBLISHABLE_KEY')
+  console.log('')
+  console.log('前置要求：')
+  console.log('  1. 已执行 tcb login')
+  console.log('  2. 当前环境已开启 CloudBase 用户名密码登录')
+  console.log('  3. admin-web/.env.production.local 或 admin-web/.env.local 中已配置 publishable key')
+}
+
+async function runBootstrap() {
+  const projectRoot = path.resolve(__dirname, '..')
+  const envId = resolveEnvId(projectRoot)
+  const publishableKey = findPublishableKey(projectRoot)
+  const nowIso = new Date().toISOString()
+
+  console.log('开始执行数据库 bootstrap...')
+  console.log(`目标环境: ${envId}`)
+
+  ensureCollections(envId)
+  const adminUser = await ensureAdminAuthUser(envId, publishableKey)
+  ensureDefaultStore(envId, nowIso)
+  ensureAdminRecords(envId, adminUser.uid, nowIso)
+
+  console.log('\n数据库 bootstrap 完成。')
+  console.log(`后台账号: ${adminUser.username}`)
+  console.log(`后台密码: ${adminUser.password}`)
+  console.log(`管理员 UID: ${adminUser.uid}`)
+  console.log(`默认门店: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}`)
 }
 
 if (require.main === module) {
@@ -364,9 +473,15 @@ if (require.main === module) {
 
 module.exports = {
   CORE_COLLECTIONS,
-  INDEX_SPECS,
-  ADMIN_PERMISSION_KEYS,
-  buildDefaultRoleTemplates,
-  resolveBootstrapConfig,
+  DEFAULT_ROLE_TEMPLATES,
+  DEFAULT_ENV_ID,
+  DEFAULT_STORE_ID,
+  DEFAULT_STORE_NAME,
+  DEFAULT_ADMIN_USERNAME,
+  DEFAULT_ADMIN_PASSWORD,
+  DEFAULT_ADMIN_UID,
+  DEFAULT_ADMIN_DISPLAY_NAME,
+  resolveEnvId,
+  findPublishableKey,
   runBootstrap
 }

@@ -7,6 +7,8 @@ const cloudbaseConfig = {
 }
 
 let appInstance: ReturnType<typeof cloudbase.init> | null = null
+let authReadyPromise: Promise<void> | null = null
+let authReady = false
 
 export function hasCloudbaseConfig() {
   return Boolean(cloudbaseConfig.env && cloudbaseConfig.accessKey)
@@ -31,22 +33,44 @@ export function getCloudbaseAuth() {
   return getCloudbaseApp().auth
 }
 
+async function ensureCloudbaseSessionReady() {
+  if (authReady) {
+    return
+  }
+  const auth = getCloudbaseAuth()
+  if (!authReadyPromise) {
+    authReadyPromise = (async () => {
+      await auth.getLoginState().catch(() => null)
+      await auth.getCurrentUser().catch(() => null)
+      authReady = true
+    })().finally(() => {
+      authReadyPromise = null
+    })
+  }
+  await authReadyPromise
+}
+
 export async function loginWithPassword(username: string, password: string) {
   const auth = getCloudbaseAuth()
   const result = await auth.signInWithPassword({ username, password })
   if (result.error) {
     throw new Error(result.error.message || '登录失败')
   }
+  authReady = false
+  await ensureCloudbaseSessionReady()
   return result.data
 }
 
 export async function logout() {
   const auth = getCloudbaseAuth()
   await auth.signOut()
+  authReady = false
+  authReadyPromise = null
 }
 
 export async function callFunction<T>(name: string, data: Record<string, unknown>) {
   const app = getCloudbaseApp()
+  await ensureCloudbaseSessionReady()
   const result = await app.callFunction({
     name,
     data
