@@ -1226,9 +1226,30 @@ const retainedFissionProduct = {
   "showInMall": false
 };
 
+function loadProductImageMap() {
+  try {
+    return require('./product-image-map.json');
+  } catch (error) {
+    return {};
+  }
+}
+
+function applyProductImageMap(product, imageMap) {
+  if (!product) return product;
+  const images = Array.isArray(product.images)
+    ? product.images.map(item => imageMap[item] || item)
+    : [];
+  return {
+    ...product,
+    images
+  };
+}
+
+const productImageMap = loadProductImageMap();
+
 const allProductsData = [
-  ...visibleProductsData,
-  retainedFissionProduct
+  ...visibleProductsData.map(item => applyProductImageMap(item, productImageMap)),
+  applyProductImageMap(retainedFissionProduct, productImageMap)
 ];
 
 const fissionCampaigns = [
@@ -1276,8 +1297,8 @@ const packagesData = [
 
 module.exports = {
   mallCategories,
-  visibleProductsData,
-  retainedFissionProduct,
+  visibleProductsData: allProductsData.slice(0, visibleProductsData.length),
+  retainedFissionProduct: allProductsData[allProductsData.length - 1],
   allProductsData,
   fissionCampaigns,
   packagesData

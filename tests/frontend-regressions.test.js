@@ -78,8 +78,14 @@ test('catalog and campaign money inputs use yuan labels while preserving fen pay
 test('product detail omits invalid discount text when original price is missing or zero', async () => {
   const pageDef = loadMiniappPage('miniapp/pages/product-detail/product-detail.js')
   const wxCalls = { setNavigationBarTitle: [] }
+  const originalGetApp = global.getApp
 
   try {
+    global.getApp = () => ({
+      getCustomerSessionToken() {
+        return ''
+      }
+    })
     global.wx = {
       cloud: {
         callFunction({ name, data }) {
@@ -122,6 +128,7 @@ test('product detail omits invalid discount text when original price is missing 
     assert.equal(page.data.loading, false)
     assert.deepEqual(wxCalls.setNavigationBarTitle, [{ title: '泡浴包' }])
   } finally {
+    global.getApp = originalGetApp
     delete global.Page
     delete global.wx
   }
@@ -131,6 +138,7 @@ test('lottery animation falls back to prize name when backend prize id is missin
   const pageDef = loadMiniappPage('miniapp/pages/lottery/lottery.js')
   const originalSetTimeout = global.setTimeout
   const originalRandom = Math.random
+  const originalGetApp = global.getApp
 
   try {
     global.setTimeout = fn => {
@@ -180,6 +188,11 @@ test('lottery animation falls back to prize name when backend prize id is missin
         return Promise.resolve()
       }
     }
+    global.getApp = () => ({
+      requireCustomerLogin() {
+        return true
+      }
+    })
 
     const page = {
       ...pageDef,
@@ -211,6 +224,7 @@ test('lottery animation falls back to prize name when backend prize id is missin
   } finally {
     global.setTimeout = originalSetTimeout
     Math.random = originalRandom
+    global.getApp = originalGetApp
     delete global.Page
     delete global.wx
   }
@@ -294,11 +308,21 @@ test('tongue-related pages render review-safe copy from runtime config', () => {
   assert.match(indexWxml, /\{\{tongueDescText\}\}/)
 
   assert.match(tongueJs, /loadReviewConfig/)
+  assert.match(tongueJs, /_promptLoginForGuest/)
+  assert.match(tongueJs, /_ensureCustomerLogin/)
+  assert.match(tongueJs, /showLoginModal:/)
+  assert.match(tongueJs, /closeLoginModal/)
+  assert.match(tongueJs, /isLoggedIn:/)
   assert.match(tongueJs, /historyText:/)
   assert.match(tongueJs, /primaryActionText:/)
   assert.match(tongueWxml, /\{\{primaryActionText\}\}/)
   assert.match(tongueWxml, /\{\{historyText\}\}/)
   assert.match(tongueWxml, /\{\{analyzingTitle\}\}/)
+  assert.match(tongueWxml, /tongue-auth-modal/)
+  assert.match(tongueWxml, /agreePrivacyAuthorization/)
+  assert.match(tongueWxml, /查看\{\{privacyContractName\}\}/)
+  assert.match(tongueWxml, /同意隐私指引/)
+  assert.match(tongueWxml, /授权手机号安全登录/)
 
   assert.match(reportJs, /safeReportView:/)
   assert.match(reportJs, /reanalyzeReport:/)
@@ -308,6 +332,11 @@ test('tongue-related pages render review-safe copy from runtime config', () => {
 
   assert.match(profileJs, /tongueMenuLabel:/)
   assert.match(profileJs, /tongueCountLabel:/)
+  assert.match(profileJs, /callCloudWithLogin/)
+  assert.match(profileJs, /openPrivacyContract/)
   assert.match(profileWxml, /\{\{tongueMenuLabel\}\}/)
   assert.match(profileWxml, /\{\{tongueCountLabel\}\}/)
+  assert.match(profileWxml, /agreePrivacyAuthorization/)
+  assert.match(profileWxml, /同意隐私指引/)
+  assert.match(profileWxml, /微信授权手机号登录/)
 })

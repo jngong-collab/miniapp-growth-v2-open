@@ -43,7 +43,9 @@ async function getHomeContent(openid, event = {}) {
     ])
 
     const safeStoreInfo = storeInfo ? await sanitizeStore(storeInfo, runtime.reviewConfig) : null
-    const visibleFeaturedProducts = excludeCampaignLinkedPackages(featuredProducts, fissionCampaigns).slice(0, 6)
+    const visibleFeaturedProducts = await resolveProductImageMap(
+        excludeCampaignLinkedPackages(featuredProducts, fissionCampaigns).slice(0, 6)
+    )
 
     return {
         code: 0,
@@ -91,7 +93,9 @@ async function getMallContent(event) {
     fissionCampaigns.forEach(item => {
         campaignMap[item.productId] = item
     })
-    const visibleProducts = excludeCampaignLinkedPackages(products, fissionCampaigns)
+    const visibleProducts = await resolveProductImageMap(
+        excludeCampaignLinkedPackages(products, fissionCampaigns)
+    )
 
     return {
         code: 0,
@@ -220,6 +224,19 @@ async function resolveCloudFileMap(fileList = []) {
         console.error('contentApi 转换云存储资源失败:', error)
         return {}
     }
+}
+
+async function resolveProductImageMap(products = []) {
+    if (!Array.isArray(products) || !products.length) return []
+    const fileMap = await resolveCloudFileMap(
+        products.flatMap(item => Array.isArray(item && item.images) ? item.images : [])
+    )
+    return products.map(item => ({
+        ...item,
+        images: Array.isArray(item && item.images)
+            ? item.images.map(image => fileMap[image] || image)
+            : []
+    }))
 }
 
 async function sanitizeStore(store, reviewConfig = {}) {

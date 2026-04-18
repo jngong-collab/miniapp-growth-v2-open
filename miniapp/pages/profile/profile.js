@@ -2,13 +2,16 @@
 const config = require('../../config')
 const { countActivePackageItems } = require('../../utils/package-state')
 const { isWorkbenchUser, hasWorkbenchPermission } = require('../../utils/workbench')
-const { callCloud } = require('../../utils/cloud-api')
+const { callCloud, callCloudWithLogin } = require('../../utils/cloud-api')
 
-Page({
-    data: {
-        userInfo: {},
+function getGuestData() {
+    return {
         isLoggedIn: false,
-        loginRedirect: '',
+        userInfo: {},
+        privacyChecked: false,
+        needPrivacyAuthorization: false,
+        privacyContractName: '《用户隐私保护指引》',
+        loggingIn: false,
         balanceYuan: '0.0',
         levelLabel: '普通会员',
         orderCount: 0,
@@ -16,6 +19,13 @@ Page({
         packageCount: 0,
         invitedCount: 0,
         tongueCount: 0,
+        tongueCountLabel: ''
+    }
+}
+
+Page({
+    data: {
+        ...getGuestData(),
         storePhone: '',
         storeInfo: null,
         version: config.version || '1.0.0',
@@ -28,16 +38,31 @@ Page({
         tongueCountLabel: ''
     },
 
-    onLoad: function (options = {}) {
-        const redirect = options.loginRedirect ? decodeURIComponent(options.loginRedirect) : ''
-        if (redirect) {
-            this.setData({ loginRedirect: redirect })
-        }
+    onLoad: function () {
     },
 
     onShow: async function () {
         await this._syncReviewConfig()
         await this._refreshSession()
+    },
+
+    _refreshPrivacyState: async function () {
+        const app = getApp()
+        if (!app || typeof app.getPrivacyAuthorizationState !== 'function') {
+            this.setData({
+                privacyChecked: true,
+                needPrivacyAuthorization: false,
+                privacyContractName: '《用户隐私保护指引》'
+            })
+            return
+        }
+
+        const privacyState = await app.getPrivacyAuthorizationState()
+        this.setData({
+            privacyChecked: true,
+            needPrivacyAuthorization: !!privacyState.needAuthorization,
+            privacyContractName: privacyState.privacyContractName || '《用户隐私保护指引》'
+        })
     },
 
     _syncReviewConfig: async function () {
@@ -60,8 +85,9 @@ Page({
         const userInfo = app.globalData.userInfo || {}
 
         this.setData({
+            ...(isLoggedIn ? {} : getGuestData()),
             isLoggedIn,
-            userInfo: isLoggedIn ? userInfo : { ...(userInfo || {}), phone: '' },
+            userInfo: isLoggedIn ? userInfo : {},
             role: app.globalData.role || 'customer',
             permissions: app.globalData.permissions || [],
             canEnterWorkbench: isWorkbenchUser(app.globalData.role)
@@ -73,8 +99,22 @@ Page({
         ])
 
         if (isLoggedIn) {
+            this.setData({
+                privacyChecked: true,
+                needPrivacyAuthorization: false,
+                privacyContractName: '《用户隐私保护指引》',
+                loggingIn: false
+            })
             this._goAfterLogin()
+            return
         }
+
+        await this._refreshPrivacyState().catch(() => {
+            this.setData({
+                privacyChecked: true,
+                needPrivacyAuthorization: false
+            })
+        })
     },
 
     _resetUserStats: function () {
@@ -92,10 +132,9 @@ Page({
 
     _goAfterLogin: function () {
         const app = getApp()
-        const target = this.data.loginRedirect
+        const target = app.consumePendingProtectedTarget ? app.consumePendingProtectedTarget() : ''
         if (!target) return
         if (target === '/pages/profile/profile') return
-        this.setData({ loginRedirect: '' })
         if (app && typeof app._navigateToPageOrTab === 'function') {
             app._navigateToPageOrTab(target)
         }
@@ -112,10 +151,10 @@ Page({
         try {
             // 并发请求基础统计数据
             const [earningsRes, packagesRes, tongueRes, orderCounts] = await Promise.all([
-                callCloud('growthApi', { action: 'getMyEarnings' }).catch(() => ({})),
-                callCloud('growthApi', { action: 'getMyPackages' }).catch(() => []),
-                callCloud('growthApi', { action: 'getTongueHistory' }).catch(() => []),
-                callCloud('commerceApi', { action: 'getMyOrderCounts' }).catch(() => ({ all: 0, pending: 0, refund: 0 }))
+                callCloudWithLogin('growthApi', { action: 'getMyEarnings' }).catch(() => ({})),
+                callCloudWithLogin('growthApi', { action: 'getMyPackages' }).catch(() => []),
+                callCloudWithLogin('growthApi', { action: 'getTongueHistory' }).catch(() => []),
+                callCloudWithLogin('commerceApi', { action: 'getMyOrderCounts' }).catch(() => ({ all: 0, pending: 0, refund: 0 }))
             ])
 
             const earnings = earningsRes || {}
@@ -233,7 +272,36 @@ Page({
         return hasWorkbenchPermission(this.data.permissions, permission)
     },
 
+    openPrivacyContract: async function () {
+        const app = getApp()
+        if (!app || typeof app.openPrivacyContract !== 'function') {
+            wx.showToast({ title: '当前版本暂不支持查看隐私指引', icon: 'none' })
+            return
+        }
+
+        try {
+            await app.openPrivacyContract()
+        } catch (error) {
+            wx.showToast({ title: '打开隐私指引失败', icon: 'none' })
+        }
+    },
+
+    onAgreePrivacyAuthorization: function () {
+        this.setData({
+            privacyChecked: true,
+            needPrivacyAuthorization: false
+        })
+        wx.showToast({ title: '已同意隐私指引', icon: 'success' })
+    },
+
     onGetPhoneNumber: async function (e) {
+        if (!this.data.privacyChecked) {
+            await this._refreshPrivacyState().catch(() => {})
+        }
+        if (this.data.needPrivacyAuthorization) {
+            wx.showToast({ title: '请先阅读并同意隐私指引', icon: 'none' })
+            return
+        }
         if (e.detail.errMsg && e.detail.errMsg.includes('fail')) {
             wx.showToast({ title: '授权失败', icon: 'none' })
             return
@@ -244,35 +312,47 @@ Page({
         }
 
         try {
-            // callCloud 返回的是 result.data，此处 res 为 { phone: 'xxx' }
+            this.setData({ loggingIn: true })
             const res = await callCloud('opsApi', {
                 action: 'bindPhoneNumber',
                 code: e.detail.code
             })
             const phone = res?.phone || ''
+            const sessionToken = res?.sessionToken || ''
+            const expiresAt = res?.expiresAt || ''
+            const user = res?.user || {}
             const app = getApp()
-            if (!phone) {
+            if (!phone || !sessionToken) {
+                this.setData({ loggingIn: false })
                 wx.showToast({ title: '绑定失败', icon: 'none' })
                 return
             }
 
             if (app.setCustomerLoginSuccess) {
-                app.setCustomerLoginSuccess(phone)
+                app.setCustomerLoginSuccess({
+                    phone,
+                    sessionToken,
+                    expiresAt,
+                    user
+                })
             } else if (app.globalData && app.globalData.userInfo) {
                 app.globalData.userInfo.phone = phone
                 app.globalData.isLoggedIn = true
             }
+            const nextUserInfo = app.globalData.userInfo || { ...user, phone }
             this.setData({
                 isLoggedIn: true,
-                'userInfo.phone': phone
+                userInfo: nextUserInfo,
+                loggingIn: false,
+                privacyChecked: true,
+                needPrivacyAuthorization: false
             })
 
             wx.showToast({ title: '绑定成功', icon: 'success' })
-            if (app && (typeof app.requireCustomerLogin === 'function' || typeof app.isCustomerLoggedIn === 'function')) {
-                this._loadUserStats().catch(() => {})
-            }
+            await this._loadUserStats().catch(() => {})
             this._goAfterLogin()
         } catch (err) {
+            this.setData({ loggingIn: false })
             wx.showToast({ title: err.message || '绑定失败', icon: 'none' })
         }
     },
@@ -281,13 +361,25 @@ Page({
         wx.showModal({
             title: '确认退出登录',
             content: '退出后将清除当前手机号登录状态，重新进入可再次绑定手机号',
-            success: res => {
+            success: async res => {
                 if (!res.confirm) return
                 const app = getApp()
-                if (app && app.logoutCustomer) {
+                try {
+                    await callCloud('opsApi', { action: 'logout' })
+                } catch (error) {
+                    console.warn('云端退出失败:', error)
+                }
+                if (app && app.clearCustomerAuth) {
+                    app.clearCustomerAuth()
+                } else if (app && app.logoutCustomer) {
                     app.logoutCustomer()
                 }
-                this._refreshSession()
+                this.setData({
+                    ...getGuestData(),
+                    role: app.globalData.role || 'customer',
+                    permissions: app.globalData.permissions || [],
+                    canEnterWorkbench: isWorkbenchUser(app.globalData.role)
+                })
                 wx.showToast({ title: '已退出登录', icon: 'success', duration: 1500 })
             }
         })

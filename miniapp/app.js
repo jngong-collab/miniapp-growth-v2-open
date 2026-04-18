@@ -2,11 +2,14 @@
 const config = require('./config')
 const { callCloud } = require('./utils/cloud-api')
 
-const LOGIN_SESSION_KEY = 'miniapp_user_session'
-const LOGIN_SESSION_DEFAULT = {
+const USER_INFO_STORAGE_KEY = 'userInfo'
+const MEMBER_SESSION_KEY = 'miniapp_member_session'
+const DEFAULT_PRIVACY_CONTRACT_NAME = '《用户隐私保护指引》'
+const MEMBER_SESSION_DEFAULT = {
   openid: '',
-  isLoggedIn: false,
-  manualLogout: false
+  sessionToken: '',
+  expiresAt: '',
+  isLoggedIn: false
 }
 
 function getPathBase(path) {
@@ -169,6 +172,75 @@ App({
     this._applyWorkbenchAccess(snapshot.workbenchAccess)
   },
 
+  _readStoredUserInfo() {
+    try {
+      const stored = wx.getStorageSync(USER_INFO_STORAGE_KEY)
+      if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {}
+      return stored
+    } catch (error) {
+      return {}
+    }
+  },
+
+  _writeStoredUserInfo(userInfo) {
+    try {
+      wx.setStorageSync(USER_INFO_STORAGE_KEY, userInfo || {})
+    } catch (error) {
+      console.warn('写入用户缓存失败:', error)
+    }
+  },
+
+  _removeStoredUserInfo() {
+    try {
+      wx.removeStorageSync(USER_INFO_STORAGE_KEY)
+    } catch (error) {
+      console.warn('清理用户缓存失败:', error)
+    }
+  },
+
+  _readMemberSession() {
+    try {
+      const saved = wx.getStorageSync(MEMBER_SESSION_KEY) || {}
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
+        return { ...MEMBER_SESSION_DEFAULT }
+      }
+      return {
+        openid: typeof saved.openid === 'string' ? saved.openid : '',
+        sessionToken: typeof saved.sessionToken === 'string' ? saved.sessionToken : '',
+        expiresAt: typeof saved.expiresAt === 'string' ? saved.expiresAt : '',
+        isLoggedIn: !!saved.isLoggedIn
+      }
+    } catch (error) {
+      return { ...MEMBER_SESSION_DEFAULT }
+    }
+  },
+
+  _writeMemberSession(session) {
+    try {
+      wx.setStorageSync(MEMBER_SESSION_KEY, {
+        ...session,
+        updatedAt: Date.now()
+      })
+    } catch (error) {
+      console.warn('写入会员会话失败:', error)
+    }
+  },
+
+  _clearMemberSessionCache() {
+    try {
+      wx.removeStorageSync(MEMBER_SESSION_KEY)
+    } catch (error) {
+      console.warn('清理会员会话失败:', error)
+    }
+  },
+
+  _isSessionExpired(expiresAt) {
+    if (!expiresAt) return true
+    const time = new Date(expiresAt).getTime()
+    if (!Number.isFinite(time)) return true
+    return time <= Date.now()
+  },
+
   _setRoleReady(ready) {
     this.globalData._roleReady = ready !== false
   },
@@ -200,6 +272,14 @@ App({
     return code === -1 && hasUnknownMsg
   },
 
+  _isAuthRequiredError(error) {
+    if (!error) return false
+    const rawCode = error.code
+    const code = typeof rawCode === 'number' ? rawCode : Number(rawCode)
+    const msg = String(error.message || error.errMsg || error.result?.msg || '')
+    return code === 401 || /未登录|请先完成手机号登录|请先绑定手机号|登录已过期/i.test(msg)
+  },
+
   async _callCloudWithFallback(candidates, payload) {
     const requestPayload = { ...payload }
     let lastError
@@ -228,41 +308,6 @@ App({
     }
   },
 
-  _readLoginSession() {
-    try {
-      const saved = wx.getStorageSync(LOGIN_SESSION_KEY) || {}
-      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
-        return { ...LOGIN_SESSION_DEFAULT }
-      }
-      return {
-        openid: typeof saved.openid === 'string' ? saved.openid : '',
-        isLoggedIn: !!saved.isLoggedIn,
-        manualLogout: !!saved.manualLogout
-      }
-    } catch (error) {
-      return { ...LOGIN_SESSION_DEFAULT }
-    }
-  },
-
-  _writeLoginSession(state) {
-    try {
-      wx.setStorageSync(LOGIN_SESSION_KEY, {
-        ...state,
-        updatedAt: Date.now()
-      })
-    } catch (error) {
-      console.warn('写入登录态失败:', error)
-    }
-  },
-
-  _clearLoginSessionCache() {
-    try {
-      wx.removeStorageSync(LOGIN_SESSION_KEY)
-    } catch (error) {
-      console.warn('清理登录态失败:', error)
-    }
-  },
-
   _hasBoundPhone(userInfo) {
     const phone = userInfo && typeof userInfo.phone === 'string'
       ? userInfo.phone.trim()
@@ -270,80 +315,153 @@ App({
     return !!phone
   },
 
-  _shouldShowAsLoggedIn() {
-    const { isLoggedIn, manualLogout } = this.globalData.loginSession || LOGIN_SESSION_DEFAULT
-    return !manualLogout && isLoggedIn
-  },
-
-  _syncLoginStateFromUserInfo(userInfo) {
+  checkLogin() {
+    const userInfo = this._readStoredUserInfo()
+    const session = this._readMemberSession()
     const hasPhone = this._hasBoundPhone(userInfo)
-    const manualLogout = !!(this.globalData.loginSession && this.globalData.loginSession.manualLogout)
-    const shouldExposePhone = !manualLogout && hasPhone
+    const hasValidSession = !!session.sessionToken && !this._isSessionExpired(session.expiresAt)
 
-    this.globalData.userInfo = shouldExposePhone
-      ? (userInfo || {})
-      : { ...(userInfo || {}), phone: '' }
-
-    this.globalData.isLoggedIn = !!shouldExposePhone
-    this.globalData.loginSession = {
-      openid: this.globalData.openid || '',
-      isLoggedIn: !!shouldExposePhone,
-      manualLogout: !!manualLogout
-    }
-    this._writeLoginSession(this.globalData.loginSession)
-
+    this.globalData.userInfo = hasPhone ? userInfo : {}
+    this.globalData.memberSession = hasValidSession
+      ? { ...MEMBER_SESSION_DEFAULT, ...session, isLoggedIn: true }
+      : { ...MEMBER_SESSION_DEFAULT }
+    this.globalData.isLoggedIn = hasPhone && hasValidSession
     return this.globalData.isLoggedIn
   },
 
-  _buildLoginSessionAfterAction() {
-    const loginSession = this._readLoginSession()
-    const shouldKeepManualLogout = !!loginSession.manualLogout
-    return {
-      ...loginSession,
-      manualLogout: shouldKeepManualLogout
+  setUserInfo(userInfo) {
+    const nextUserInfo = userInfo && typeof userInfo === 'object' ? { ...userInfo } : {}
+    this.globalData.userInfo = nextUserInfo
+    if (this._hasBoundPhone(nextUserInfo)) {
+      this._writeStoredUserInfo(nextUserInfo)
+    } else {
+      this._removeStoredUserInfo()
     }
+    this.globalData.isLoggedIn = this._hasBoundPhone(nextUserInfo) && !!this.globalData.memberSession.sessionToken && !this._isSessionExpired(this.globalData.memberSession.expiresAt)
+    return this.globalData.userInfo
   },
 
-  _initLoginSession() {
-    this.globalData.loginSession = this._buildLoginSessionAfterAction()
-    this.globalData.isLoggedIn = this._shouldShowAsLoggedIn()
+  setMemberSession(session) {
+    const nextSession = {
+      ...MEMBER_SESSION_DEFAULT,
+      ...(session || {}),
+      openid: (session && session.openid) || this.globalData.openid || '',
+      sessionToken: (session && session.sessionToken) || '',
+      expiresAt: (session && session.expiresAt) || '',
+      isLoggedIn: !!(session && session.sessionToken) && !this._isSessionExpired(session.expiresAt)
+    }
+    this.globalData.memberSession = nextSession
+    if (nextSession.isLoggedIn) {
+      this._writeMemberSession(nextSession)
+    } else {
+      this._clearMemberSessionCache()
+    }
+    this.globalData.isLoggedIn = this._hasBoundPhone(this.globalData.userInfo) && nextSession.isLoggedIn
+    return nextSession
+  },
+
+  getCustomerSessionToken() {
+    const session = this.globalData.memberSession || MEMBER_SESSION_DEFAULT
+    if (!session.sessionToken || this._isSessionExpired(session.expiresAt)) return ''
+    return session.sessionToken
+  },
+
+  clearUserInfo() {
+    this.globalData.userInfo = {}
+    this.globalData.isLoggedIn = false
+    this._removeStoredUserInfo()
+  },
+
+  clearCustomerAuth() {
+    this.clearUserInfo()
+    this.globalData.memberSession = { ...MEMBER_SESSION_DEFAULT }
+    this._clearMemberSessionCache()
   },
 
   isCustomerLoggedIn() {
-    return this._shouldShowAsLoggedIn() && this._hasBoundPhone(this.globalData.userInfo)
+    const hasPhone = this._hasBoundPhone(this.globalData.userInfo)
+    const sessionToken = this.getCustomerSessionToken()
+    this.globalData.isLoggedIn = hasPhone && !!sessionToken
+    return this.globalData.isLoggedIn
   },
 
-  setCustomerLoginSuccess(phone) {
-    const safePhone = (phone || '').toString().trim()
+  setCustomerLoginSuccess(payload = {}) {
     const currentUserInfo = this.globalData.userInfo || {}
-    const nextUserInfo = { ...currentUserInfo }
+    const nextUserInfo = {
+      ...currentUserInfo,
+      ...(payload.user || {})
+    }
+    const safePhone = String(payload.phone || nextUserInfo.phone || '').trim()
     if (safePhone) {
       nextUserInfo.phone = safePhone
-    } else {
-      delete nextUserInfo.phone
     }
-
-    this.globalData.userInfo = nextUserInfo
-    this.globalData.loginSession = {
-      openid: this.globalData.openid || '',
-      isLoggedIn: !!safePhone,
-      manualLogout: false
-    }
-    this.globalData.isLoggedIn = !!safePhone
-    this._writeLoginSession(this.globalData.loginSession)
+    this.setUserInfo(nextUserInfo)
+    this.setMemberSession({
+      openid: this.globalData.openid || payload.openid || '',
+      sessionToken: payload.sessionToken || '',
+      expiresAt: payload.expiresAt || ''
+    })
   },
 
   logoutCustomer() {
-    const nextUserInfo = this.globalData.userInfo ? { ...this.globalData.userInfo } : {}
-    delete nextUserInfo.phone
-    this.globalData.userInfo = nextUserInfo
-    this.globalData.loginSession = {
-      openid: this.globalData.openid || '',
-      isLoggedIn: false,
-      manualLogout: true
-    }
-    this.globalData.isLoggedIn = false
-    this._writeLoginSession(this.globalData.loginSession)
+    this.clearCustomerAuth()
+  },
+
+  setPendingProtectedTarget(target) {
+    this.globalData.pendingProtectedTarget = buildRedirectTarget(target)
+  },
+
+  consumePendingProtectedTarget() {
+    const target = this.globalData.pendingProtectedTarget || ''
+    this.globalData.pendingProtectedTarget = ''
+    return target
+  },
+
+  getPrivacyAuthorizationState() {
+    return new Promise(resolve => {
+      if (!wx || typeof wx.getPrivacySetting !== 'function') {
+        resolve({
+          supported: false,
+          needAuthorization: false,
+          privacyContractName: DEFAULT_PRIVACY_CONTRACT_NAME
+        })
+        return
+      }
+
+      wx.getPrivacySetting({
+        success: res => {
+          resolve({
+            supported: true,
+            needAuthorization: !!res.needAuthorization,
+            privacyContractName: res.privacyContractName || DEFAULT_PRIVACY_CONTRACT_NAME
+          })
+        },
+        fail: error => {
+          console.warn('获取隐私授权状态失败:', error)
+          resolve({
+            supported: true,
+            needAuthorization: false,
+            privacyContractName: DEFAULT_PRIVACY_CONTRACT_NAME
+          })
+        }
+      })
+    })
+  },
+
+  openPrivacyContract() {
+    return new Promise((resolve, reject) => {
+      if (!wx || typeof wx.openPrivacyContract !== 'function') {
+        const error = new Error('当前微信版本不支持打开隐私保护指引')
+        error.code = -1
+        reject(error)
+        return
+      }
+
+      wx.openPrivacyContract({
+        success: resolve,
+        fail: reject
+      })
+    })
   },
 
   _navigateToPageOrTab(url) {
@@ -363,6 +481,7 @@ App({
   requireCustomerLogin(redirectTo, options = {}) {
     if (this.isCustomerLoggedIn()) return true
     const target = buildRedirectTarget(redirectTo)
+    if (target) this.setPendingProtectedTarget(target)
     const modal = options.silent
       ? null
       : () => wx.showModal({
@@ -372,12 +491,7 @@ App({
           cancelText: options.cancelText || '取消',
           success: res => {
             if (!res.confirm) return
-            if (target) {
-              const encodedTarget = encodeURIComponent(target)
-              this._navigateToPageOrTab(`/pages/profile/profile?loginRedirect=${encodedTarget}`)
-            } else {
-              this._navigateToPageOrTab('/pages/profile/profile')
-            }
+            this._navigateToPageOrTab('/pages/profile/profile')
           }
         })
 
@@ -416,7 +530,7 @@ App({
     }
     this._applyRuntimeReviewConfig(this._buildDefaultReviewConfig())
     this.loadReviewConfig().catch(() => {})
-    this._initLoginSession()
+    this.checkLogin()
 
     // 登录
     this._login()
@@ -430,8 +544,9 @@ App({
     role: 'customer',      // customer / staff / admin
     permissions: [],       // ['verify', 'viewOrders', ...]
     workbenchAccess: null,
-    loginSession: { ...LOGIN_SESSION_DEFAULT },
+    memberSession: { ...MEMBER_SESSION_DEFAULT },
     isLoggedIn: false,
+    pendingProtectedTarget: '',
     reviewConfig: null,
     _reviewConfigPromise: null,
     _roleReady: false,
@@ -458,7 +573,9 @@ App({
         return this.globalData.reviewConfig
       })
       .catch(error => {
-        console.warn('加载审核配置失败，使用本地安全兜底:', error && error.message ? error.message : error)
+        if (!this._isAuthRequiredError(error)) {
+          console.warn('加载审核配置失败，使用本地安全兜底:', error && error.message ? error.message : error)
+        }
         return this._applyRuntimeReviewConfig(this._buildDefaultReviewConfig())
       })
       .finally(() => {
@@ -501,8 +618,11 @@ App({
           throw err
         }
         this.globalData.openid = normalized.openid
-        this.globalData.userInfo = normalized.userInfo || {}
-        this._syncLoginStateFromUserInfo(this.globalData.userInfo)
+        const nextUserInfo = {
+          ...(this.globalData.userInfo || {}),
+          ...(normalized.userInfo || {})
+        }
+        this.setUserInfo(nextUserInfo)
         console.log('登录成功，openid:', normalized.openid, '来源:', res._sourceFunction)
         // 登录成功后获取角色和权限
         return this._loadRole({ preserveExistingOnError: hadSession, fallbackState: previousState })
@@ -519,7 +639,7 @@ App({
           this._restoreSessionState(previousState)
         } else {
           this.globalData.openid = null
-          this.globalData.userInfo = {}
+          this.clearUserInfo()
           this._applyWorkbenchAccess(this._buildCustomerAccess())
         }
         this._setRoleReady(true)
@@ -567,8 +687,10 @@ App({
           this.globalData.openid = this.globalData.openid || normalized.openid
         }
         if (normalized?.userInfo) {
-          this.globalData.userInfo = normalized.userInfo
-          this._syncLoginStateFromUserInfo(this.globalData.userInfo)
+          this.setUserInfo({
+            ...(this.globalData.userInfo || {}),
+            ...normalized.userInfo
+          })
         }
         return normalized
       })

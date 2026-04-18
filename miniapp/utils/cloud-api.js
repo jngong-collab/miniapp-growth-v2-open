@@ -1,5 +1,28 @@
+function buildRequestData(data = {}, { requireLogin = false } = {}) {
+    const app = getApp()
+    const payload = { ...(data || {}) }
+    if (app && typeof app.getCustomerSessionToken === 'function') {
+        const sessionToken = app.getCustomerSessionToken()
+        if (sessionToken && !payload.sessionToken) {
+            payload.sessionToken = sessionToken
+        }
+    }
+
+    if (requireLogin) {
+        getCustomerRequiredCloudClient()
+        if (!payload.sessionToken) {
+            const error = new Error('请先绑定手机号后再访问')
+            error.code = -401
+            throw error
+        }
+    }
+
+    return payload
+}
+
 function callCloud(name, data = {}) {
-    return wx.cloud.callFunction({ name, data }).then(res => {
+    const requestData = buildRequestData(data)
+    return wx.cloud.callFunction({ name, data: requestData }).then(res => {
         const result = res.result || {}
         if (result.code !== 0) {
             const error = new Error(result.msg || '请求失败')
@@ -19,11 +42,7 @@ function getCustomerRequiredCloudClient() {
         throw error
     }
 
-    if (typeof app.isCustomerLoggedIn !== 'function') {
-        return app
-    }
-
-    if (!app || !app.isCustomerLoggedIn || !app.isCustomerLoggedIn()) {
+    if (typeof app.isCustomerLoggedIn !== 'function' || !app.isCustomerLoggedIn()) {
         const error = new Error('请先绑定手机号后再访问')
         error.code = -401
         throw error
@@ -32,8 +51,17 @@ function getCustomerRequiredCloudClient() {
 }
 
 function callCloudWithLogin(name, data = {}) {
-    getCustomerRequiredCloudClient()
-    return callCloud(name, data)
+    const requestData = buildRequestData(data, { requireLogin: true })
+    return wx.cloud.callFunction({ name, data: requestData }).then(res => {
+        const result = res.result || {}
+        if (result.code !== 0) {
+            const error = new Error(result.msg || '请求失败')
+            error.code = result.code
+            error.result = result
+            throw error
+        }
+        return result.data
+    })
 }
 
 module.exports = {

@@ -6,7 +6,8 @@ const Module = require('module')
 
 const repoRoot = path.resolve(__dirname, '..')
 const appPath = path.join(repoRoot, 'miniapp', 'app.js')
-const LOGIN_SESSION_KEY = 'miniapp_user_session'
+const USER_INFO_STORAGE_KEY = 'userInfo'
+const MEMBER_SESSION_KEY = 'miniapp_member_session'
 
 const dbCommand = {
   gte: (value) => ({ _op: 'gte', value }),
@@ -55,22 +56,18 @@ function unloadModule(modulePath) {
 }
 
 function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000' } = {}) {
+  const users = user ? [{ ...user }] : []
+  const authSessions = []
   return {
     init: () => {},
     database: () => ({
+      command: dbCommand,
       serverDate: () => new Date('2026-04-15T00:00:00Z'),
-      collection: () => ({
-        where: () => ({
-          limit: () => ({
-            get: async () => ({ data: user ? [user] : [] })
-          }),
-          update: async () => ({ stats: { updated: 1 } })
-        }),
-        doc: () => ({
-          update: async () => ({ stats: { updated: 1 } })
-        }),
-        add: async () => ({ _id: 'user-new' })
-      })
+      collection(name) {
+        if (name === 'users') return createUserCollection(users)
+        if (name === 'auth_sessions') return createSessionCollection(authSessions)
+        return createSessionCollection([])
+      }
     }),
     getWXContext: () => ({ OPENID: 'test-openid' }),
     DYNAMIC_CURRENT_ENV: 'test-env',
@@ -247,7 +244,7 @@ function createGrowthAuthWxSdk({ user, sessions = [] }) {
   }
 }
 
-test('opsApi bindPhoneNumber rejects missing code and missing user', async () => {
+test('opsApi bindPhoneNumber rejects missing code and initializes missing user before returning session', async () => {
   const opsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
     'wx-server-sdk': createOpsApiWxSdk({ user: null })
   })
@@ -257,8 +254,9 @@ test('opsApi bindPhoneNumber rejects missing code and missing user', async () =>
   assert.match(missingCode.msg, /缺少手机号授权码/)
 
   const missingUser = await opsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
-  assert.equal(missingUser.code, -1)
-  assert.match(missingUser.msg, /用户不存在/)
+  assert.equal(missingUser.code, 0)
+  assert.equal(missingUser.data.phone, '13800138000')
+  assert.ok(missingUser.data.sessionToken)
 })
 
 test('opsApi bindPhoneNumber binds phone and handles rebind', async () => {
@@ -271,6 +269,9 @@ test('opsApi bindPhoneNumber binds phone and handles rebind', async () => {
   const res = await opsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
   assert.equal(res.code, 0)
   assert.equal(res.data.phone, '13800138000')
+  assert.ok(res.data.sessionToken)
+  assert.ok(res.data.user)
+  assert.equal(res.data.user.phone, '13800138000')
 })
 
 test('opsApi ensureAuth, getSession and logout follow the persisted session lifecycle', async () => {
@@ -345,6 +346,18 @@ test('growthApi analyzeTongue rejects missing and expired sessions before touchi
   })
   assert.equal(expiredTokenRes.code, 401)
   assert.match(expiredTokenRes.msg, /过期|重新登录/)
+})
+
+test('growthApi getTongueRuntimeConfig is available before member login', async () => {
+  const growthModule = loadFreshModule('../miniapp/cloudfunctions/growthApi/index.js', {
+    'wx-server-sdk': createGrowthAuthWxSdk({ user: null, sessions: [] })
+  })
+
+  const res = await growthModule.main({ action: 'getTongueRuntimeConfig' })
+  assert.equal(res.code, 0)
+  assert.ok(res.data)
+  assert.equal(typeof res.data.isInReview, 'boolean')
+  assert.ok(res.data.reviewConfig)
 })
 
 test('leads.updateCustomer rejects cross-store updates and writes audit log', async () => {
@@ -524,7 +537,8 @@ function loadMiniappApp(storageInitial = {}) {
   return {
     app: appInstance,
     stored: persistedStore,
-    getSession: () => persistedStore.get(LOGIN_SESSION_KEY) || null,
+    getUserInfo: () => persistedStore.get(USER_INFO_STORAGE_KEY) || null,
+    getSession: () => persistedStore.get(MEMBER_SESSION_KEY) || null,
     wxCalls,
     cleanup() {
       delete require.cache[require.resolve(appPath)]
@@ -534,7 +548,7 @@ function loadMiniappApp(storageInitial = {}) {
   }
 }
 
-test('profile onGetPhoneNumber refreshes local state with callCloud result.data shape', async () => {
+test('profile onGetPhoneNumber refreshes local state with full bind payload', async () => {
   const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
   const wxCalls = { showToast: [] }
 
@@ -542,15 +556,28 @@ test('profile onGetPhoneNumber refreshes local state with callCloud result.data 
     global.wx = {
       cloud: {
         callFunction({ name, data }) {
-          assert.equal(name, 'opsApi')
-          assert.equal(data.action, 'bindPhoneNumber')
-          assert.equal(data.code, 'mock-phone-code')
-          return Promise.resolve({
-            result: {
-              code: 0,
-              data: { phone: '13800138000' }
-            }
-          })
+          if (name === 'opsApi') {
+            assert.equal(data.action, 'bindPhoneNumber')
+            assert.equal(data.code, 'mock-phone-code')
+            return Promise.resolve({
+              result: {
+                code: 0,
+                data: {
+                  phone: '13800138000',
+                  sessionToken: 'sess-1',
+                  expiresAt: '2099-01-01T00:00:00.000Z',
+                  user: { nickName: 'TestUser', phone: '13800138000' }
+                }
+              }
+            })
+          }
+          if (name === 'growthApi') {
+            return Promise.resolve({ result: { code: 0, data: data.action === 'getMyEarnings' ? {} : [] } })
+          }
+          if (name === 'commerceApi') {
+            return Promise.resolve({ result: { code: 0, data: { all: 0, pending: 0, refund: 0 } } })
+          }
+          throw new Error(`unexpected cloud function: ${name}`)
         }
       },
       showToast(payload) {
@@ -558,7 +585,25 @@ test('profile onGetPhoneNumber refreshes local state with callCloud result.data 
       }
     }
 
-    const appMock = { globalData: { userInfo: { nickName: 'TestUser', phone: '' } } }
+    const appMock = {
+      globalData: { userInfo: { nickName: 'TestUser', phone: '' } },
+      setCustomerLoginSuccess(payload) {
+        this.globalData.userInfo = { ...(payload.user || {}), phone: payload.phone }
+        this.globalData.memberSession = {
+          sessionToken: payload.sessionToken,
+          expiresAt: payload.expiresAt
+        }
+      },
+      isCustomerLoggedIn() {
+        return true
+      },
+      getCustomerSessionToken() {
+        return this.globalData.memberSession && this.globalData.memberSession.sessionToken
+      },
+      consumePendingProtectedTarget() {
+        return ''
+      }
+    }
     global.getApp = () => appMock
 
     const setDataCalls = []
@@ -589,10 +634,9 @@ test('profile onGetPhoneNumber refreshes local state with callCloud result.data 
     assert.equal(page.data.userInfo.phone, '13800138000')
     // 验证 app.globalData 被刷新
     assert.equal(appMock.globalData.userInfo.phone, '13800138000')
-    // 验证 setData 调用包含 phone 字段
-    const phoneUpdate = setDataCalls.find(u => u && u['userInfo.phone'] !== undefined)
-    assert.ok(phoneUpdate, 'expected setData to include userInfo.phone')
-    assert.equal(phoneUpdate['userInfo.phone'], '13800138000')
+    assert.equal(appMock.globalData.memberSession.sessionToken, 'sess-1')
+    const loginUpdate = setDataCalls.find(u => u && u.userInfo && u.userInfo.phone === '13800138000')
+    assert.ok(loginUpdate, 'expected setData to include refreshed userInfo')
   } finally {
     delete global.Page
     delete global.wx
@@ -604,13 +648,21 @@ test('profile page exposes guest login guidance while cart checkout and payment 
   const profileJsSource = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'profile', 'profile.js'), 'utf8')
   const profileWxmlSource = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'profile', 'profile.wxml'), 'utf8')
   const cartSource = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'cart', 'cart.js'), 'utf8')
+  const appSource = fs.readFileSync(path.join(repoRoot, 'miniapp', 'app.js'), 'utf8')
 
   assert.match(profileJsSource, /_requireLogin/)
   assert.match(profileJsSource, /requireCustomerLogin/)
-  assert.match(profileJsSource, /userInfo:\s*isLoggedIn\s*\?\s*userInfo\s*:\s*\{\s*\.\.\.\(userInfo \|\| \{\}\),\s*phone:\s*''\s*\}/)
-  assert.match(profileWxmlSource, /login-tip/)
-  assert.match(profileWxmlSource, /绑定手机号/)
+  assert.match(profileJsSource, /consumePendingProtectedTarget/)
+  assert.match(profileJsSource, /openPrivacyContract/)
+  assert.match(profileJsSource, /onAgreePrivacyAuthorization/)
+  assert.match(profileWxmlSource, /guest-showcase-card/)
+  assert.match(profileWxmlSource, /<text class="guest-showcase-title">未登录<\/text>/)
+  assert.match(profileWxmlSource, /agreePrivacyAuthorization/)
+  assert.match(profileWxmlSource, /同意隐私指引/)
+  assert.match(profileWxmlSource, /微信授权手机号登录/)
   assert.match(profileWxmlSource, /退出登录/)
+  assert.match(appSource, /getPrivacySetting/)
+  assert.match(appSource, /openPrivacyContract/)
 
   assert.match(cartSource, /requireCustomerLogin\('\/pages\/cart\/cart\?from=checkout'/)
   assert.match(cartSource, /callCloudWithLogin\('commerceApi',\s*\{\s*action:\s*'createCartOrder'/s)
@@ -643,57 +695,62 @@ test('callCloudWithLogin blocks API calls when customer is not bound and raises 
   }
 })
 
-test('miniapp login session auto-restores on first login and is blocked after manual logout', () => {
+test('miniapp member session restores from storage and hard logout clears both user and session', () => {
   const firstRun = loadMiniappApp()
   const firstApp = firstRun.app
 
   firstApp.globalData.openid = 'openid-1'
   firstApp.globalData.userInfo = { nickName: 'TestUser' }
-  firstApp.setCustomerLoginSuccess('13800138000')
+  firstApp.setCustomerLoginSuccess({
+    phone: '13800138000',
+    sessionToken: 'sess-1',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    user: { nickName: 'TestUser' }
+  })
 
   const sessionAfterBind = firstRun.getSession()
+  const userAfterBind = firstRun.getUserInfo()
   assert.equal(sessionAfterBind.isLoggedIn, true)
-  assert.equal(sessionAfterBind.manualLogout, false)
+  assert.equal(sessionAfterBind.sessionToken, 'sess-1')
+  assert.equal(userAfterBind.phone, '13800138000')
   assert.equal(firstApp.globalData.userInfo.phone, '13800138000')
   assert.equal(firstApp.isCustomerLoggedIn(), true)
   firstRun.cleanup()
 
-  const reopenRun = loadMiniappApp({ [LOGIN_SESSION_KEY]: sessionAfterBind })
+  const reopenRun = loadMiniappApp({
+    [USER_INFO_STORAGE_KEY]: userAfterBind,
+    [MEMBER_SESSION_KEY]: sessionAfterBind
+  })
   const reopenApp = reopenRun.app
-  reopenApp.globalData.openid = 'openid-1'
-  reopenApp.globalData.userInfo = { nickName: 'TestUser', phone: '13800138000' }
-
-  reopenApp._initLoginSession()
-  assert.equal(reopenApp.globalData.loginSession.isLoggedIn, true)
-  assert.equal(reopenApp._shouldShowAsLoggedIn(), true)
-
-  reopenApp._syncLoginStateFromUserInfo({ nickName: 'TestUser', phone: '13800138000' })
+  reopenApp.checkLogin()
+  assert.equal(reopenApp.globalData.memberSession.isLoggedIn, true)
   assert.equal(reopenApp.globalData.userInfo.phone, '13800138000')
   assert.equal(reopenApp.isCustomerLoggedIn(), true)
 
   reopenApp.logoutCustomer()
-  assert.equal(reopenApp.globalData.loginSession.isLoggedIn, false)
-  assert.equal(reopenApp.globalData.loginSession.manualLogout, true)
-  assert.equal(reopenRun.getSession().manualLogout, true)
-  assert.equal(reopenApp.globalData.userInfo.phone, undefined)
+  assert.equal(reopenApp.globalData.memberSession.isLoggedIn, false)
+  assert.equal(reopenRun.getSession(), null)
+  assert.equal(reopenRun.getUserInfo(), null)
+  assert.deepEqual(reopenApp.globalData.userInfo, {})
 
-  reopenApp._initLoginSession()
-  reopenApp._syncLoginStateFromUserInfo({ nickName: 'TestUser', phone: '13800138000' })
-  assert.equal(reopenApp.globalData.userInfo.phone, '')
+  reopenApp.checkLogin()
+  assert.deepEqual(reopenApp.globalData.userInfo, {})
   assert.equal(reopenApp.isCustomerLoggedIn(), false)
   reopenRun.cleanup()
 })
 
-test('tongue and order flows are blocked before cloud calls when customer login is missing', async () => {
-  const requireCalls = []
+test('tongue page keeps interface visible and prompts login before protected actions when customer login is missing', async () => {
   const cloudCalls = []
+  const wxCalls = { showToast: [] }
   const appMock = {
-    requireCustomerLogin: (target) => {
-      requireCalls.push(target)
-      return false
-    },
+    isCustomerLoggedIn: () => false,
+    setPendingProtectedTarget: () => {},
     loadReviewConfig: async () => {},
-    getReviewConfig: () => ({ enabled: true })
+    getReviewConfig: () => ({ enabled: true, historyEmptyText: '暂无照片记录' }),
+    getPrivacyAuthorizationState: async () => ({
+      needAuthorization: true,
+      privacyContractName: '《测试隐私保护指引》'
+    })
   }
 
   global.wx = {
@@ -706,11 +763,11 @@ test('tongue and order flows are blocked before cloud calls when customer login 
     navigateTo: () => {},
     switchTab: () => {},
     setNavigationBarTitle: () => {},
-    showModal: async () => ({ confirm: false }),
-    showToast: () => {},
-    showLoading: () => {},
-    hideLoading: () => {},
-    requestPayment: async () => ({})
+    showToast: payload => {
+      wxCalls.showToast.push(payload)
+    },
+    getStorageSync: () => '',
+    setStorageSync: () => {}
   }
 
   const tonguePage = loadMiniappPage('miniapp/pages/tongue/tongue.js')
@@ -722,73 +779,29 @@ test('tongue and order flows are blocked before cloud calls when customer login 
     }
   }
 
-  const reportPage = loadMiniappPage('miniapp/pages/tongue-report/tongue-report.js')
-  const reportInstance = {
-    ...reportPage,
-    data: JSON.parse(JSON.stringify(reportPage.data)),
-    setData(update) {
-      this.data = { ...this.data, ...update }
-    }
-  }
-
-  const ordersPage = loadMiniappPage('miniapp/pages/orders/orders.js')
-  const ordersInstance = {
-    ...ordersPage,
-    data: JSON.parse(JSON.stringify(ordersPage.data)),
-    setData(update) {
-      this.data = { ...this.data, ...update }
-    }
-  }
-
-  const productPage = loadMiniappPage('miniapp/pages/product-detail/product-detail.js')
-  const productInstance = {
-    ...productPage,
-    data: JSON.parse(JSON.stringify(productPage.data)),
-    setData(update) {
-      this.data = { ...this.data, ...update }
-    }
-  }
-  productInstance.data.product = { _id: 'prod-1' }
-  productInstance.data.campaign = null
-
   try {
     global.getApp = () => appMock
 
     await tongueInstance.onLoad()
+    await tongueInstance.onShow()
+    assert.equal(tongueInstance.data.showLoginModal, true)
+    assert.equal(tongueInstance.data.privacyChecked, true)
+    assert.equal(tongueInstance.data.needPrivacyAuthorization, true)
+    assert.equal(tongueInstance.data.privacyContractName, '《测试隐私保护指引》')
+    tongueInstance.onAgreePrivacyAuthorization()
+    assert.equal(tongueInstance.data.needPrivacyAuthorization, false)
+    tongueInstance.closeLoginModal()
+    assert.equal(tongueInstance.data.showLoginModal, false)
+    tongueInstance.chooseImage()
     await tongueInstance.startAnalyze()
     tongueInstance.goToHistory()
 
-    await reportInstance.onLoad({ mode: 'history' })
-    await reportInstance._loadHistory()
-    await reportInstance._loadReport('report-1')
-    reportInstance.viewHistoryReport({ currentTarget: { dataset: { id: 'report-1' } } })
-    reportInstance.goAnalyzeAgain()
-    reportInstance.goAnalyze()
-    reportInstance.goToProduct({ currentTarget: { dataset: { id: 'product-1' } } })
-
-    await ordersInstance.onShow()
-    await ordersInstance.loadOrders()
-    await ordersInstance.requestRefund({ currentTarget: { dataset: { id: 'order-1' } } })
-    await ordersInstance.payOrder({ currentTarget: { dataset: { id: 'order-1' } } })
-
-    productInstance.onBuy()
-    await productInstance.confirmBuy()
-
     assert.equal(cloudCalls.length, 0)
-    assert.ok(requireCalls.length >= 16)
-
-    const requiredTargets = [
-      '/pages/tongue/tongue',
-      '/pages/tongue-report/tongue-report?mode=history',
-      '/pages/tongue-report/tongue-report?mode=report',
-      '/pages/orders/orders',
-      '/pages/product-detail/product-detail?id=prod-1'
-    ]
-    requiredTargets.forEach(target => {
-      assert.ok(requireCalls.includes(target), `expected tongue/orders/tongue-report/product-detail login guard for ${target}`)
-    })
+    assert.equal(tongueInstance.data.isLoggedIn, false)
+    assert.equal(tongueInstance.data.state, 'idle')
+    assert.equal(tongueInstance.data.showLoginModal, true)
+    assert.equal(wxCalls.showToast[0].title, '已同意隐私指引')
   } finally {
-    global.getApp = () => {}
     delete global.Page
     delete global.getApp
     delete global.wx

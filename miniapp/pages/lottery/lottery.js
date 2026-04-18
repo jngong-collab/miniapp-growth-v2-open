@@ -47,10 +47,18 @@ Page({
     },
 
     onLoad() {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/lottery/lottery', { content: '抽奖需要先绑定手机号' })) {
+            return
+        }
         this.loadLotteryHome()
     },
 
     onShow() {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/lottery/lottery', { content: '抽奖需要先绑定手机号' })) {
+            return
+        }
         this.loadLotteryHome()
     },
 
@@ -80,6 +88,10 @@ Page({
     },
 
     async startLottery() {
+        const app = getApp()
+        if (!app.requireCustomerLogin('/pages/lottery/lottery', { content: '抽奖需要先绑定手机号' })) {
+            return
+        }
         if (this.data.isRunning) return
         if (this.data.remainChances <= 0) {
             wx.showToast({ title: '今日次数已用完，明天再来~', icon: 'none' })

@@ -129,4 +129,56 @@
       </view>
     </block>
   </view>
+
+  <view class="modal-mask {{showLoginModal ? 'modal-show' : ''}}" bindtap="closeLoginModal" wx:if="{{showLoginModal}}">
+    <view class="modal-content tongue-auth-modal content-show" catchtap>
+      <view class="modal-close-round" bindtap="closeLoginModal">✕</view>
+
+      <view class="auth-header-visual">
+        <view class="floating-icon">{{isReviewMode ? '👶' : '🌿'}}</view>
+      </view>
+
+      <view class="auth-body">
+        <text class="auth-m-title">{{isReviewMode ? '登录后记录宝宝日常' : '登录后使用 AI 舌象'}}</text>
+        <text class="auth-m-desc">{{isReviewMode ? '授权手机号后，可保存宝宝日常照片记录并查看历史。' : '授权手机号后，可拍照分析并查看历史舌象报告。'}}</text>
+
+        <block wx:if="{{!privacyChecked}}">
+          <view class="auth-privacy-box auth-privacy-loading">
+            <text class="auth-privacy-title">正在检查隐私授权状态…</text>
+            <text class="auth-privacy-desc">首次使用手机号登录前，需要先确认微信侧的隐私授权状态。</text>
+          </view>
+        </block>
+        <block wx:elif="{{needPrivacyAuthorization}}">
+          <view class="auth-privacy-box">
+            <text class="auth-privacy-title">使用前请先阅读并同意隐私指引</text>
+            <text class="auth-privacy-desc">首次使用当前功能前，请先查看并同意{{privacyContractName}}。</text>
+
+            <button class="tongue-privacy-link" bindtap="openPrivacyContract">查看{{privacyContractName}}</button>
+            <button
+              id="tongue-privacy-agree-btn"
+              class="tongue-privacy-agree"
+              open-type="agreePrivacyAuthorization"
+              bindagreeprivacyauthorization="onAgreePrivacyAuthorization"
+            >
+              同意隐私指引
+            </button>
+          </view>
+        </block>
+        <button
+          wx:else
+          class="tongue-login-action"
+          open-type="getPhoneNumber"
+          bind:getphonenumber="onGetPhoneNumber"
+          loading="{{loggingIn}}"
+        >
+          {{loggingIn ? '登录中...' : '授权手机号安全登录'}}
+        </button>
+
+        <view class="auth-safe-tip">
+          <text class="safe-icon">🔒</text>
+          <text>仅用于同步会员身份、历史记录与订单信息</text>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>

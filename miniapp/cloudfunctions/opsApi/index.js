@@ -164,7 +164,7 @@ async function getSession(event, openid) {
 }
 
 async function bindPhoneNumber(event, openid) {
-    const loginRes = await loginWithPhone(event, openid, { includeUser: false, includeSession: true })
+    const loginRes = await loginWithPhone(event, openid, { includeUser: true, includeSession: true })
     if (loginRes.code) return loginRes
 
     return {
@@ -173,7 +173,8 @@ async function bindPhoneNumber(event, openid) {
         data: {
             phone: loginRes.data.phone,
             sessionToken: loginRes.data.sessionToken,
-            expiresAt: loginRes.data.expiresAt
+            expiresAt: loginRes.data.expiresAt,
+            user: loginRes.data.user || null
         }
     }
 }
@@ -249,6 +250,9 @@ async function loginWithPhone(event, openid, options = {}) {
         payload.user = {
             _id: latestUser._id || '',
             _openid: latestUser._openid || openid,
+            nickName: latestUser.nickName || '',
+            avatarUrl: latestUser.avatarUrl || '',
+            storeId: latestUser.storeId || '',
             phone: latestUser.phone || '',
             phoneBoundAt: latestUser.phoneBoundAt || '',
             profileCompleted: latestUser.profileCompleted === true,

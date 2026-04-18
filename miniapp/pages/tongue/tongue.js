@@ -1,9 +1,15 @@
 // pages/tongue/tongue.js
 const config = require('../../config')
-const { callCloud } = require('../../utils/cloud-api')
+const { callCloud, callCloudWithLogin } = require('../../utils/cloud-api')
 
 Page({
     data: {
+        isLoggedIn: false,
+        showLoginModal: false,
+        loggingIn: false,
+        privacyChecked: false,
+        needPrivacyAuthorization: false,
+        privacyContractName: '《用户隐私保护指引》',
         state: 'idle',    // 'idle' | 'preview' | 'analyzing'
         selectedImage: '',
         uploadedFileId: '',
@@ -25,11 +31,10 @@ Page({
 
     onLoad: async function () {
         await this._syncReviewConfig()
-        const app = getApp()
-        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
-            return
+        this._syncLoginState()
+        if (this.data.isLoggedIn) {
+            this._loadHistory()
         }
-        this._loadHistory()
         // 读取上次保存的宝宝信息
         const savedAge = wx.getStorageSync('tongue_baby_age_index')
         const savedGender = wx.getStorageSync('tongue_baby_gender')
@@ -41,18 +46,63 @@ Page({
         }
     },
 
-    onShow: function () {
-        const app = getApp()
-        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
-            return
-        }
+    onShow: async function () {
+        await this._syncReviewConfig()
+        this._syncLoginState()
         // 从报告页返回时，重置状态
         if (this._analysisCompleted) {
             this._analysisCompleted = false
             this.setData({ state: 'idle', selectedImage: '' })
-            this._loadHistory()
+            if (this.data.isLoggedIn) {
+                this._loadHistory()
+            }
         }
-        this._syncReviewConfig()
+        if (!this.data.isLoggedIn) {
+            await this._refreshPrivacyState()
+            this._promptLoginForGuest()
+        }
+    },
+
+    onHide: function () {
+        this._guestPromptShown = false
+        this.setData({ showLoginModal: false, loggingIn: false })
+    },
+
+    _syncLoginState: function () {
+        const app = getApp()
+        const isLoggedIn = app.isCustomerLoggedIn ? app.isCustomerLoggedIn() : false
+        this.setData({ isLoggedIn })
+        if (!isLoggedIn) {
+            this.setData({
+                showLoginModal: this.data.showLoginModal && !isLoggedIn,
+                state: 'idle',
+                selectedImage: '',
+                uploadedFileId: '',
+                historyCount: 0,
+                historyText: this._buildHistoryText(0, false)
+            })
+            return
+        }
+        this._guestPromptShown = false
+    },
+
+    _refreshPrivacyState: async function () {
+        const app = getApp()
+        if (!app || typeof app.getPrivacyAuthorizationState !== 'function') {
+            this.setData({
+                privacyChecked: true,
+                needPrivacyAuthorization: false,
+                privacyContractName: '《用户隐私保护指引》'
+            })
+            return
+        }
+
+        const privacyState = await app.getPrivacyAuthorizationState()
+        this.setData({
+            privacyChecked: true,
+            needPrivacyAuthorization: !!privacyState.needAuthorization,
+            privacyContractName: privacyState.privacyContractName || '《用户隐私保护指引》'
+        })
     },
 
     _syncReviewConfig: async function () {
@@ -72,9 +122,7 @@ Page({
             reviewConfig,
             isReviewMode,
             stepLabels,
-            historyText: this.data.historyCount > 0
-                ? `${historyLabel} (${this.data.historyCount})`
-                : emptyLabel,
+            historyText: this._buildHistoryText(this.data.historyCount, this.data.isLoggedIn, historyLabel, emptyLabel),
             primaryActionText: isReviewMode ? reviewConfig.previewPrimaryText : '开始 AI 分析',
             analyzingTitle: isReviewMode ? reviewConfig.analyzingTitle : '正在深度解析舌象特征',
             analyzingSubtitle: isReviewMode ? reviewConfig.analyzingSubtitle : '结合中医体质理论进行推演…'
@@ -85,20 +133,140 @@ Page({
         })
     },
 
+    _buildHistoryText: function (historyCount, isLoggedIn, historyLabel, emptyLabel) {
+        const safeHistoryLabel = historyLabel || (this.data.isReviewMode ? this.data.reviewConfig.historyLinkText : '查看历史报告')
+        const safeEmptyLabel = emptyLabel || (this.data.isReviewMode ? this.data.reviewConfig.historyEmptyText : '暂无历史报告')
+        if (!isLoggedIn) {
+            return this.data.isReviewMode ? '登录后查看照片记录' : '登录后查看历史报告'
+        }
+        return historyCount > 0 ? `${safeHistoryLabel} (${historyCount})` : safeEmptyLabel
+    },
+
+    _promptLoginForGuest: function (force = false) {
+        if (this.data.isLoggedIn) {
+            return true
+        }
+        if (this._guestPromptShown && !force) {
+            return false
+        }
+        this._guestPromptShown = true
+        const app = getApp()
+        if (app && typeof app.setPendingProtectedTarget === 'function') {
+            app.setPendingProtectedTarget('/pages/tongue/tongue')
+        }
+        this.setData({
+            showLoginModal: true
+        })
+        return false
+    },
+
+    _ensureCustomerLogin: function () {
+        if (this.data.isLoggedIn) {
+            return true
+        }
+        return this._promptLoginForGuest(true)
+    },
+
+    closeLoginModal: function () {
+        this.setData({ showLoginModal: false })
+    },
+
+    openPrivacyContract: async function () {
+        const app = getApp()
+        if (!app || typeof app.openPrivacyContract !== 'function') {
+            wx.showToast({ title: '当前版本暂不支持查看隐私指引', icon: 'none' })
+            return
+        }
+
+        try {
+            await app.openPrivacyContract()
+        } catch (error) {
+            wx.showToast({ title: '打开隐私指引失败', icon: 'none' })
+        }
+    },
+
+    onAgreePrivacyAuthorization: function () {
+        this.setData({
+            privacyChecked: true,
+            needPrivacyAuthorization: false
+        })
+        wx.showToast({ title: '已同意隐私指引', icon: 'success' })
+    },
+
+    onGetPhoneNumber: async function (e) {
+        if (!this.data.privacyChecked) {
+            await this._refreshPrivacyState().catch(() => {})
+        }
+        if (this.data.needPrivacyAuthorization) {
+            wx.showToast({ title: '请先阅读并同意隐私指引', icon: 'none' })
+            return
+        }
+        if (e.detail.errMsg && e.detail.errMsg.includes('fail')) {
+            wx.showToast({ title: '授权失败', icon: 'none' })
+            return
+        }
+        if (!e.detail.code) {
+            wx.showToast({ title: '未获取到授权码', icon: 'none' })
+            return
+        }
+
+        try {
+            this.setData({ loggingIn: true })
+            const res = await callCloud('opsApi', {
+                action: 'bindPhoneNumber',
+                code: e.detail.code
+            })
+            const phone = res?.phone || ''
+            const sessionToken = res?.sessionToken || ''
+            const expiresAt = res?.expiresAt || ''
+            const user = res?.user || {}
+            const app = getApp()
+            if (!phone || !sessionToken) {
+                wx.showToast({ title: '绑定失败', icon: 'none' })
+                return
+            }
+            if (app.setCustomerLoginSuccess) {
+                app.setCustomerLoginSuccess({
+                    phone,
+                    sessionToken,
+                    expiresAt,
+                    user
+                })
+            }
+            this._syncLoginState()
+            this.setData({
+                showLoginModal: false,
+                loggingIn: false,
+                privacyChecked: true,
+                needPrivacyAuthorization: false
+            })
+            await this._loadHistory()
+            wx.showToast({ title: '登录成功', icon: 'success' })
+            const target = app.consumePendingProtectedTarget ? app.consumePendingProtectedTarget() : ''
+            if (target && target !== '/pages/tongue/tongue' && typeof app._navigateToPageOrTab === 'function') {
+                app._navigateToPageOrTab(target)
+            }
+        } catch (error) {
+            this.setData({ loggingIn: false })
+            wx.showToast({ title: error.message || '绑定失败', icon: 'none' })
+        }
+    },
+
     // 加载历史记录数量
     _loadHistory: async function () {
         try {
-            const history = await callCloud('growthApi', { action: 'getTongueHistory' })
+            const history = await callCloudWithLogin('growthApi', { action: 'getTongueHistory' })
             const historyCount = history.length
-            const historyText = historyCount > 0
-                ? `${this.data.isReviewMode ? this.data.reviewConfig.historyLinkText : '查看历史报告'} (${historyCount})`
-                : (this.data.isReviewMode ? this.data.reviewConfig.historyEmptyText : '暂无历史报告')
+            const historyText = this._buildHistoryText(historyCount, true)
             this.setData({ historyCount, historyText })
         } catch (e) { /* ignore */ }
     },
 
     // 选择/拍摄图片
     chooseImage: function () {
+        if (!this._ensureCustomerLogin()) {
+            return
+        }
         wx.chooseMedia({
             count: 1,
             mediaType: ['image'],
@@ -143,8 +311,7 @@ Page({
 
     // 开始分析 / 保存记录
     startAnalyze: async function () {
-        const app = getApp()
-        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
+        if (!this._ensureCustomerLogin()) {
             return
         }
         this.setData({ state: 'analyzing', step: 0 })
@@ -171,7 +338,7 @@ Page({
             }
 
             // 步骤 4：生成建议（调云函数）
-            const analyzeRes = await callCloud('growthApi', {
+            const analyzeRes = await callCloudWithLogin('growthApi', {
                 action: 'analyzeTongue',
                 imageFileId: fileId,
                 babyAge: this.data.ageIndex >= 0 ? this.data.ageList[this.data.ageIndex] : '',
@@ -206,8 +373,7 @@ Page({
 
     // 去历史记录页
     goToHistory: function () {
-        const app = getApp()
-        if (!app.requireCustomerLogin('/pages/tongue/tongue', { content: 'AI 舌象需要先绑定手机号' })) {
+        if (!this._ensureCustomerLogin()) {
             return
         }
         wx.navigateTo({ url: '/pages/tongue-report/tongue-report?mode=history' })

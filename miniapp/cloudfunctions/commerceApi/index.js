@@ -59,6 +59,8 @@ async function getProductDetail(event) {
         db.collection('packages').where({ productId }).limit(1).get().catch(() => ({ data: [] }))
     ])
 
+    product = await resolveProductImages(product)
+
     return {
         code: 0,
         data: {
@@ -66,6 +68,29 @@ async function getProductDetail(event) {
             campaign: campaignsRes.data[0] || null,
             packageDetail: packageRes.data[0] || null
         }
+    }
+}
+
+async function resolveProductImages(product) {
+    if (!product || !Array.isArray(product.images) || !product.images.length) return product
+    const cloudImages = product.images.filter(item => item && String(item).startsWith('cloud://'))
+    if (!cloudImages.length) return product
+
+    try {
+        const res = await cloud.getTempFileURL({ fileList: [...new Set(cloudImages)] })
+        const fileMap = (res.fileList || []).reduce((acc, item) => {
+            if (item.fileID && item.tempFileURL) {
+                acc[item.fileID] = item.tempFileURL
+            }
+            return acc
+        }, {})
+        return {
+            ...product,
+            images: product.images.map(item => fileMap[item] || item)
+        }
+    } catch (error) {
+        console.error('commerceApi 转换商品图片失败:', error)
+        return product
     }
 }
 

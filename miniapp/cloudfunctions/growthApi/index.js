@@ -164,10 +164,7 @@ async function drawLottery(openid, event = {}) {
 }
 
 async function getTongueRuntimeConfig(openid, event = {}) {
-    const auth = await ensureAuth(openid, event)
-    if (auth.code) return auth
-
-    const runtime = await loadTongueRuntime(openid, event, auth.user)
+    const runtime = await loadTongueRuntime(openid, event, null)
     return {
         code: 0,
         data: {
@@ -471,20 +468,21 @@ async function resolveUserStoreId({ openid, invitedBy = '', currentUser = null }
 }
 
 function sanitizeReviewConfig(reviewConfig = {}) {
+    const safeReviewConfig = reviewConfig && typeof reviewConfig === 'object' ? reviewConfig : {}
     return {
-        enabled: reviewConfig.enabled === true,
-        entryTitle: String(reviewConfig.entryTitle || '').trim(),
-        pageTitle: String(reviewConfig.pageTitle || '').trim(),
-        historyTitle: String(reviewConfig.historyTitle || '').trim(),
-        reportTitle: String(reviewConfig.reportTitle || '').trim(),
-        submitText: String(reviewConfig.submitText || '').trim(),
-        shareTitle: String(reviewConfig.shareTitle || '').trim(),
-        emptyText: String(reviewConfig.emptyText || '').trim(),
-        listTagText: String(reviewConfig.listTagText || '').trim(),
-        safeBannerUrl: String(reviewConfig.safeBannerUrl || '').trim(),
-        safeShareImageUrl: String(reviewConfig.safeShareImageUrl || '').trim(),
-        hideHistoryAiRecords: reviewConfig.hideHistoryAiRecords !== false,
-        allowReanalyzeAfterReview: reviewConfig.allowReanalyzeAfterReview !== false
+        enabled: safeReviewConfig.enabled === true,
+        entryTitle: String(safeReviewConfig.entryTitle || '').trim(),
+        pageTitle: String(safeReviewConfig.pageTitle || '').trim(),
+        historyTitle: String(safeReviewConfig.historyTitle || '').trim(),
+        reportTitle: String(safeReviewConfig.reportTitle || '').trim(),
+        submitText: String(safeReviewConfig.submitText || '').trim(),
+        shareTitle: String(safeReviewConfig.shareTitle || '').trim(),
+        emptyText: String(safeReviewConfig.emptyText || '').trim(),
+        listTagText: String(safeReviewConfig.listTagText || '').trim(),
+        safeBannerUrl: String(safeReviewConfig.safeBannerUrl || '').trim(),
+        safeShareImageUrl: String(safeReviewConfig.safeShareImageUrl || '').trim(),
+        hideHistoryAiRecords: safeReviewConfig.hideHistoryAiRecords !== false,
+        allowReanalyzeAfterReview: safeReviewConfig.allowReanalyzeAfterReview !== false
     }
 }
 
