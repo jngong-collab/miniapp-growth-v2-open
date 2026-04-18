@@ -74,8 +74,17 @@ exports.main = async (event) => {
     let deleted = 0
     let pkgDeleted = 0
     for (const p of staleProducts.data) {
-      await db.collection('products').doc(p._id).remove()
-      deleted++
+      // 检查是否有历史订单引用，避免破坏订单数据完整性
+      const orderItemsRef = await db.collection('order_items').where({ productId: p._id }).limit(1).get()
+      if (orderItemsRef.data.length > 0) {
+        // 有历史订单引用，标记为归档而非物理删除
+        await db.collection('products').doc(p._id).update({
+          data: { status: 'archived', updatedAt: db.serverDate() }
+        })
+      } else {
+        await db.collection('products').doc(p._id).remove()
+        deleted++
+      }
       // 同步删除对应套餐明细
       const stalePkgs = await db.collection('packages').where({ productId: p._id }).get()
       for (const sp of stalePkgs.data) {

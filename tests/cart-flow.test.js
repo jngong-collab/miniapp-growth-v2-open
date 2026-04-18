@@ -220,6 +220,12 @@ test('cart checkout keeps selected items when payment setup fails after order cr
   }
 
   global.getApp = () => ({
+    isCustomerLoggedIn() {
+      return true
+    },
+    getCustomerSessionToken() {
+      return 'sess-cart-checkout'
+    },
     globalData: {
       openid: 'user-openid'
     }

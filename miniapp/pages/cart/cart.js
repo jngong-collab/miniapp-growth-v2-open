@@ -23,6 +23,11 @@ Page({
         this.loadCart()
     },
 
+    onUnload() {
+        if (this._redirectTimer) clearTimeout(this._redirectTimer)
+        if (this._navigateTimer) clearTimeout(this._navigateTimer)
+    },
+
     loadCart() {
         const items = getCartItems()
         const summary = getCartSummary(items.filter(item => item.checked))
@@ -145,7 +150,7 @@ Page({
             removeCartItems(checkoutItems.map(item => item.productId))
             this.loadCart()
             wx.showToast({ title: '支付成功', icon: 'success', duration: 2000 })
-            setTimeout(() => {
+            this._redirectTimer = setTimeout(() => {
                 wx.redirectTo({ url: '/pages/orders/orders?status=paid' })
             }, 1200)
         } catch (error) {
@@ -153,7 +158,7 @@ Page({
             const errMsg = String(error.errMsg || error.message || '').toLowerCase()
             if (errMsg.includes('cancel') || errMsg.includes('用户取消')) {
                 wx.showToast({ title: '已取消支付，可在订单页继续支付', icon: 'none', duration: 2500 })
-                setTimeout(() => {
+                this._navigateTimer = setTimeout(() => {
                     wx.navigateTo({ url: '/pages/orders/orders?status=pending' })
                 }, 800)
                 return

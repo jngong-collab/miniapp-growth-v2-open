@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, DatePicker, Descriptions, Input, Select, Space, Table, Tag, Typography } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { adminApi } from '../lib/admin-api'
 import type {
@@ -248,7 +249,7 @@ export function VerificationPage() {
     }
   })
 
-  const handleQuery = (input?: string) => {
+  const handleQuery = useCallback((input?: string) => {
     const trimmedCode = (input ?? verifyCode).trim()
     if (!trimmedCode) {
       message.warning('请输入核销码后再查询')
@@ -257,7 +258,7 @@ export function VerificationPage() {
 
     setVerifyCode(trimmedCode)
     queryMutation.mutate(trimmedCode)
-  }
+  }, [verifyCode, message, queryMutation])
 
   const handleVerify = () => {
     if (!lookup) {
@@ -276,11 +277,11 @@ export function VerificationPage() {
     })
   }
 
-  const jumpToVerification = (item: VerificationQueueItem) => {
+  const jumpToVerification = useCallback((item: VerificationQueueItem) => {
     setVerifyCode(item.verifyCode)
     queryCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     handleQuery(item.verifyCode)
-  }
+  }, [handleQuery])
 
   const applyPendingSearch = () => {
     setPendingFilters(prev => ({
@@ -299,6 +300,89 @@ export function VerificationPage() {
       page: 1
     }))
   }
+
+  const pendingColumns = useMemo((): ColumnsType<VerificationQueueItem> => [
+    { title: '订单号', dataIndex: 'orderNo', width: 180 },
+    {
+      title: '用户',
+      dataIndex: 'userLabel',
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span>{record.userLabel}</span>
+          <Typography.Text type="secondary">{record.userPhone || '未留手机号'}</Typography.Text>
+        </Space>
+      )
+    },
+    {
+      title: '商品',
+      dataIndex: 'productName',
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <span>{record.productName}</span>
+          <Typography.Text type="secondary">
+            {record.productType === 'package' ? '套餐服务' : '单次服务'}
+          </Typography.Text>
+        </Space>
+      )
+    },
+    { title: '核销码', dataIndex: 'verifyCode', width: 120 },
+    { title: '待核销内容', dataIndex: 'pendingSummary' },
+    {
+      title: '状态',
+      dataIndex: 'verificationStatus',
+      width: 120,
+      render: (_, record) => getVerificationStatusTag(record.verificationStatus, record.verificationStatusLabel)
+    },
+    {
+      title: '有效期',
+      dataIndex: 'packageExpireAt',
+      width: 160,
+      render: (value) => formatDateText(value)
+    },
+    { title: '下单时间', dataIndex: 'createdAtText', width: 160 },
+    {
+      title: '操作',
+      dataIndex: 'action',
+      width: 140,
+      render: (_, record) => (
+        <Button type="link" onClick={() => jumpToVerification(record)}>
+          使用该核销码
+        </Button>
+      )
+    }
+  ], [jumpToVerification])
+
+  const recordColumns = useMemo((): ColumnsType<VerificationRecord> => [
+    { title: '核销时间', dataIndex: 'createdAtText', width: 160 },
+    { title: '订单号', dataIndex: 'orderNo', width: 180 },
+    { title: '商品', dataIndex: 'productName' },
+    { title: '服务项目', dataIndex: 'serviceName', width: 160 },
+    { title: '核销码', dataIndex: 'verifyCode', width: 120 },
+    { title: '用户', dataIndex: 'userLabel', width: 140 },
+    {
+      title: '当前状态',
+      dataIndex: 'verificationStatus',
+      width: 120,
+      render: (_, record) => getVerificationStatusTag(record.verificationStatus, record.verificationStatusLabel)
+    },
+    {
+      title: '操作人',
+      dataIndex: 'operatorOpenid',
+      width: 180,
+      render: (value) => value || '系统'
+    }
+  ], [])
+
+  const packageColumns = useMemo((): ColumnsType<PackageServiceOption> => [
+    { title: '服务项目', dataIndex: 'value' },
+    { title: '套餐次数', dataIndex: 'totalCount', width: 120 },
+    {
+      title: '剩余次数',
+      dataIndex: 'remainingCount',
+      width: 120,
+      render: (value: number | null) => (value ?? 0)
+    }
+  ], [])
 
   return (
     <div className="page-stack">
@@ -372,56 +456,7 @@ export function VerificationPage() {
               }))
             }}
             dataSource={pendingQuery.data?.list || []}
-            columns={[
-              { title: '订单号', dataIndex: 'orderNo', width: 180 },
-              {
-                title: '用户',
-                dataIndex: 'userLabel',
-                render: (_, record) => (
-                  <Space direction="vertical" size={0}>
-                    <span>{record.userLabel}</span>
-                    <Typography.Text type="secondary">{record.userPhone || '未留手机号'}</Typography.Text>
-                  </Space>
-                )
-              },
-              {
-                title: '商品',
-                dataIndex: 'productName',
-                render: (_, record) => (
-                  <Space direction="vertical" size={0}>
-                    <span>{record.productName}</span>
-                    <Typography.Text type="secondary">
-                      {record.productType === 'package' ? '套餐服务' : '单次服务'}
-                    </Typography.Text>
-                  </Space>
-                )
-              },
-              { title: '核销码', dataIndex: 'verifyCode', width: 120 },
-              { title: '待核销内容', dataIndex: 'pendingSummary' },
-              {
-                title: '状态',
-                dataIndex: 'verificationStatus',
-                width: 120,
-                render: (_, record) => getVerificationStatusTag(record.verificationStatus, record.verificationStatusLabel)
-              },
-              {
-                title: '有效期',
-                dataIndex: 'packageExpireAt',
-                width: 160,
-                render: value => formatDateText(value)
-              },
-              { title: '下单时间', dataIndex: 'createdAtText', width: 160 },
-              {
-                title: '操作',
-                dataIndex: 'action',
-                width: 140,
-                render: (_, record) => (
-                  <Button type="link" onClick={() => jumpToVerification(record)}>
-                    使用该核销码
-                  </Button>
-                )
-              }
-            ]}
+            columns={pendingColumns}
             locale={{ emptyText: '当前没有待核销服务' }}
           />
         </Space>
@@ -482,26 +517,7 @@ export function VerificationPage() {
               }))
             }}
             dataSource={recordsQuery.data?.list || []}
-            columns={[
-              { title: '核销时间', dataIndex: 'createdAtText', width: 160 },
-              { title: '订单号', dataIndex: 'orderNo', width: 180 },
-              { title: '商品', dataIndex: 'productName' },
-              { title: '服务项目', dataIndex: 'serviceName', width: 160 },
-              { title: '核销码', dataIndex: 'verifyCode', width: 120 },
-              { title: '用户', dataIndex: 'userLabel', width: 140 },
-              {
-                title: '当前状态',
-                dataIndex: 'verificationStatus',
-                width: 120,
-                render: (_, record) => getVerificationStatusTag(record.verificationStatus, record.verificationStatusLabel)
-              },
-              {
-                title: '操作人',
-                dataIndex: 'operatorOpenid',
-                width: 180,
-                render: value => value || '系统'
-              }
-            ]}
+            columns={recordColumns}
             locale={{ emptyText: '当前没有履约记录' }}
           />
         </Space>
@@ -562,16 +578,7 @@ export function VerificationPage() {
                     rowKey="value"
                     pagination={false}
                     dataSource={packageServiceOptions}
-                    columns={[
-                      { title: '服务项目', dataIndex: 'value' },
-                      { title: '套餐次数', dataIndex: 'totalCount', width: 120 },
-                      {
-                        title: '剩余次数',
-                        dataIndex: 'remainingCount',
-                        width: 120,
-                        render: (value: number | null) => (value ?? 0)
-                      }
-                    ]}
+                    columns={packageColumns}
                   />
                 </>
               ) : (

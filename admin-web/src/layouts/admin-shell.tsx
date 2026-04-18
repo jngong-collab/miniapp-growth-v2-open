@@ -58,7 +58,7 @@ export function AdminShell() {
     const routePermissions = sessionQuery.data?.routePermissions || {}
     return menuItems
       .filter(item => permissions.includes(routePermissions[item.key] || item.permission))
-      .map(({ permission: _permission, ...item }) => item)
+      .map(item => ({ key: item.key, label: item.label, icon: item.icon }))
   }, [sessionQuery.data?.permissions, sessionQuery.data?.routePermissions])
 
   if (sessionQuery.isLoading) {

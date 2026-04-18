@@ -1,42 +1,111 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Space, Switch, Typography } from 'antd'
 import L from 'leaflet'
 import { adminApi } from '../lib/admin-api'
 import { getTempFileUrl, uploadFileToCloud } from '../lib/cloudbase'
+import type { AiConfig, ReviewConfig } from '../types/admin'
 
 const DEFAULT_MAP_CENTER: [number, number] = [23.1291, 113.2644]
+const DEFAULT_REVIEW_CONFIG: ReviewConfig = {
+  enabled: false,
+  entryTitle: '宝宝日常',
+  pageTitle: '宝宝日常',
+  historyTitle: '成长记录',
+  reportTitle: '记录详情',
+  submitText: '保存本次记录',
+  shareTitle: '记录宝宝健康每一天',
+  emptyText: '暂无成长记录',
+  listTagText: '待AI分析',
+  safeBannerUrl: '/assets/images/baby-massage.png',
+  safeShareImageUrl: '/assets/images/baby-massage.png',
+  hideHistoryAiRecords: true,
+  allowReanalyzeAfterReview: true
+}
+
+type AiBaseFormValues = Pick<
+  AiConfig,
+  | 'enabled'
+  | 'apiUrl'
+  | 'apiKey'
+  | 'model'
+  | 'imageApiUrl'
+  | 'imageApiKey'
+  | 'imageModel'
+  | 'dailyLimit'
+  | 'userDailyLimit'
+  | 'systemPrompt'
+>
 
 async function readPemFile(file: File) {
   return file.text()
 }
 
-function LocationMapPreview(props: {
+function getAiBaseFormValues(aiConfig?: AiConfig | null): AiBaseFormValues {
+  return {
+    enabled: aiConfig?.enabled === true,
+    apiUrl: aiConfig?.apiUrl || '',
+    apiKey: aiConfig?.apiKey || '',
+    model: aiConfig?.model || '',
+    imageApiUrl: aiConfig?.imageApiUrl || '',
+    imageApiKey: aiConfig?.imageApiKey || '',
+    imageModel: aiConfig?.imageModel || '',
+    dailyLimit: Number(aiConfig?.dailyLimit || 0),
+    userDailyLimit: Number(aiConfig?.userDailyLimit || 0),
+    systemPrompt: aiConfig?.systemPrompt || ''
+  }
+}
+
+function getReviewFormValues(reviewConfig?: ReviewConfig | null): ReviewConfig {
+  return {
+    ...DEFAULT_REVIEW_CONFIG,
+    ...(reviewConfig || {})
+  }
+}
+
+function formatConfiguredSecret(configured: boolean, fileName?: string) {
+  if (!configured) {
+    return '未配置'
+  }
+  return fileName ? `已配置（当前文件：${fileName}）` : '已配置'
+}
+
+function LocationMapPreview({
+  center,
+  marker: markerPosition,
+  interactive,
+  onPick
+}: {
   center: [number, number]
   marker?: [number, number] | null
   interactive?: boolean
   onPick?: (coords: [number, number]) => void
 }) {
   const mapRef = useRef<HTMLDivElement | null>(null)
+  const onPickRef = useRef(onPick)
+
+  useEffect(() => {
+    onPickRef.current = onPick
+  }, [onPick])
 
   useEffect(() => {
     if (!mapRef.current) return
 
     const map = L.map(mapRef.current, {
-      center: props.center,
+      center,
       zoom: 16,
-      zoomControl: Boolean(props.interactive),
-      dragging: Boolean(props.interactive),
-      scrollWheelZoom: Boolean(props.interactive),
-      doubleClickZoom: Boolean(props.interactive),
+      zoomControl: Boolean(interactive),
+      dragging: Boolean(interactive),
+      scrollWheelZoom: Boolean(interactive),
+      doubleClickZoom: Boolean(interactive),
       attributionControl: false
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
 
-    let marker: L.CircleMarker | null = null
-    if (props.marker) {
-      marker = L.circleMarker(props.marker, {
+    let circleMarker: L.CircleMarker | null = null
+    if (markerPosition) {
+      circleMarker = L.circleMarker(markerPosition, {
         radius: 10,
         color: '#bf3f31',
         fillColor: '#bf3f31',
@@ -44,27 +113,27 @@ function LocationMapPreview(props: {
       }).addTo(map)
     }
 
-    if (props.interactive && props.onPick) {
+    if (interactive && onPick) {
       map.on('click', (event: L.LeafletMouseEvent) => {
         const next: [number, number] = [event.latlng.lat, event.latlng.lng]
-        if (marker) {
-          marker.setLatLng(next)
+        if (circleMarker) {
+          circleMarker.setLatLng(next)
         } else {
-          marker = L.circleMarker(next, {
+          circleMarker = L.circleMarker(next, {
             radius: 10,
             color: '#bf3f31',
             fillColor: '#bf3f31',
             fillOpacity: 0.9
           }).addTo(map)
         }
-        props.onPick?.(next)
+        onPickRef.current?.(next)
       })
     }
 
     return () => {
       map.remove()
     }
-  }, [props.center, props.interactive, props.marker, props.onPick])
+  }, [center, interactive, markerPosition])
 
   return <div className="settings-leaflet-map" ref={mapRef} />
 }
@@ -74,7 +143,8 @@ export function SettingsPage() {
   const queryClient = useQueryClient()
   const [storeForm] = Form.useForm()
   const [payForm] = Form.useForm()
-  const [aiForm] = Form.useForm()
+  const [aiForm] = Form.useForm<AiBaseFormValues>()
+  const [reviewForm] = Form.useForm<ReviewConfig>()
   const [notifyForm] = Form.useForm()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [draftLocation, setDraftLocation] = useState<[number, number] | null>(null)
@@ -88,9 +158,8 @@ export function SettingsPage() {
   const apiV3KeyValue = String(Form.useWatch('apiV3Key', payForm) || '')
   const privateKeyValue = String(Form.useWatch('privateKey', payForm) || '')
   const certificateValue = String(Form.useWatch('certificatePem', payForm) || '')
-  const apiV3KeyConfigured = Boolean(apiV3KeyValue.trim())
-  const privateKeyConfigured = Boolean(privateKeyValue.trim())
-  const certificateConfigured = Boolean(certificateValue.trim())
+  const privateKeyFileName = String(Form.useWatch('privateKeyFileName', payForm) || '')
+  const certificateFileName = String(Form.useWatch('certificateFileName', payForm) || '')
   const fetchedImageModels = useMemo(
     () => fetchedAiModels.filter(model => /(image|imagen)/i.test(model)),
     [fetchedAiModels]
@@ -100,8 +169,15 @@ export function SettingsPage() {
     queryKey: ['settings'],
     queryFn: adminApi.getSettings
   })
+  const payConfig = settingsQuery.data?.payConfig
+  const apiV3KeyConfigured = Boolean(apiV3KeyValue.trim() || payConfig?.apiV3KeyConfigured)
+  const privateKeyConfigured = Boolean(privateKeyValue.trim() || payConfig?.privateKeyConfigured)
+  const certificateConfigured = Boolean(certificateValue.trim() || payConfig?.certificateConfigured)
   const hasMapLocation = Number.isFinite(latitude) && Number.isFinite(longitude) && latitude > 0 && longitude > 0
-  const currentLocation = hasMapLocation ? ([latitude, longitude] as [number, number]) : null
+  const currentLocation = useMemo<[number, number] | null>(
+    () => (hasMapLocation ? [latitude, longitude] : null),
+    [hasMapLocation, latitude, longitude]
+  )
   const mapOpenUrl = hasMapLocation ? `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}` : ''
   const pickerCenter = useMemo<[number, number]>(() => {
     if (draftLocation) return draftLocation
@@ -113,9 +189,10 @@ export function SettingsPage() {
     if (!settingsQuery.data) return
     storeForm.setFieldsValue(settingsQuery.data.storeInfo || {})
     payForm.setFieldsValue(settingsQuery.data.payConfig || {})
-    aiForm.setFieldsValue(settingsQuery.data.aiConfig || {})
+    aiForm.setFieldsValue(getAiBaseFormValues(settingsQuery.data.aiConfig))
+    reviewForm.setFieldsValue(getReviewFormValues(settingsQuery.data.aiConfig?.reviewConfig))
     notifyForm.setFieldsValue(settingsQuery.data.notificationConfig || {})
-  }, [settingsQuery.data, storeForm, payForm, aiForm, notifyForm])
+  }, [settingsQuery.data, storeForm, payForm, aiForm, reviewForm, notifyForm])
 
   useEffect(() => {
     let disposed = false
@@ -164,6 +241,14 @@ export function SettingsPage() {
     onSuccess: () => {
       message.success('AI 配置已更新')
       queryClient.invalidateQueries({ queryKey: ['settings'] })
+    },
+    onError: (error: Error) => message.error(error.message)
+  })
+  const updateReviewMutation = useMutation({
+    mutationFn: adminApi.updateAiConfig,
+    onSuccess: result => {
+      message.success('审核模式已更新')
+      reviewForm.setFieldsValue(getReviewFormValues(result.reviewConfig))
     },
     onError: (error: Error) => message.error(error.message)
   })
@@ -421,6 +506,9 @@ export function SettingsPage() {
               </Form.Item>
               <Form.Item name="privateKeyFileName" hidden><Input /></Form.Item>
               <Form.Item name="certificateFileName" hidden><Input /></Form.Item>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
+                高敏支付材料采用只写入模式。页面不会回显已保存的私钥或证书正文；留空表示保持当前配置，重新导入或粘贴新内容才会更新。
+              </Typography.Paragraph>
 
               <Row gutter={16}>
                 <Col span={12}>
@@ -449,8 +537,14 @@ export function SettingsPage() {
                       </label>
                     </Space>
                   } style={{ marginBottom: 12 }}>
-                    <Input.TextArea rows={4} placeholder="apiclient_key.pem 内容" />
+                    <Input.TextArea
+                      rows={4}
+                      placeholder={privateKeyConfigured ? '已配置，留空保持不变；需要更新时请重新导入或粘贴 apiclient_key.pem 内容' : '粘贴 apiclient_key.pem 内容，或使用“导入”按钮'}
+                    />
                   </Form.Item>
+                  <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>
+                    当前状态：{formatConfiguredSecret(privateKeyConfigured, privateKeyFileName)}
+                  </Typography.Paragraph>
                 </Col>
                 <Col span={12}>
                   <Form.Item name="certificatePem" label={
@@ -478,8 +572,14 @@ export function SettingsPage() {
                       </label>
                     </Space>
                   } style={{ marginBottom: 12 }}>
-                    <Input.TextArea rows={4} placeholder="apiclient_cert.pem 内容" />
+                    <Input.TextArea
+                      rows={4}
+                      placeholder={certificateConfigured ? '已配置，留空保持不变；需要更新时请重新导入或粘贴 apiclient_cert.pem 内容' : '粘贴 apiclient_cert.pem 内容，或使用“导入”按钮'}
+                    />
                   </Form.Item>
+                  <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4, marginBottom: 12 }}>
+                    当前状态：{formatConfiguredSecret(certificateConfigured, certificateFileName)}
+                  </Typography.Paragraph>
                 </Col>
               </Row>
               <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
@@ -569,42 +669,42 @@ export function SettingsPage() {
           </Card>
 
           <Card size="small" className="panel-card" title="审核模式" bordered={false} loading={settingsQuery.isLoading} style={{ marginTop: 16 }}>
-            <Form form={aiForm} layout="vertical" onFinish={values => updateAiMutation.mutate(values)}>
+            <Form form={reviewForm} layout="vertical" onFinish={values => updateReviewMutation.mutate({ reviewConfig: values })}>
               <Row gutter={16}>
                 <Col span={6}>
-                  <Form.Item name={['reviewConfig', 'enabled']} label="启用审核模式" valuePropName="checked" style={{ marginBottom: 12 }}>
+                  <Form.Item name="enabled" label="启用审核模式" valuePropName="checked" style={{ marginBottom: 12 }}>
                     <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                   </Form.Item>
                 </Col>
                 <Col span={9}>
-                  <Form.Item name={['reviewConfig', 'hideHistoryAiRecords']} label="隐藏旧 AI 历史" valuePropName="checked" style={{ marginBottom: 12 }}>
+                  <Form.Item name="hideHistoryAiRecords" label="隐藏旧 AI 历史" valuePropName="checked" style={{ marginBottom: 12 }}>
                     <Switch checkedChildren="隐藏" unCheckedChildren="显示" />
                   </Form.Item>
                 </Col>
                 <Col span={9}>
-                  <Form.Item name={['reviewConfig', 'allowReanalyzeAfterReview']} label="结束后允许补分析" valuePropName="checked" style={{ marginBottom: 12 }}>
+                  <Form.Item name="allowReanalyzeAfterReview" label="结束后允许补分析" valuePropName="checked" style={{ marginBottom: 12 }}>
                     <Switch checkedChildren="允许" unCheckedChildren="禁止" />
                   </Form.Item>
                 </Col>
               </Row>
               <Row gutter={12}>
-                <Col span={6}><Form.Item name={['reviewConfig', 'entryTitle']} label="入口标题" style={{ marginBottom: 12 }}><Input placeholder="宝宝日常" /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['reviewConfig', 'pageTitle']} label="页面标题" style={{ marginBottom: 12 }}><Input placeholder="健康打卡" /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['reviewConfig', 'historyTitle']} label="历史标题" style={{ marginBottom: 12 }}><Input placeholder="照片记录" /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['reviewConfig', 'reportTitle']} label="详情标题" style={{ marginBottom: 12 }}><Input placeholder="记录详情" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="entryTitle" label="入口标题" style={{ marginBottom: 12 }}><Input placeholder="宝宝日常" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="pageTitle" label="页面标题" style={{ marginBottom: 12 }}><Input placeholder="健康打卡" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="historyTitle" label="历史标题" style={{ marginBottom: 12 }}><Input placeholder="照片记录" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="reportTitle" label="详情标题" style={{ marginBottom: 12 }}><Input placeholder="记录详情" /></Form.Item></Col>
               </Row>
               <Row gutter={12}>
-                <Col span={6}><Form.Item name={['reviewConfig', 'submitText']} label="提交按钮" style={{ marginBottom: 12 }}><Input placeholder="保存记录" /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['reviewConfig', 'shareTitle']} label="分享文案" style={{ marginBottom: 12 }}><Input placeholder="分享" /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['reviewConfig', 'emptyText']} label="空状态" style={{ marginBottom: 12 }}><Input placeholder="暂无记录" /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['reviewConfig', 'listTagText']} label="列表标签" style={{ marginBottom: 12 }}><Input placeholder="待AI分析" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="submitText" label="提交按钮" style={{ marginBottom: 12 }}><Input placeholder="保存记录" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="shareTitle" label="分享文案" style={{ marginBottom: 12 }}><Input placeholder="分享" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="emptyText" label="空状态" style={{ marginBottom: 12 }}><Input placeholder="暂无记录" /></Form.Item></Col>
+                <Col span={6}><Form.Item name="listTagText" label="列表标签" style={{ marginBottom: 12 }}><Input placeholder="待AI分析" /></Form.Item></Col>
               </Row>
               <Row gutter={12}>
-                <Col span={12}><Form.Item name={['reviewConfig', 'safeBannerUrl']} label="审核态 Banner 地址" style={{ marginBottom: 12 }}><Input placeholder="https://..." /></Form.Item></Col>
-                <Col span={12}><Form.Item name={['reviewConfig', 'safeShareImageUrl']} label="审核态分享图地址" style={{ marginBottom: 12 }}><Input placeholder="https://..." /></Form.Item></Col>
+                <Col span={12}><Form.Item name="safeBannerUrl" label="审核态 Banner 地址" style={{ marginBottom: 12 }}><Input placeholder="https://..." /></Form.Item></Col>
+                <Col span={12}><Form.Item name="safeShareImageUrl" label="审核态分享图地址" style={{ marginBottom: 12 }}><Input placeholder="https://..." /></Form.Item></Col>
               </Row>
               <div className="settings-actions" style={{ marginTop: 12 }}>
-                <Button type="primary" htmlType="submit" loading={updateAiMutation.isPending}>保存审核模式</Button>
+                <Button type="primary" htmlType="submit" loading={updateReviewMutation.isPending}>保存审核模式</Button>
               </div>
             </Form>
           </Card>
@@ -639,7 +739,7 @@ export function SettingsPage() {
             center={pickerCenter}
             marker={draftLocation || currentLocation}
             interactive
-            onPick={coords => setDraftLocation(coords)}
+            onPick={useCallback((coords: [number, number]) => setDraftLocation(coords), [])}
           />
         </div>
       </Modal>

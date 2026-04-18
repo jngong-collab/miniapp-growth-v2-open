@@ -307,9 +307,16 @@ function maskPayConfigSecrets(payConfig) {
   }
 
   return {
-    ...buildDefaultPayConfig(),
-    ...payConfig,
+    _id: payConfig._id,
+    enabled: payConfig.enabled === true,
+    mchId: trimText(payConfig.mchId),
+    notifyUrl: trimText(payConfig.notifyUrl),
+    certSerialNo: trimText(payConfig.certSerialNo),
     apiV3Key: payConfig.apiV3Key ? SECRET_MASK : '',
+    privateKey: '',
+    privateKeyFileName: trimText(payConfig.privateKeyFileName),
+    certificatePem: '',
+    certificateFileName: trimText(payConfig.certificateFileName),
     apiV3KeyConfigured: Boolean(payConfig.apiV3Key),
     privateKeyConfigured: Boolean(payConfig.privateKey),
     certificateConfigured: Boolean(payConfig.certificatePem)
@@ -352,7 +359,9 @@ function normalizeAiConfigPayload(payload) {
       ? 0
       : Number(source.userDailyLimit)
   }
-  next.reviewConfig = normalizeReviewConfig(source.reviewConfig)
+  if (Object.prototype.hasOwnProperty.call(source, 'reviewConfig')) {
+    next.reviewConfig = normalizeReviewConfig(source.reviewConfig)
+  }
   return next
 }
 
@@ -363,8 +372,8 @@ function maskAiConfigSecrets(aiConfig) {
   return {
     ...buildDefaultAiConfig(),
     ...aiConfig,
-    apiKey: aiConfig.apiKey ? '••••••••' : '',
-    imageApiKey: aiConfig.imageApiKey ? '••••••••' : '',
+    apiKey: aiConfig.apiKey ? SECRET_MASK : '',
+    imageApiKey: aiConfig.imageApiKey ? SECRET_MASK : '',
     reviewConfig: normalizeReviewConfig(aiConfig.reviewConfig)
   }
 }

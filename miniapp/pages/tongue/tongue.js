@@ -68,6 +68,11 @@ Page({
         this.setData({ showLoginModal: false, loggingIn: false })
     },
 
+    onUnload: function () {
+        if (this._stepTimer) clearTimeout(this._stepTimer)
+        if (this._navigateTimer) clearTimeout(this._navigateTimer)
+    },
+
     _syncLoginState: function () {
         const app = getApp()
         const isLoggedIn = app.isCustomerLoggedIn ? app.isCustomerLoggedIn() : false
@@ -329,7 +334,7 @@ Page({
             this.setData({ step: 2 })
 
             // 步骤 3：模拟进度
-            setTimeout(() => { if (this.data.state === 'analyzing') this.setData({ step: 3 }) }, 3000)
+            this._stepTimer = setTimeout(() => { if (this.data.state === 'analyzing') this.setData({ step: 3 }) }, 3000)
 
             // 整理症状
             let finalSymptoms = []
@@ -350,7 +355,7 @@ Page({
 
             const reportId = analyzeRes.reportId
             this._analysisCompleted = true
-            setTimeout(() => {
+            this._navigateTimer = setTimeout(() => {
                 wx.navigateTo({
                     url: `/pages/tongue-report/tongue-report?reportId=${reportId}`
                 })

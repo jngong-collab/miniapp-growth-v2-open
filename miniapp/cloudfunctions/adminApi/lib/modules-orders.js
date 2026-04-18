@@ -145,8 +145,9 @@ function buildRefundTimeline(refundRequest, order) {
   return rows
 }
 
-async function loadOrderContext(storeId, limit = 500) {
-  const orders = await safeList('orders', { storeId }, { orderBy: ['createdAt', 'desc'], limit })
+async function loadOrderContext(storeId, options = {}) {
+  const { limit = 500, where: extraWhere = {} } = options
+  const orders = await safeList('orders', { storeId, ...extraWhere }, { orderBy: ['createdAt', 'desc'], limit })
   const orderIds = orders.map(item => item._id)
   if (!orderIds.length) {
     return {
@@ -469,14 +470,19 @@ async function verifyOrderItem(access, event) {
     const remaining = item.packageRemaining || {}
     if (remaining.used) return { code: -1, msg: '该服务已核销，不可重复核销' }
 
-    await db.collection('order_items').doc(item._id).update({
+    const updateRes = await db.collection('order_items').where({
+      _id: item._id,
+      'packageRemaining.used': _cmd.neq(true)
+    }).update({
       data: {
-        packageRemaining: {
-          used: true,
-          usedAt: db.serverDate()
-        }
+        'packageRemaining.used': true,
+        'packageRemaining.usedAt': db.serverDate()
       }
     })
+
+    if ((updateRes.stats && updateRes.stats.updated) === 0) {
+      return { code: -1, msg: '该服务已核销，不可重复核销' }
+    }
   }
 
   await db.collection('package_usage').add({
@@ -527,25 +533,37 @@ async function listOrders(access, event) {
   } = event
 
   const storeId = getAccessStoreId(access)
-  const { orders, refundMap, users, orderItemsMap } = await loadOrderContext(storeId, 500)
-  const keywordText = String(keyword || '').trim().toLowerCase()
+
+  const dbWhere = {}
+  if (status !== 'all') {
+    if (status === 'refund') {
+      dbWhere.status = _cmd.in(['refund_requested', 'refunding', 'refunded'])
+    } else {
+      dbWhere.status = status
+    }
+  }
+  if (source === 'fission') {
+    dbWhere.fissionCampaignId = _cmd.neq('')
+  } else if (source === 'order') {
+    dbWhere.fissionCampaignId = ''
+  }
+
   const [startAt, endAt] = Array.isArray(dateRange) ? dateRange : []
-  const startTimestamp = startAt ? toTimestamp(startAt) : 0
-  const endTimestamp = endAt ? toTimestamp(endAt) : 0
+  if (startAt || endAt) {
+    const createdAtCond = {}
+    if (startAt) createdAtCond.$gte = new Date(startAt)
+    if (endAt) createdAtCond.$lte = new Date(new Date(endAt).getTime() + 24 * 60 * 60 * 1000 - 1)
+    dbWhere.createdAt = createdAtCond
+  }
+
+  const { orders, refundMap, users, orderItemsMap } = await loadOrderContext(storeId, { limit: 500, where: dbWhere })
+  const keywordText = String(keyword || '').trim().toLowerCase()
 
   const enriched = orders.map(order => {
     const items = orderItemsMap[order._id] || []
     return normalizeOrderSummary(order, items, users[order._openid] || null, refundMap[order._id] || null)
   }).filter(order => {
-    if (status !== 'all') {
-      if (status === 'refund') {
-        if (!['refund_requested', 'refunding', 'refunded'].includes(order.status)) return false
-      } else if (order.status !== status) {
-        return false
-      }
-    }
     if (productType !== 'all' && !order.productTypes.includes(productType)) return false
-    if (source !== 'all' && order.leadSourceKey !== source) return false
     if (keywordText) {
       const haystacks = [
         order.orderNo,
@@ -556,13 +574,14 @@ async function listOrders(access, event) {
       ].join(' ').toLowerCase()
       if (!haystacks.includes(keywordText)) return false
     }
-    const createdAt = toTimestamp(order.createdAt)
-    if (startTimestamp && createdAt < startTimestamp) return false
-    if (endTimestamp && createdAt > endTimestamp + 24 * 60 * 60 * 1000 - 1) return false
     return true
   })
 
-  return { code: 0, data: paginate(enriched, Number(page || 1), Number(pageSize || 20)) }
+  const data = paginate(enriched, Number(page || 1), Number(pageSize || 20))
+  if (orders.length >= 500) {
+    data.warning = '数据量较大，仅展示前 500 条匹配记录，建议缩小查询范围'
+  }
+  return { code: 0, data }
 }
 
 async function getOrderDetail(access, event) {
@@ -644,9 +663,14 @@ async function reviewRefund(access, event) {
   if (!request || request.orderId !== orderId) return { code: -1, msg: '退款申请不存在' }
   const order = await safeGetByIdAndStore('orders', orderId, storeId)
   if (!order) return { code: -1, msg: '无权限操作该门店订单' }
-  if (request.status !== 'pending') return { code: -1, msg: '该申请已处理' }
-
   if (status === 'approved') {
+    if (request.status === 'refunded' || order.status === 'refunded') {
+      return { code: 0, msg: '退款已完成' }
+    }
+    if (request.status !== 'pending' && !(request.status === 'refunding' && order.status === 'refunding')) {
+      return { code: -1, msg: '该申请已处理' }
+    }
+
     const result = await approveRefundRequest({ request, order, reviewerUid: access.uid })
     if (!result.code) {
       await writeAuditLog(access, {
@@ -660,6 +684,8 @@ async function reviewRefund(access, event) {
     }
     return result
   }
+
+  if (request.status !== 'pending') return { code: -1, msg: '该申请已处理' }
 
   const fallbackOrderStatus = request.previousStatus || 'paid'
   await db.runTransaction(async transaction => {

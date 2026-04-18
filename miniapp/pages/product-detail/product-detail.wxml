@@ -125,7 +125,7 @@
         <view class="detail-content">
           <text class="detail-text" wx:if="{{product.detail}}">{{product.detail}}</text>
           <block wx:if="{{product.images.length > 1}}">
-            <image class="detail-img" wx:for="{{product.images}}" wx:key="*this" src="{{item}}" mode="widthFix" wx:if="{{index > 0}}"></image>
+            <image class="detail-img" wx:for="{{product.images}}" wx:key="*this" src="{{item}}" mode="widthFix" lazy-load="{{true}}" wx:if="{{index > 0}}"></image>
           </block>
         </view>
       </view>

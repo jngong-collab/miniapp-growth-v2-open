@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react'
 import type { ReactNode } from 'react'
 import { Spin } from 'antd'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { AdminShell } from './layouts/admin-shell'
 import { PermissionIndexRedirect, PermissionRoute } from './components/permission-route'
 
@@ -89,4 +89,6 @@ const router = createBrowserRouter([
   }
 ])
 
-export default router
+export default function App() {
+  return <RouterProvider router={router} />
+}

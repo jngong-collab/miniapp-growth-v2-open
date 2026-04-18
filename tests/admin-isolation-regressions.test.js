@@ -272,8 +272,10 @@ test('settings read paths scope pay, ai, and notification config by storeId', as
     assert.equal(payCall.condition.storeId, 'store-a')
     assert.equal(notificationCall.condition.storeId, 'store-a')
     assert.equal(result.data.payConfig.apiV3Key, '••••••••')
-    assert.equal(result.data.payConfig.privateKey, '-----BEGIN PRIVATE KEY-----demo-----END PRIVATE KEY-----')
-    assert.equal(result.data.payConfig.certificatePem, '-----BEGIN CERTIFICATE-----demo-----END CERTIFICATE-----')
+    assert.equal(result.data.payConfig.privateKey, '')
+    assert.equal(result.data.payConfig.certificatePem, '')
+    assert.equal(result.data.payConfig.privateKeyConfigured, true)
+    assert.equal(result.data.payConfig.certificateConfigured, true)
   } finally {
     restoreData()
     restoreContext()

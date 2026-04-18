@@ -171,6 +171,12 @@ async function updateAdminAccountStatus(access, event) {
 
   const account = await safeGetFirst('admin_accounts', { uid, storeId })
   if (!account) return { code: -1, msg: '后台账号不存在' }
+  if (account.role === 'owner' && access.account.role !== 'owner') {
+    return { code: -1, msg: '无权操作 owner 账号' }
+  }
+  if (account.role === 'owner' && status === 'inactive') {
+    return { code: -1, msg: 'owner 账号不可停用' }
+  }
   if (status === 'active' && !String(account.uid || '').trim()) {
     return { code: -1, msg: '后台账号尚未绑定登录 UID' }
   }
@@ -203,6 +209,9 @@ async function updateAdminAccountPermissions(access, event) {
 
   const account = await safeGetFirst('admin_accounts', { uid, storeId })
   if (!account) return { code: -1, msg: '后台账号不存在' }
+  if (account.role === 'owner' && access.account.role !== 'owner') {
+    return { code: -1, msg: '无权操作 owner 账号' }
+  }
 
   const nextRole = String(event.role || '').trim()
   const nextPermissions = normalizeAdminPermissions(event.permissions)

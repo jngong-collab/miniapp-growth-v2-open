@@ -30,6 +30,10 @@ Page({
         this.refreshCartCount()
     },
 
+    onUnload: function () {
+        if (this._searchTimer) clearTimeout(this._searchTimer)
+    },
+
     onPullDownRefresh: async function () {
         await this._loadData(true)
         wx.stopPullDownRefresh()

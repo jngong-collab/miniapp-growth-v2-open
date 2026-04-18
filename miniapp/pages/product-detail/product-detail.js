@@ -34,6 +34,10 @@ Page({
         this.refreshCartCount()
     },
 
+    onUnload: function () {
+        if (this._redirectTimer) clearTimeout(this._redirectTimer)
+    },
+
     _loadProduct: async function (productId) {
         this.setData({ loading: true })
         try {
@@ -189,7 +193,7 @@ Page({
             // Step 4：支付成功
             wx.showToast({ title: '支付成功 🎉', icon: 'success', duration: 2000 })
             // 跳转到套餐/订单页
-            setTimeout(() => {
+            this._redirectTimer = setTimeout(() => {
                 if (product.type === 'service' || product.type === 'package') {
                     wx.navigateTo({ url: '/pages/package-usage/package-usage' })
                 } else {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Card, Col, Drawer, Empty, Form, Input, InputNumber, Row, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -75,18 +75,12 @@ function compareCategoryOrder(left: string, right: string) {
 
 function useImagePreviewMap(images: string[]) {
   const [previewMap, setPreviewMap] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    const validKeys = new Set(images)
-    setPreviewMap(prev => {
-      const next = Object.fromEntries(Object.entries(prev).filter(([key]) => validKeys.has(key)))
-      return Object.keys(next).length === Object.keys(prev).length ? prev : next
-    })
-  }, [images])
+  const fetchingRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let disposed = false
-    const pending = images.filter(image => image && !previewMap[image])
+    const validKeys = new Set(images)
+    const pending = images.filter(image => image && !previewMap[image] && !fetchingRef.current.has(image) && validKeys.has(image))
     if (!pending.length) {
       return () => {
         disposed = true
@@ -94,14 +88,17 @@ function useImagePreviewMap(images: string[]) {
     }
 
     pending.forEach(image => {
+      fetchingRef.current.add(image)
       if (image.startsWith('cloud://')) {
         getTempFileUrl(image)
           .then(url => {
+            fetchingRef.current.delete(image)
             if (!disposed) {
               setPreviewMap(prev => ({ ...prev, [image]: url || image }))
             }
           })
           .catch(() => {
+            fetchingRef.current.delete(image)
             if (!disposed) {
               setPreviewMap(prev => ({ ...prev, [image]: image }))
             }
@@ -109,13 +106,14 @@ function useImagePreviewMap(images: string[]) {
         return
       }
 
+      fetchingRef.current.delete(image)
       setPreviewMap(prev => ({ ...prev, [image]: image }))
     })
 
     return () => {
       disposed = true
     }
-  }, [images, previewMap])
+  }, [images])
 
   return previewMap
 }
@@ -326,7 +324,7 @@ function ImageGalleryEditor(props: ImageGalleryEditorProps) {
       {props.images.length ? (
         <div className="catalog-image-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
           {props.images.map((image, index) => (
-            <div key={`${image}-${index}`} className="catalog-image-item" style={{ width: 80 }}>
+            <div key={image} className="catalog-image-item" style={{ width: 80 }}>
               <div className="catalog-image-preview" style={{ width: 80, height: 80, background: '#f5f5f5', borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
                 {props.previewMap[image] ? (
                   <img src={props.previewMap[image]} alt={`图片 ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

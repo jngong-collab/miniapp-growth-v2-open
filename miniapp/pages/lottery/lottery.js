@@ -62,6 +62,10 @@ Page({
         this.loadLotteryHome()
     },
 
+    onUnload() {
+        if (this._spinTimer) clearTimeout(this._spinTimer)
+    },
+
     async loadLotteryHome() {
         try {
             const data = await callCloud('growthApi', { action: 'getLotteryHome' })
@@ -138,7 +142,7 @@ Page({
         if (remaining < 5) next = 260
         if (remaining < 3) next = 400
 
-        setTimeout(() => this._spin(step + 1, totalSteps, seq, winIndex, next, prize, remainChances), next)
+        this._spinTimer = setTimeout(() => this._spin(step + 1, totalSteps, seq, winIndex, next, prize, remainChances), next)
     },
 
     closeResult() {

@@ -68,7 +68,8 @@ test('payApi wxpayNotify rejects forged callbacks without internal secret', asyn
   require.cache[internalAuthPath] = new Module(internalAuthPath, module)
   require.cache[internalAuthPath].exports = {
     getInternalSecret: () => 'secret',
-    isAuthorizedInternalCall: () => false
+    isAuthorizedInternalCall: () => false,
+    resolveTrustedWxpayNotify: undefined
   }
 
   const payApi = require('../miniapp/cloudfunctions/payApi/index.js')
@@ -93,7 +94,8 @@ test('payApi wxpayNotify accepts callbacks with valid internal secret', async ()
   require.cache[internalAuthPath] = new Module(internalAuthPath, module)
   require.cache[internalAuthPath].exports = {
     getInternalSecret: () => 'secret',
-    isAuthorizedInternalCall: (event) => event && event._internalSecret === 'secret'
+    isAuthorizedInternalCall: (event) => event && event._internalSecret === 'secret',
+    resolveTrustedWxpayNotify: undefined
   }
 
   const payApi = require('../miniapp/cloudfunctions/payApi/index.js')

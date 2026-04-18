@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Avatar, Button, Card, Descriptions, Drawer, Form, Input, message, Select, Space, Table, Tag, Timeline, Typography } from 'antd'
 import dayjs from 'dayjs'
@@ -88,7 +88,13 @@ export function CustomersPage() {
   const detail = detailQuery.data as CustomerDetail | undefined
   const loginTag = loginStatusTagProps(detail?.loginStatus || '')
 
-  const columns = [
+  const handleOpenDetail = useCallback((openid: string) => {
+    setActiveOpenid(openid)
+    setIsEditing(false)
+    editForm.resetFields()
+  }, [editForm])
+
+  const columns = useMemo(() => [
     {
       title: '用户',
       render: (_: unknown, record: CustomerRecord) => (
@@ -153,13 +159,7 @@ export function CustomersPage() {
         <Button size="small" onClick={() => handleOpenDetail(record._openid)}>详情</Button>
       )
     }
-  ]
-
-  const handleOpenDetail = (openid: string) => {
-    setActiveOpenid(openid)
-    setIsEditing(false)
-    editForm.resetFields()
-  }
+  ], [handleOpenDetail])
 
   const handleClose = () => {
     setActiveOpenid('')

@@ -109,11 +109,16 @@ async function getMyOrders(event, openid) {
     const orders = ordersRes.data || []
     if (!orders.length) return { code: 0, data: [] }
 
-    const itemEntries = await Promise.all(orders.map(async (order) => {
-        const itemsRes = await db.collection('order_items').where({ orderId: order._id }).get().catch(() => ({ data: [] }))
-        return [order._id, itemsRes.data || []]
-    }))
-    const itemMap = Object.fromEntries(itemEntries)
+    const orderIds = orders.map(o => o._id)
+    const itemsRes = await db.collection('order_items').where({
+        orderId: _.in(orderIds)
+    }).get().catch(() => ({ data: [] }))
+    const itemMap = {}
+    for (const item of (itemsRes.data || [])) {
+        const oid = item.orderId
+        if (!itemMap[oid]) itemMap[oid] = []
+        itemMap[oid].push(item)
+    }
 
     return {
         code: 0,

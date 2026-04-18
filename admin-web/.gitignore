@@ -10,6 +10,19 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*支付证书*.zip
+*微信支付证书*.zip
+*证书*.zip
 *.local
 
 # Editor directories and files

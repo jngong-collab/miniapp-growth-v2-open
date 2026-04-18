@@ -69,7 +69,10 @@ Page({
             const updates = {}
             details.forEach(d => { updates[`campaigns[${d.index}].productDetail`] = d.productDetail })
             if (Object.keys(updates).length) this.setData(updates)
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.error('加载活动失败:', e)
+            wx.showToast({ title: '活动加载失败', icon: 'none' })
+        }
     },
 
     _loadEarnings: async function () {
@@ -80,7 +83,10 @@ Page({
                 balanceYuan: (d.balance / 100).toFixed(1),
                 totalEarnedYuan: (d.totalEarned / 100).toFixed(1)
             })
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.error('加载收益失败:', e)
+            wx.showToast({ title: '收益加载失败', icon: 'none' })
+        }
     },
 
     _loadRecords: async function () {
@@ -92,7 +98,10 @@ Page({
                 createdAtStr: this._fmt(r.createdAt)
             }))
             this.setData({ records: formatted })
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.error('加载记录失败:', e)
+            wx.showToast({ title: '记录加载失败', icon: 'none' })
+        }
     },
 
     _fmt: function (date) {

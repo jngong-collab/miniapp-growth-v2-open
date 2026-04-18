@@ -173,6 +173,7 @@ App({
   },
 
   _readStoredUserInfo() {
+    if (!wx || typeof wx.getStorageSync !== 'function') return {}
     try {
       const stored = wx.getStorageSync(USER_INFO_STORAGE_KEY)
       if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {}
@@ -183,6 +184,7 @@ App({
   },
 
   _writeStoredUserInfo(userInfo) {
+    if (!wx || typeof wx.setStorageSync !== 'function') return
     try {
       wx.setStorageSync(USER_INFO_STORAGE_KEY, userInfo || {})
     } catch (error) {
@@ -191,6 +193,7 @@ App({
   },
 
   _removeStoredUserInfo() {
+    if (!wx || typeof wx.removeStorageSync !== 'function') return
     try {
       wx.removeStorageSync(USER_INFO_STORAGE_KEY)
     } catch (error) {
@@ -199,39 +202,34 @@ App({
   },
 
   _readMemberSession() {
-    try {
-      const saved = wx.getStorageSync(MEMBER_SESSION_KEY) || {}
-      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
-        return { ...MEMBER_SESSION_DEFAULT }
-      }
-      return {
-        openid: typeof saved.openid === 'string' ? saved.openid : '',
-        sessionToken: typeof saved.sessionToken === 'string' ? saved.sessionToken : '',
-        expiresAt: typeof saved.expiresAt === 'string' ? saved.expiresAt : '',
-        isLoggedIn: !!saved.isLoggedIn
-      }
-    } catch (error) {
-      return { ...MEMBER_SESSION_DEFAULT }
-    }
+    this._clearMemberSessionCache()
+    return { ...MEMBER_SESSION_DEFAULT }
   },
 
   _writeMemberSession(session) {
-    try {
-      wx.setStorageSync(MEMBER_SESSION_KEY, {
-        ...session,
-        updatedAt: Date.now()
-      })
-    } catch (error) {
-      console.warn('写入会员会话失败:', error)
-    }
+    this._clearMemberSessionCache()
   },
 
   _clearMemberSessionCache() {
+    if (!wx || typeof wx.removeStorageSync !== 'function') return
     try {
       wx.removeStorageSync(MEMBER_SESSION_KEY)
     } catch (error) {
       console.warn('清理会员会话失败:', error)
     }
+  },
+
+  _resetMemberSession() {
+    this.globalData.memberSession = { ...MEMBER_SESSION_DEFAULT }
+    this._clearMemberSessionCache()
+    this.globalData.isLoggedIn = false
+  },
+
+  _reconcileMemberSessionOpenid(openid) {
+    const activeSession = this.globalData.memberSession || MEMBER_SESSION_DEFAULT
+    if (!activeSession.sessionToken || !activeSession.openid || !openid) return
+    if (activeSession.openid === openid) return
+    this._resetMemberSession()
   },
 
   _isSessionExpired(expiresAt) {
@@ -374,8 +372,7 @@ App({
 
   clearCustomerAuth() {
     this.clearUserInfo()
-    this.globalData.memberSession = { ...MEMBER_SESSION_DEFAULT }
-    this._clearMemberSessionCache()
+    this._resetMemberSession()
   },
 
   isCustomerLoggedIn() {
@@ -618,12 +615,12 @@ App({
           throw err
         }
         this.globalData.openid = normalized.openid
+        this._reconcileMemberSessionOpenid(normalized.openid)
         const nextUserInfo = {
           ...(this.globalData.userInfo || {}),
           ...(normalized.userInfo || {})
         }
         this.setUserInfo(nextUserInfo)
-        console.log('登录成功，openid:', normalized.openid, '来源:', res._sourceFunction)
         // 登录成功后获取角色和权限
         return this._loadRole({ preserveExistingOnError: hadSession, fallbackState: previousState })
       })
@@ -654,7 +651,6 @@ App({
       .then(access => {
         const normalized = this._normalizeRoleResult(access)
         this._applyWorkbenchAccess(normalized || this._buildCustomerAccess())
-        console.log('角色:', this.globalData.role, '权限:', this.globalData.permissions)
         return this.globalData.workbenchAccess
       })
       .catch((err) => {

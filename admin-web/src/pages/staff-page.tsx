@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Drawer, Form, Input, Select, Space, Table, Tag, Typography } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { adminApi } from '../lib/admin-api'
 import type {
   AdminAccount,
   AdminAccountForm,
   AdminAccountStatus,
+  AdminLoginEvent,
+  AdminRoleTemplate,
+  AuditLogRecord,
   PermissionKey,
   StaffRecord
 } from '../types/admin'
@@ -107,7 +111,7 @@ export function StaffPage() {
     mutationFn: (values: { permissions: string[] }) =>
       adminApi.updateMiniappStaffPermissions(String(editingStaff?.openid || ''), values.permissions),
     onSuccess: async () => {
-      message.success('员工权限已更新')
+      message.success('员工权限已更改')
       setEditingStaff(null)
       permForm.resetFields()
       await refreshConsoleData()
@@ -140,7 +144,7 @@ export function StaffPage() {
     mutationFn: (values: { uid: string; role: string; permissions: PermissionKey[] }) =>
       adminApi.updateAdminAccountPermissions(values.uid, values.permissions, values.role),
     onSuccess: async () => {
-      message.success('后台账号权限已更新')
+      message.success('后台账号权限已更改')
       setEditingAdminAccount(null)
       adminPermForm.resetFields()
       await refreshConsoleData()
@@ -177,13 +181,159 @@ export function StaffPage() {
     setAccountDrawerOpen(true)
   }
 
-  const openAdminPermissionDrawer = (record: AdminAccount) => {
+  const openAdminPermissionDrawer = useCallback((record: AdminAccount) => {
     setEditingAdminAccount(record)
     adminPermForm.setFieldsValue({
       role: record.role,
       permissions: record.permissions
     })
-  }
+  }, [adminPermForm])
+
+  const adminAccountColumns = useMemo((): ColumnsType<AdminAccount> => [
+    { title: '显示名', dataIndex: 'displayName', width: 140 },
+    { title: '用户名', dataIndex: 'username', width: 160 },
+    {
+      title: '登录 UID',
+      dataIndex: 'uid',
+      width: 180,
+      render: (value) => value || <Typography.Text type="secondary">待绑定</Typography.Text>
+    },
+    { title: '角色', dataIndex: 'role', width: 120 },
+    {
+      title: '权限',
+      dataIndex: 'permissions',
+      render: (permissions) => renderPermissionTags(permissions || [])
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 110,
+      render: (value) => renderAccountStatus(value)
+    },
+    {
+      title: '最近登录',
+      dataIndex: 'lastLoginAt',
+      width: 160,
+      render: (value) => formatDateTime(value, '未登录')
+    },
+    {
+      title: '操作',
+      width: 220,
+      render: (_, record) => (
+        <Space wrap>
+          <Button
+            size="small"
+            onClick={() => openAdminPermissionDrawer(record)}
+            disabled={!record.uid}
+          >
+            调整权限
+          </Button>
+          <Button
+            size="small"
+            onClick={() => updateAdminStatusMutation.mutate({
+              uid: record.uid,
+              status: getNextAccountStatus(record.status)
+            })}
+            disabled={!record.uid || updateAdminStatusMutation.isPending}
+          >
+            {record.status === 'active' ? '停用' : '启用'}
+          </Button>
+        </Space>
+      )
+    }
+  ], [openAdminPermissionDrawer, updateAdminStatusMutation])
+
+  const roleTemplateColumns = useMemo((): ColumnsType<AdminRoleTemplate> => [
+    { title: '模板名', dataIndex: 'roleName', width: 180 },
+    { title: '角色键', dataIndex: 'roleKey', width: 160 },
+    {
+      title: '来源',
+      width: 120,
+      render: (_, record) => record.isSystem
+        ? <Tag color="blue">系统模板</Tag>
+        : <Tag color="default">门店模板</Tag>
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 120,
+      render: (value) => value || 'active'
+    },
+    {
+      title: '权限',
+      dataIndex: 'permissions',
+      render: (permissions) => renderPermissionTags(permissions || [])
+    }
+  ], [])
+
+  const loginEventColumns = useMemo((): ColumnsType<AdminLoginEvent> => [
+    {
+      title: '时间',
+      dataIndex: 'createdAt',
+      width: 160,
+      render: (value) => formatDateTime(value)
+    },
+    {
+      title: '账号',
+      width: 200,
+      render: (_, record) => record.username || record.uid
+    },
+    {
+      title: '事件',
+      dataIndex: 'eventType',
+      width: 160,
+      render: (value) => value || 'login'
+    },
+    {
+      title: '结果',
+      dataIndex: 'result',
+      width: 100,
+      render: (value) => renderLoginResult(value)
+    },
+    {
+      title: 'IP',
+      dataIndex: 'ip',
+      width: 160,
+      render: (value) => value || '-'
+    }
+  ], [])
+
+  const staffColumns = useMemo((): ColumnsType<StaffRecord> => [
+    { title: '员工', dataIndex: 'name', width: 120 },
+    { title: '手机号', dataIndex: 'phone', width: 160 },
+    {
+      title: '权限',
+      render: (_, record) => renderPermissionTags(record.permissions || [])
+    },
+    {
+      title: '操作',
+      width: 100,
+      render: (_, record) => (
+        <Button
+          size="small"
+          onClick={() => {
+            setEditingStaff(record)
+            permForm.setFieldsValue({ permissions: record.permissions || [] })
+          }}
+        >
+          编辑权限
+        </Button>
+      )
+    }
+  ], [permForm])
+
+  const auditLogColumns = useMemo((): ColumnsType<AuditLogRecord> => [
+    {
+      title: '时间',
+      dataIndex: 'createdAt',
+      width: 160,
+      render: (value) => formatDateTime(value)
+    },
+    { title: '操作人', dataIndex: 'actorName', width: 120 },
+    { title: '模块', dataIndex: 'module', width: 120 },
+    { title: '动作', dataIndex: 'action', width: 220 },
+    { title: '摘要', dataIndex: 'summary' }
+  ], [])
 
   return (
     <div className="page-stack">
@@ -192,9 +342,7 @@ export function StaffPage() {
           <div className="hero-kicker">ADMIN IDENTITY</div>
           <Typography.Title level={2}>后台身份与员工权限</Typography.Title>
           <Typography.Paragraph>
-            管理后台账号生命周期、角色模板、登录日志，同时保留小程序员工权限与最近审计日志视图。
-            当前界面仅维护后台账号记录和权限，不提供密码重置或实际 CloudBase 用户开通。
-          </Typography.Paragraph>
+            管理后台账号生命周期、角色模板、登录日志，同时保留小程序员工权限与最近审计日志视图。当前界面仅维护后台账号记录和权限，不提供密码重置或实时 CloudBase 用户开通。          </Typography.Paragraph>
         </div>
       </div>
 
@@ -208,66 +356,14 @@ export function StaffPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="要启用后台账号，必须先绑定登录 UID。未绑定 UID 的记录只能作为待激活账号占位。"
+          message="要启用后台账号，必须先绑定登录 UID。未绑定 UID 的记录只能作为待激活账号占位符"
         />
         <Table
           rowKey={record => record._id || record.uid || record.username}
           loading={adminAccountsQuery.isLoading}
           dataSource={adminAccountsQuery.data || []}
           pagination={false}
-          columns={[
-            { title: '显示名', dataIndex: 'displayName', width: 140 },
-            { title: '用户名', dataIndex: 'username', width: 160 },
-            {
-              title: '登录 UID',
-              dataIndex: 'uid',
-              width: 180,
-              render: value => value || <Typography.Text type="secondary">待绑定</Typography.Text>
-            },
-            { title: '角色', dataIndex: 'role', width: 120 },
-            {
-              title: '权限',
-              dataIndex: 'permissions',
-              render: permissions => renderPermissionTags(permissions || [])
-            },
-            {
-              title: '状态',
-              dataIndex: 'status',
-              width: 110,
-              render: value => renderAccountStatus(value)
-            },
-            {
-              title: '最近登录',
-              dataIndex: 'lastLoginAt',
-              width: 160,
-              render: value => formatDateTime(value, '未登录')
-            },
-            {
-              title: '操作',
-              width: 220,
-              render: (_, record) => (
-                <Space wrap>
-                  <Button
-                    size="small"
-                    onClick={() => openAdminPermissionDrawer(record)}
-                    disabled={!record.uid}
-                  >
-                    调整权限
-                  </Button>
-                  <Button
-                    size="small"
-                    onClick={() => updateAdminStatusMutation.mutate({
-                      uid: record.uid,
-                      status: getNextAccountStatus(record.status)
-                    })}
-                    disabled={!record.uid || updateAdminStatusMutation.isPending}
-                  >
-                    {record.status === 'active' ? '停用' : '启用'}
-                  </Button>
-                </Space>
-              )
-            }
-          ]}
+          columns={adminAccountColumns}
         />
       </Card>
 
@@ -277,28 +373,7 @@ export function StaffPage() {
           loading={roleTemplatesQuery.isLoading}
           dataSource={roleTemplatesQuery.data || []}
           pagination={false}
-          columns={[
-            { title: '模板名', dataIndex: 'roleName', width: 180 },
-            { title: '角色键', dataIndex: 'roleKey', width: 160 },
-            {
-              title: '来源',
-              width: 120,
-              render: (_, record) => record.isSystem
-                ? <Tag color="blue">系统模板</Tag>
-                : <Tag color="default">门店模板</Tag>
-            },
-            {
-              title: '状态',
-              dataIndex: 'status',
-              width: 120,
-              render: value => value || 'active'
-            },
-            {
-              title: '权限',
-              dataIndex: 'permissions',
-              render: permissions => renderPermissionTags(permissions || [])
-            }
-          ]}
+          columns={roleTemplateColumns}
         />
       </Card>
 
@@ -308,37 +383,7 @@ export function StaffPage() {
           loading={loginEventsQuery.isLoading}
           dataSource={loginEventsQuery.data?.list || []}
           pagination={false}
-          columns={[
-            {
-              title: '时间',
-              dataIndex: 'createdAt',
-              width: 160,
-              render: value => formatDateTime(value)
-            },
-            {
-              title: '账号',
-              width: 200,
-              render: (_, record) => record.username || record.uid
-            },
-            {
-              title: '事件',
-              dataIndex: 'eventType',
-              width: 160,
-              render: value => value || 'login'
-            },
-            {
-              title: '结果',
-              dataIndex: 'result',
-              width: 100,
-              render: value => renderLoginResult(value)
-            },
-            {
-              title: 'IP',
-              dataIndex: 'ip',
-              width: 160,
-              render: value => value || '-'
-            }
-          ]}
+          columns={loginEventColumns}
         />
       </Card>
 
@@ -348,29 +393,7 @@ export function StaffPage() {
           loading={staffQuery.isLoading}
           dataSource={staffQuery.data || []}
           pagination={false}
-          columns={[
-            { title: '员工', dataIndex: 'name', width: 120 },
-            { title: '手机号', dataIndex: 'phone', width: 160 },
-            {
-              title: '权限',
-              render: (_, record) => renderPermissionTags(record.permissions || [])
-            },
-            {
-              title: '操作',
-              width: 100,
-              render: (_, record) => (
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setEditingStaff(record)
-                    permForm.setFieldsValue({ permissions: record.permissions || [] })
-                  }}
-                >
-                  编辑权限
-                </Button>
-              )
-            }
-          ]}
+          columns={staffColumns}
         />
       </Card>
 
@@ -380,18 +403,7 @@ export function StaffPage() {
           loading={auditLogsQuery.isLoading}
           dataSource={auditLogsQuery.data?.list || []}
           pagination={false}
-          columns={[
-            {
-              title: '时间',
-              dataIndex: 'createdAt',
-              width: 160,
-              render: value => formatDateTime(value)
-            },
-            { title: '操作者', dataIndex: 'actorName', width: 120 },
-            { title: '模块', dataIndex: 'module', width: 120 },
-            { title: '动作', dataIndex: 'action', width: 220 },
-            { title: '摘要', dataIndex: 'summary' }
-          ]}
+          columns={auditLogColumns}
         />
       </Card>
 
@@ -502,7 +514,7 @@ export function StaffPage() {
           <Form.Item label="员工名称">
             <Typography.Text>{editingStaff?.name}</Typography.Text>
           </Form.Item>
-          <Form.Item name="permissions" label="权限项" rules={[{ required: true, message: '请选择权限项' }]}>
+          <Form.Item name="permissions" label="权限项" rules={[{ required: true, message: '请选择权限组' }]}>
             <Select mode="multiple" options={miniappPermissionOptions} />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={updatePermMutation.isPending}>

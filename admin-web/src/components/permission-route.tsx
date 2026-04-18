@@ -1,20 +1,11 @@
 import type { ReactElement } from 'react'
 import { Result } from 'antd'
 import { Navigate, useOutletContext } from 'react-router-dom'
-import type { AdminSession, PermissionKey } from '../types/admin'
+import type { PermissionKey } from '../types/admin'
+import { getFirstAllowedRoute } from '../lib/routing'
 
 interface AdminOutletContext {
-  session: AdminSession
-}
-
-export function getFirstAllowedRoute(session: Pick<AdminSession, 'permissions' | 'routePermissions'>) {
-  for (const [routePath, permission] of Object.entries(session.routePermissions)) {
-    if (session.permissions.includes(permission)) {
-      return routePath
-    }
-  }
-
-  return null
+  session: import('../types/admin').AdminSession
 }
 
 export function PermissionRoute({
@@ -35,11 +26,11 @@ export function PermissionRoute({
 
 export function PermissionIndexRedirect() {
   const { session } = useOutletContext<AdminOutletContext>()
-  const routePath = getFirstAllowedRoute(session)
+  const firstRoute = getFirstAllowedRoute(session)
 
-  if (!routePath) {
-    return <Result status="403" title="无可访问页面" subTitle="当前账号尚未分配后台页面权限" />
+  if (firstRoute) {
+    return <Navigate to={firstRoute} replace />
   }
 
-  return <Navigate to={routePath} replace />
+  return <Result status="403" title="无可访问页面" subTitle="当前账号尚未分配后台页面权限" />
 }

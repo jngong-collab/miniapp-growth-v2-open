@@ -152,7 +152,12 @@ function mergeLeadTrack(leadMap, openid, source, timestamp) {
 async function listLeads(access, event) {
   const { source = 'all', followupStatus = 'all', keyword = '', page = 1, pageSize = 20 } = event
   const storeId = getAccessStoreId(access)
-  const users = await safeListByStore('users', storeId, {}, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  // 限制线索查询范围为最近90天，避免大数据量OOM
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+  const users = await safeListByStore('users', storeId, {
+    createdAt: _cmd.gte(ninetyDaysAgo)
+  }, { orderBy: ['createdAt', 'desc'], limit: 500 })
   const openids = users.map(item => item._openid).filter(Boolean)
   const campaignIds = (await safeList('fission_campaigns', { storeId }, {
     orderBy: ['createdAt', 'desc'],

@@ -53,10 +53,14 @@ async function listPaymentRecords(access, event) {
   const endTimestamp = endAt ? toTimestamp(endAt) : 0
   const keywordText = String(keyword || '').trim().toLowerCase()
 
-  const orders = await safeList('orders', {
-    storeId,
-    status: _cmd.in(PAID_STATUSES)
-  }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const ordersWhere = { storeId, status: _cmd.in(PAID_STATUSES) }
+  if (startAt || endAt) {
+    const createdAtCond = {}
+    if (startAt) createdAtCond.$gte = new Date(startAt)
+    if (endAt) createdAtCond.$lte = new Date(new Date(endAt).getTime() + 24 * 60 * 60 * 1000 - 1)
+    ordersWhere.createdAt = createdAtCond
+  }
+  const orders = await safeList('orders', ordersWhere, { orderBy: ['createdAt', 'desc'], limit: 500 })
 
   const users = await fetchUsersMap(orders.map(o => o._openid))
 
@@ -94,7 +98,14 @@ async function listRefundRecords(access, event) {
   const endTimestamp = endAt ? toTimestamp(endAt) : 0
   const keywordText = String(keyword || '').trim().toLowerCase()
 
-  const orders = await safeList('orders', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const ordersWhere = { storeId }
+  if (startAt || endAt) {
+    const createdAtCond = {}
+    if (startAt) createdAtCond.$gte = new Date(startAt)
+    if (endAt) createdAtCond.$lte = new Date(new Date(endAt).getTime() + 24 * 60 * 60 * 1000 - 1)
+    ordersWhere.createdAt = createdAtCond
+  }
+  const orders = await safeList('orders', ordersWhere, { orderBy: ['createdAt', 'desc'], limit: 500 })
   const orderMap = toMap(orders, '_id')
   const orderIds = orders.map(o => o._id).filter(Boolean)
 
@@ -102,9 +113,14 @@ async function listRefundRecords(access, event) {
     return { code: 0, data: paginate([], Number(page || 1), Number(pageSize || 20)) }
   }
 
-  const requests = await safeList('refund_requests', {
-    orderId: _cmd.in(orderIds)
-  }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const requestsWhere = { orderId: _cmd.in(orderIds) }
+  if (startAt || endAt) {
+    const reqCreatedAtCond = {}
+    if (startAt) reqCreatedAtCond.$gte = new Date(startAt)
+    if (endAt) reqCreatedAtCond.$lte = new Date(new Date(endAt).getTime() + 24 * 60 * 60 * 1000 - 1)
+    requestsWhere.createdAt = reqCreatedAtCond
+  }
+  const requests = await safeList('refund_requests', requestsWhere, { orderBy: ['createdAt', 'desc'], limit: 500 })
 
   const users = await fetchUsersMap(orders.map(o => o._openid))
 

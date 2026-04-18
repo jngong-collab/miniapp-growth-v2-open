@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Button, Card, DatePicker, Descriptions, Drawer, Input, Select, Space, Table, Tag, Timeline, Typography } from 'antd'
 import dayjs from 'dayjs'
@@ -137,7 +137,7 @@ export function OrdersPage() {
     onError: (error: Error) => message.error(error.message)
   })
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '订单号',
       dataIndex: 'orderNo',
@@ -211,7 +211,40 @@ export function OrdersPage() {
         </Space>
       )
     }
-  ]
+  ], [reviewMutation])
+
+  const detailColumns = useMemo(() => [
+    { title: '商品', dataIndex: 'productName' },
+    { title: '类型', dataIndex: 'productType', width: 100 },
+    { title: '数量', dataIndex: 'quantity', width: 90 },
+    { title: '单价', dataIndex: 'price', width: 120, render: (value: unknown) => formatMoneyCent(Number(value || 0)) },
+    { title: '小计', dataIndex: 'totalAmount', width: 120, render: (value: unknown) => formatMoneyCent(Number(value || 0)) },
+    {
+      title: '核销码',
+      dataIndex: 'verifyCode',
+      width: 140,
+      render: (value: string | undefined) => value || '-'
+    },
+    {
+      title: '剩余次数',
+      width: 220,
+      render: (_: unknown, record: OrderItemDetail) => getRemainingCountText(record)
+    },
+    {
+      title: '有效期',
+      dataIndex: 'packageExpireAt',
+      width: 170,
+      render: (value: unknown) => getExpireAtText(value)
+    },
+    {
+      title: '使用状态',
+      width: 120,
+      render: (_: unknown, record: OrderItemDetail) => {
+        const status = getVerificationStatusTag(record)
+        return <Tag color={status.color}>{status.label}</Tag>
+      }
+    }
+  ], [])
 
   return (
     <div className="page-stack">
@@ -301,38 +334,7 @@ export function OrdersPage() {
               rowKey={record => String(record._id)}
               pagination={false}
               dataSource={(detailQuery.data as OrderDetail | undefined)?.items || []}
-              columns={[
-                { title: '商品', dataIndex: 'productName' },
-                { title: '类型', dataIndex: 'productType', width: 100 },
-                { title: '数量', dataIndex: 'quantity', width: 90 },
-                { title: '单价', dataIndex: 'price', width: 120, render: value => formatMoneyCent(Number(value || 0)) },
-                { title: '小计', dataIndex: 'totalAmount', width: 120, render: value => formatMoneyCent(Number(value || 0)) },
-                {
-                  title: '核销码',
-                  dataIndex: 'verifyCode',
-                  width: 140,
-                  render: (value: string | undefined) => value || '-'
-                },
-                {
-                  title: '剩余次数',
-                  width: 220,
-                  render: (_: unknown, record: OrderItemDetail) => getRemainingCountText(record)
-                },
-                {
-                  title: '有效期',
-                  dataIndex: 'packageExpireAt',
-                  width: 170,
-                  render: (value: unknown) => getExpireAtText(value)
-                },
-                {
-                  title: '使用状态',
-                  width: 120,
-                  render: (_: unknown, record: OrderItemDetail) => {
-                    const status = getVerificationStatusTag(record)
-                    return <Tag color={status.color}>{status.label}</Tag>
-                  }
-                }
-              ]}
+              columns={detailColumns}
               scroll={{ x: 1380 }}
             />
           </Card>

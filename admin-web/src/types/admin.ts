@@ -312,6 +312,22 @@ export interface SettingsData {
   notificationConfig: NotificationConfig | null
 }
 
+export interface ReviewConfig {
+  enabled: boolean
+  entryTitle: string
+  pageTitle: string
+  historyTitle: string
+  reportTitle: string
+  submitText: string
+  shareTitle: string
+  emptyText: string
+  listTagText: string
+  safeBannerUrl: string
+  safeShareImageUrl: string
+  hideHistoryAiRecords: boolean
+  allowReanalyzeAfterReview: boolean
+}
+
 export interface AiConfig {
   _id?: string
   enabled: boolean
@@ -324,7 +340,7 @@ export interface AiConfig {
   dailyLimit: number
   userDailyLimit: number
   systemPrompt: string
-  reviewConfig?: Record<string, unknown>
+  reviewConfig: ReviewConfig
 }
 
 export interface AiModelListResult {

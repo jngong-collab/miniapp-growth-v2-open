@@ -21,6 +21,9 @@ Page({
         }
         this._loadPackages()
     },
+    onUnload: function () {
+        if (this._qrTimer) clearTimeout(this._qrTimer)
+    },
 
     _findPackageById: function (packageId) {
         return (this.data.packages || []).find(item => item._id === packageId) || null
@@ -45,7 +48,9 @@ Page({
                 }
             }
         } catch (e) {
+            console.error('加载套餐失败:', e)
             this.setData({ loading: false })
+            wx.showToast({ title: '套餐加载失败', icon: 'none' })
         }
     },
 
@@ -62,14 +67,14 @@ Page({
         if (!item) return
         this.setData({ selectedPackage: item, activeTab: 'qr' })
         // 延迟绘制二维码
-        setTimeout(() => this._drawQrCode(item.verifyCode), 100)
+        this._qrTimer = setTimeout(() => this._drawQrCode(item.verifyCode), 100)
     },
 
     showQrCode: function (e) {
         const item = this._findPackageById(e.currentTarget.dataset.id)
         if (!item) return
         this.setData({ selectedPackage: item, activeTab: 'qr' })
-        setTimeout(() => this._drawQrCode(item.verifyCode), 100)
+        this._qrTimer = setTimeout(() => this._drawQrCode(item.verifyCode), 100)
     },
 
     // 绘制核销码（大号数字 + 条形码样式）

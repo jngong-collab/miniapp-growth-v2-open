@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { adminApi } from '../lib/admin-api'
 import { hasCloudbaseConfig, loginWithPassword } from '../lib/cloudbase'
-import { getFirstAllowedRoute } from '../components/permission-route'
+import { getFirstAllowedRoute } from '../lib/routing'
 import type { AdminSession } from '../types/admin'
 
 export function LoginPage() {

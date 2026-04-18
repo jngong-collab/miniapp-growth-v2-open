@@ -31,8 +31,8 @@
         <view class="remaining-item" wx:for="{{item.remainingItems}}" wx:key="name" wx:for-item="ri">
           <text class="remaining-name">{{ri.name}}</text>
           <view class="remaining-dots">
-            <view class="dot-circle filled" wx:for="{{ri.remaining}}" wx:key="*this"></view>
-            <view class="dot-circle empty" wx:for="{{ri.used}}" wx:key="*this"></view>
+            <view class="dot-circle filled" wx:for="{{ri.remaining}}" wx:key="filled-{{index}}"></view>
+            <view class="dot-circle empty" wx:for="{{ri.used}}" wx:key="empty-{{index}}"></view>
           </view>
           <text class="remaining-count">剩余 {{ri.remaining}} 次</text>
         </view>

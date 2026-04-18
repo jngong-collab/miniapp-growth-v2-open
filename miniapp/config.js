@@ -1,3 +1,16 @@
+const CLOUDBASE_ENV_PLACEHOLDER = 'your-cloudbase-env-id'
+
+function resolveCloudEnv() {
+    const injectedEnv = typeof globalThis !== 'undefined' && globalThis && typeof globalThis.__CLOUDBASE_ENV_ID__ === 'string'
+        ? globalThis.__CLOUDBASE_ENV_ID__.trim()
+        : ''
+
+    if (!injectedEnv || injectedEnv === CLOUDBASE_ENV_PLACEHOLDER) {
+        return ''
+    }
+    return injectedEnv
+}
+
 /**
  * 小儿推拿门店拓客小程序 - 通用配置文件
  * 
@@ -23,9 +36,9 @@ module.exports = {
      * 在微信开发者工具中创建云开发环境后获取
      * 格式一般为：xxx-yyy 或 cloud1-xxxxxxxx
      */
-    // 部署到生产环境前在此处填写门店自己的 CloudBase 环境 ID。
-    // 不要在仓库中提交真实环境 ID。
-    cloudEnv: 'yuxiaozhu111-4ga6qic990d1eb4e',
+    // 仓库中只保留占位逻辑；真实环境 ID 通过本地未跟踪补丁或构建注入。
+    cloudEnv: resolveCloudEnv(),
+    cloudEnvPlaceholder: CLOUDBASE_ENV_PLACEHOLDER,
 
     // ============================================================
     // 📱 应用配置

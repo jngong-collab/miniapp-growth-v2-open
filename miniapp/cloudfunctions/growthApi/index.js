@@ -6,6 +6,7 @@ const db = cloud.database()
 const _ = db.command
 const http = require('http')
 const https = require('https')
+const crypto = require('crypto')
 const AUTH_SESSION_COLLECTION = 'auth_sessions'
 const MEMBER_LEVELS = ['normal', 'vip', 'svip']
 const AUTH_REQUIRED_CODE = 401
@@ -134,32 +135,55 @@ async function drawLottery(openid, event = {}) {
     const campaign = await getActiveLotteryCampaign()
     if (!campaign) return { code: -1, msg: '当前暂无抽奖活动' }
 
-    const remainChances = await getRemainChances(openid, campaign)
-    if (remainChances <= 0) {
-        return { code: -1, msg: '今日次数已用完，明天再来' }
-    }
-
     const prize = pickLotteryPrize(campaign.prizes || [])
     if (!prize) return { code: -1, msg: '活动奖品配置异常' }
 
-    await db.collection('lottery_records').add({
-        data: {
-            _openid: openid,
-            campaignId: campaign._id,
-            prizeId: prize.id,
-            prizeName: prize.name,
-            prizeIcon: prize.icon || '',
-            status: prize.name === '谢谢参与' ? 'missed' : 'won',
-            createdAt: db.serverDate()
-        }
-    })
+    const limit = campaign.dailyLimitPerUser || 3
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const newRecordId = `lot_${Date.now()}_${crypto.randomInt(100000, 1000000)}`
 
-    return {
-        code: 0,
-        data: {
-            prize,
-            remainChances: remainChances - 1
+    try {
+        const remainChances = await db.runTransaction(async transaction => {
+            const countRes = await transaction.collection('lottery_records').where({
+                _openid: openid,
+                campaignId: campaign._id,
+                createdAt: _.gte(today)
+            }).count()
+
+            const used = countRes.total || 0
+            if (used >= limit) {
+                throw new Error('DAILY_LIMIT_EXCEEDED')
+            }
+
+            await transaction.collection('lottery_records').doc(newRecordId).set({
+                data: {
+                    _openid: openid,
+                    campaignId: campaign._id,
+                    prizeId: prize.id,
+                    prizeName: prize.name,
+                    prizeIcon: prize.icon || '',
+                    status: prize.name === '谢谢参与' ? 'missed' : 'won',
+                    createdAt: db.serverDate()
+                }
+            })
+
+            return Math.max(0, limit - used - 1)
+        })
+
+        return {
+            code: 0,
+            data: {
+                prize,
+                remainChances
+            }
         }
+    } catch (err) {
+        if (err.message === 'DAILY_LIMIT_EXCEEDED') {
+            return { code: -1, msg: '今日次数已用完，明天再来' }
+        }
+        console.error('抽奖事务失败:', err)
+        return { code: -1, msg: '抽奖失败，请重试' }
     }
 }
 
@@ -230,19 +254,57 @@ async function analyzeTongue(openid, event = {}) {
             storeId: runtime.storeId
         })
 
-        const reportRes = await createTongueReportRecord({
-            openid,
-            storeId: runtime.storeId,
-            imageFileId,
-            babyAge,
-            babyGender,
-            symptoms,
-            result,
-            isReviewMode: false
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const reportId = `tr_${Date.now()}_${crypto.randomInt(100000, 1000000)}`
+
+        const reportRes = await db.runTransaction(async transaction => {
+            const [userUsageRes, globalUsageRes] = await Promise.all([
+                transaction.collection('tongue_reports').where({
+                    _openid: openid,
+                    createdAt: _.gte(today),
+                    isReviewMode: _.neq(true)
+                }).count(),
+                transaction.collection('tongue_reports').where({
+                    storeId: runtime.storeId,
+                    createdAt: _.gte(today),
+                    isReviewMode: _.neq(true)
+                }).count()
+            ])
+
+            if (runtime.aiConfig.userDailyLimit > 0 && userUsageRes.total >= runtime.aiConfig.userDailyLimit) {
+                throw new Error('USER_LIMIT_EXCEEDED')
+            }
+            if (runtime.aiConfig.dailyLimit > 0 && globalUsageRes.total >= runtime.aiConfig.dailyLimit) {
+                throw new Error('GLOBAL_LIMIT_EXCEEDED')
+            }
+
+            await transaction.collection('tongue_reports').doc(reportId).set({
+                data: {
+                    _openid: openid,
+                    storeId: runtime.storeId || '',
+                    imageFileId: imageFileId || '',
+                    babyAge: babyAge || '',
+                    babyGender: babyGender || '',
+                    symptoms: normalizeSymptoms(symptoms),
+                    result: result ? normalizeTongueResult(result) : null,
+                    isReviewMode: false,
+                    shareCount: 0,
+                    createdAt: db.serverDate()
+                }
+            })
+
+            return { _id: reportId }
         })
 
         return { code: 0, data: { reportId: reportRes._id, ...result } }
     } catch (err) {
+        if (err.message === 'USER_LIMIT_EXCEEDED') {
+            return { code: -2, msg: `今日分析次数已用完（每日限 ${runtime.aiConfig.userDailyLimit} 次）` }
+        }
+        if (err.message === 'GLOBAL_LIMIT_EXCEEDED') {
+            return { code: -3, msg: '今日门店分析次数已达上限，请明日再来' }
+        }
         console.error('AI 分析失败:', err)
         const msg = err.message || ''
         if (msg.includes('timed out') || msg.includes('time_limit') || msg.includes('较多')) {
@@ -393,13 +455,39 @@ async function reanalyzeTongueReport(openid, event = {}) {
         })
 
         const normalizedResult = normalizeTongueResult(result)
-        await db.collection('tongue_reports').doc(reportId).update({
-            data: {
-                result: normalizedResult,
-                reanalyzedAt: db.serverDate(),
-                reanalyzeSource: 'review_record',
-                updatedAt: db.serverDate()
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const storeId = runtime.storeId || report.storeId || ''
+
+        await db.runTransaction(async transaction => {
+            const [userUsageRes, globalUsageRes] = await Promise.all([
+                transaction.collection('tongue_reports').where({
+                    _openid: openid,
+                    createdAt: _.gte(today),
+                    isReviewMode: _.neq(true)
+                }).count(),
+                transaction.collection('tongue_reports').where({
+                    storeId,
+                    createdAt: _.gte(today),
+                    isReviewMode: _.neq(true)
+                }).count()
+            ])
+
+            if (runtime.aiConfig.userDailyLimit > 0 && userUsageRes.total >= runtime.aiConfig.userDailyLimit) {
+                throw new Error('USER_LIMIT_EXCEEDED')
             }
+            if (runtime.aiConfig.dailyLimit > 0 && globalUsageRes.total >= runtime.aiConfig.dailyLimit) {
+                throw new Error('GLOBAL_LIMIT_EXCEEDED')
+            }
+
+            await transaction.collection('tongue_reports').doc(reportId).update({
+                data: {
+                    result: normalizedResult,
+                    reanalyzedAt: db.serverDate(),
+                    reanalyzeSource: 'review_record',
+                    updatedAt: db.serverDate()
+                }
+            })
         })
 
         return {
@@ -411,6 +499,12 @@ async function reanalyzeTongueReport(openid, event = {}) {
             }
         }
     } catch (err) {
+        if (err.message === 'USER_LIMIT_EXCEEDED') {
+            return { code: -2, msg: `今日分析次数已用完（每日限 ${runtime.aiConfig.userDailyLimit} 次）` }
+        }
+        if (err.message === 'GLOBAL_LIMIT_EXCEEDED') {
+            return { code: -3, msg: '今日门店分析次数已达上限，请明日再来' }
+        }
         console.error('重新分析失败:', err)
         const msg = err.message || ''
         if (msg.includes('timed out') || msg.includes('time_limit') || msg.includes('较多')) {

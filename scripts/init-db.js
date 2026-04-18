@@ -2,19 +2,21 @@
 
 const fs = require('fs')
 const path = require('path')
+const readline = require('readline')
 const { execFileSync } = require('child_process')
 const cloudbase = require('../admin-web/node_modules/@cloudbase/js-sdk/dist/index.cjs.js')
 
 const { ADMIN_PERMISSION_KEYS } = require('../miniapp/cloudfunctions/adminApi/lib/admin-contract')
 
-const DEFAULT_ENV_ID = 'yuxiaozhu111-4ga6qic990d1eb4e'
+const DEFAULT_ENV_ID = 'your-cloudbase-env-id'
 const DEFAULT_REGION = 'ap-shanghai'
 const DEFAULT_STORE_ID = 'store_001'
 const DEFAULT_STORE_NAME = '默认总店'
 const DEFAULT_ADMIN_USERNAME = 'admin'
-const DEFAULT_ADMIN_PASSWORD = 'Admin123'
+const DEFAULT_ADMIN_PASSWORD = ''
 const DEFAULT_ADMIN_UID = 'admin_store_001'
 const DEFAULT_ADMIN_DISPLAY_NAME = '系统超级管理员'
+const MIN_ADMIN_PASSWORD_LENGTH = 12
 
 const CORE_COLLECTIONS = [
   'stores',
@@ -105,6 +107,19 @@ function trimValue(value) {
   return String(value || '').trim()
 }
 
+function resolveOptionalValue(source, key, fallback) {
+  const value = trimValue(source[key])
+  return value || fallback
+}
+
+function isPlaceholderEnvId(value) {
+  const normalized = trimValue(value)
+  if (!normalized) return true
+  return normalized === DEFAULT_ENV_ID
+    || /your-production-env-id/i.test(normalized)
+    || /your-cloudbase-env-id/i.test(normalized)
+}
+
 function readTextIfExists(filePath) {
   try {
     return fs.readFileSync(filePath, 'utf8')
@@ -152,7 +167,7 @@ function resolveEnvId(projectRoot) {
 
   for (const candidate of envCandidates) {
     const value = trimValue(candidate)
-    if (value) return value
+    if (value && !isPlaceholderEnvId(value)) return value
   }
 
   const cloudbaseRcPath = path.join(projectRoot, 'cloudbaserc.json')
@@ -161,13 +176,98 @@ function resolveEnvId(projectRoot) {
     try {
       const rc = JSON.parse(rcText)
       const value = trimValue(rc.envId)
-      if (value && !value.includes('your-production-env-id')) return value
+      if (value && !isPlaceholderEnvId(value)) return value
     } catch (error) {
       // ignore malformed local config and continue fallback
     }
   }
 
-  return DEFAULT_ENV_ID
+  return ''
+}
+
+function validateAdminPassword(password) {
+  const value = trimValue(password)
+  if (!value) {
+    throw new Error('缺少后台初始密码，请通过 ADMIN_PASSWORD 或交互式输入显式提供')
+  }
+  if (value.length < MIN_ADMIN_PASSWORD_LENGTH) {
+    throw new Error(`后台初始密码至少需要 ${MIN_ADMIN_PASSWORD_LENGTH} 位`)
+  }
+  if (/^admin123$/i.test(value)) {
+    throw new Error('后台初始密码不能继续使用已知弱口令')
+  }
+  return value
+}
+
+function promptHidden(question) {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: true
+    })
+
+    rl.stdoutMuted = true
+    rl._writeToOutput = function _writeToOutput(stringToWrite) {
+      if (!rl.stdoutMuted) {
+        rl.output.write(stringToWrite)
+        return
+      }
+      if (stringToWrite === '\r\n') {
+        rl.output.write(stringToWrite)
+        return
+      }
+      rl.output.write('*')
+    }
+
+    process.stdout.write(question)
+    rl.question('', answer => {
+      rl.close()
+      process.stdout.write('\n')
+      resolve(answer)
+    })
+  })
+}
+
+async function resolveAdminPassword(env = process.env) {
+  const envPassword = trimValue(env.ADMIN_PASSWORD)
+  if (envPassword) {
+    return validateAdminPassword(envPassword)
+  }
+
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error('缺少 ADMIN_PASSWORD；非交互模式下请通过环境变量显式提供')
+  }
+
+  const first = await promptHidden('请输入后台初始密码（不会回显）: ')
+  const second = await promptHidden('请再次输入后台初始密码: ')
+
+  if (first !== second) {
+    throw new Error('两次输入的后台初始密码不一致')
+  }
+
+  return validateAdminPassword(first)
+}
+
+function resolveRuntimeBootstrapOptions(projectRoot, env = process.env) {
+  const envId = resolveEnvId(projectRoot)
+  if (!envId) {
+    throw new Error(`缺少 CloudBase 环境 ID，请设置 TCB_ENV_ID / CLOUDBASE_ENV_ID，或将 cloudbaserc.json 中的 envId 从占位值改为真实环境 ID（当前占位值: ${DEFAULT_ENV_ID}）`)
+  }
+
+  return {
+    envId,
+    publishableKey: findPublishableKey(projectRoot),
+    admin: {
+      uid: resolveOptionalValue(env, 'ADMIN_UID', DEFAULT_ADMIN_UID),
+      username: resolveOptionalValue(env, 'ADMIN_USERNAME', DEFAULT_ADMIN_USERNAME),
+      displayName: resolveOptionalValue(env, 'ADMIN_DISPLAY_NAME', DEFAULT_ADMIN_DISPLAY_NAME)
+    },
+    store: {
+      id: resolveOptionalValue(env, 'ADMIN_STORE_ID', DEFAULT_STORE_ID),
+      name: resolveOptionalValue(env, 'ADMIN_STORE_NAME', DEFAULT_STORE_NAME)
+    }
+  }
 }
 
 function getTcbBin() {
@@ -321,33 +421,37 @@ function getCloudbaseAuthClient(envId, publishableKey) {
   return app.auth()
 }
 
-async function ensureAdminAuthUser(envId, publishableKey) {
+async function ensureAdminAuthUser(envId, publishableKey, admin) {
   console.log('\n[2/4] 创建或确认后台登录用户')
   const auth = getCloudbaseAuthClient(envId, publishableKey)
 
   let signInRes = await auth.signInWithPassword({
-    username: DEFAULT_ADMIN_USERNAME,
-    password: DEFAULT_ADMIN_PASSWORD
+    username: admin.username,
+    password: admin.password
   })
 
   if (!signInRes.error) {
     const uid = trimValue(signInRes?.data?.user?.id || signInRes?.data?.session?.user?.id)
-    console.log(`  - 后台登录用户已存在: ${DEFAULT_ADMIN_USERNAME}`)
-    return { uid: uid || DEFAULT_ADMIN_UID, username: DEFAULT_ADMIN_USERNAME, password: DEFAULT_ADMIN_PASSWORD }
+    console.log(`  - 后台登录用户已存在: ${admin.username}`)
+    return { uid: uid || admin.uid, username: admin.username }
   }
 
   const signUpRes = await auth.signUp({
-    username: DEFAULT_ADMIN_USERNAME,
-    password: DEFAULT_ADMIN_PASSWORD
+    username: admin.username,
+    password: admin.password
   })
 
   if (signUpRes.error) {
-    throw new Error(`创建后台登录用户失败: ${signUpRes.error.message || '未知错误'}`)
+    const message = signUpRes.error.message || '未知错误'
+    if (/exist|exists|已存在|duplicate/i.test(message)) {
+      throw new Error(`后台登录用户 ${admin.username} 已存在，但提供的密码无法登录；请确认 ADMIN_PASSWORD 或交互式输入的密码是否正确`)
+    }
+    throw new Error(`创建后台登录用户失败: ${message}`)
   }
 
   signInRes = await auth.signInWithPassword({
-    username: DEFAULT_ADMIN_USERNAME,
-    password: DEFAULT_ADMIN_PASSWORD
+    username: admin.username,
+    password: admin.password
   })
 
   if (signInRes.error) {
@@ -355,17 +459,17 @@ async function ensureAdminAuthUser(envId, publishableKey) {
   }
 
   const uid = trimValue(signInRes?.data?.user?.id || signInRes?.data?.session?.user?.id)
-  console.log(`  + 已创建后台登录用户: ${DEFAULT_ADMIN_USERNAME}`)
-  return { uid: uid || DEFAULT_ADMIN_UID, username: DEFAULT_ADMIN_USERNAME, password: DEFAULT_ADMIN_PASSWORD }
+  console.log(`  + 已创建后台登录用户: ${admin.username}`)
+  return { uid: uid || admin.uid, username: admin.username }
 }
 
-function ensureDefaultStore(envId, nowIso) {
+function ensureDefaultStore(envId, store, nowIso) {
   console.log('\n[3/4] 初始化默认门店')
   updateDocuments(envId, 'stores', [{
-    q: { _id: DEFAULT_STORE_ID },
+    q: { _id: store.id },
     u: {
       $set: {
-        name: DEFAULT_STORE_NAME,
+        name: store.name,
         phone: '',
         address: '',
         latitude: 0,
@@ -382,18 +486,18 @@ function ensureDefaultStore(envId, nowIso) {
     multi: false,
     upsert: true
   }])
-  console.log(`  + 门店已就绪: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}`)
+  console.log(`  + 门店已就绪: ${store.id} / ${store.name}`)
 }
 
-function ensureAdminRecords(envId, adminUid, nowIso) {
+function ensureAdminRecords(envId, admin, store, nowIso) {
   console.log('\n[4/4] 写入管理员映射和角色模板')
 
   updateDocuments(envId, 'users', [{
-    q: { _id: adminUid, uid: adminUid },
+    q: { _id: admin.uid, uid: admin.uid },
     u: {
       $set: {
         _openid: '',
-        nickName: DEFAULT_ADMIN_DISPLAY_NAME,
+        nickName: admin.displayName,
         avatarUrl: '',
         phone: '',
         invitedBy: '',
@@ -403,7 +507,7 @@ function ensureAdminRecords(envId, adminUid, nowIso) {
         memberLevel: 'vip',
         role: 'owner',
         permissions: [...ADMIN_PERMISSION_KEYS],
-        storeId: DEFAULT_STORE_ID,
+        storeId: store.id,
         createdAt: nowIso,
         updatedAt: nowIso
       }
@@ -414,14 +518,14 @@ function ensureAdminRecords(envId, adminUid, nowIso) {
   console.log('  + users 已写入管理员档案')
 
   updateDocuments(envId, 'admin_accounts', [{
-    q: { uid: adminUid },
+    q: { uid: admin.uid },
     u: {
       $set: {
-        username: DEFAULT_ADMIN_USERNAME,
-        displayName: DEFAULT_ADMIN_DISPLAY_NAME,
+        username: admin.username,
+        displayName: admin.displayName,
         role: 'owner',
         permissions: [...ADMIN_PERMISSION_KEYS],
-        storeId: DEFAULT_STORE_ID,
+        storeId: store.id,
         status: 'active',
         lastLoginAt: null,
         createdAt: nowIso,
@@ -433,10 +537,10 @@ function ensureAdminRecords(envId, adminUid, nowIso) {
   }])
   console.log('  + admin_accounts 已写入管理员权限')
 
-  for (const template of DEFAULT_ROLE_TEMPLATES) {
+  for (const template of buildDefaultRoleTemplates(store.id)) {
     updateDocuments(envId, 'admin_role_templates', [{
       q: {
-        storeId: DEFAULT_STORE_ID,
+        storeId: store.id,
         roleKey: template.roleKey
       },
       u: {
@@ -461,14 +565,17 @@ function printUsage() {
   console.log('数据库 bootstrap 脚本（傻瓜版）')
   console.log('')
   console.log('默认行为：')
-  console.log(`  - 环境 ID: 自动识别，识别不到时回退为 ${DEFAULT_ENV_ID}`)
-  console.log(`  - 后台账号: ${DEFAULT_ADMIN_USERNAME}`)
-  console.log(`  - 后台密码: ${DEFAULT_ADMIN_PASSWORD}`)
-  console.log(`  - 默认门店: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}`)
+  console.log('  - 环境 ID: 从 TCB_ENV_ID / CLOUDBASE_ENV_ID 读取，或使用 cloudbaserc.json 中的非占位值')
+  console.log(`  - 后台账号: 默认 ${DEFAULT_ADMIN_USERNAME}，可通过 ADMIN_USERNAME 覆盖`)
+  console.log(`  - 后台密码: 必须通过 ADMIN_PASSWORD 或交互式输入显式提供，且不会打印到日志`)
+  console.log(`  - 默认门店: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}，可通过 ADMIN_STORE_ID / ADMIN_STORE_NAME 覆盖`)
   console.log('')
   console.log('可选环境变量：')
   console.log('  TCB_ENV_ID / CLOUDBASE_ENV_ID')
   console.log('  VITE_CLOUDBASE_PUBLISHABLE_KEY')
+  console.log('  ADMIN_PASSWORD')
+  console.log('  ADMIN_UID / ADMIN_USERNAME / ADMIN_DISPLAY_NAME')
+  console.log('  ADMIN_STORE_ID / ADMIN_STORE_NAME')
   console.log('')
   console.log('前置要求：')
   console.log('  1. 已执行 tcb login')
@@ -478,23 +585,28 @@ function printUsage() {
 
 async function runBootstrap() {
   const projectRoot = path.resolve(__dirname, '..')
-  const envId = resolveEnvId(projectRoot)
-  const publishableKey = findPublishableKey(projectRoot)
+  const runtimeOptions = resolveRuntimeBootstrapOptions(projectRoot)
+  const adminPassword = await resolveAdminPassword(process.env)
   const nowIso = new Date().toISOString()
 
   console.log('开始执行数据库 bootstrap...')
-  console.log(`目标环境: ${envId}`)
+  console.log(`目标环境: ${runtimeOptions.envId}`)
 
-  ensureCollections(envId)
-  const adminUser = await ensureAdminAuthUser(envId, publishableKey)
-  ensureDefaultStore(envId, nowIso)
-  ensureAdminRecords(envId, adminUser.uid, nowIso)
+  ensureCollections(runtimeOptions.envId)
+  const adminUser = await ensureAdminAuthUser(runtimeOptions.envId, runtimeOptions.publishableKey, {
+    ...runtimeOptions.admin,
+    password: adminPassword
+  })
+  ensureDefaultStore(runtimeOptions.envId, runtimeOptions.store, nowIso)
+  ensureAdminRecords(runtimeOptions.envId, {
+    ...runtimeOptions.admin,
+    uid: adminUser.uid
+  }, runtimeOptions.store, nowIso)
 
   console.log('\n数据库 bootstrap 完成。')
   console.log(`后台账号: ${adminUser.username}`)
-  console.log(`后台密码: ${adminUser.password}`)
   console.log(`管理员 UID: ${adminUser.uid}`)
-  console.log(`默认门店: ${DEFAULT_STORE_ID} / ${DEFAULT_STORE_NAME}`)
+  console.log(`默认门店: ${runtimeOptions.store.id} / ${runtimeOptions.store.name}`)
 }
 
 if (require.main === module) {
@@ -526,6 +638,7 @@ module.exports = {
   buildDefaultRoleTemplates,
   resolveBootstrapConfig,
   resolveEnvId,
+  resolveAdminPassword,
   findPublishableKey,
   runBootstrap
 }

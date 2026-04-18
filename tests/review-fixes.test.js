@@ -310,8 +310,9 @@ test('page json files avoid unsupported share config flags', () => {
 
 test('payCallback uses CAS update for idempotency', () => {
   const payApi = fs.readFileSync(path.join(repoRoot, 'miniapp', 'cloudfunctions', 'payApi', 'index.js'), 'utf8');
-  assert.match(payApi, /casUpdate\.stats\.updated === 0/);
-  assert.match(payApi, /status:\s*_\.\s*neq\s*\(\s*'paid'\s*\)/);
+  assert.match(payApi, /const casUpdate = await db\.collection\('orders'\)\.doc\(order\._id\)\.where\(\{\s*status:\s*'pending'/s);
+  assert.doesNotMatch(payApi, /status:\s*_\.\s*neq\s*\(\s*'paid'\s*\)/);
+  assert.match(payApi, /postPayStatus:\s*'pending'/);
 });
 
 test('verifyPackage uses conditional atomic decrement and expiry check', () => {

@@ -695,7 +695,7 @@ test('callCloudWithLogin blocks API calls when customer is not bound and raises 
   }
 })
 
-test('miniapp member session restores from storage and hard logout clears both user and session', () => {
+test('miniapp member session stays in memory only and hard logout clears both user and session', () => {
   const firstRun = loadMiniappApp()
   const firstApp = firstRun.app
 
@@ -710,22 +710,20 @@ test('miniapp member session restores from storage and hard logout clears both u
 
   const sessionAfterBind = firstRun.getSession()
   const userAfterBind = firstRun.getUserInfo()
-  assert.equal(sessionAfterBind.isLoggedIn, true)
-  assert.equal(sessionAfterBind.sessionToken, 'sess-1')
+  assert.equal(sessionAfterBind, null)
   assert.equal(userAfterBind.phone, '13800138000')
   assert.equal(firstApp.globalData.userInfo.phone, '13800138000')
   assert.equal(firstApp.isCustomerLoggedIn(), true)
   firstRun.cleanup()
 
   const reopenRun = loadMiniappApp({
-    [USER_INFO_STORAGE_KEY]: userAfterBind,
-    [MEMBER_SESSION_KEY]: sessionAfterBind
+    [USER_INFO_STORAGE_KEY]: userAfterBind
   })
   const reopenApp = reopenRun.app
   reopenApp.checkLogin()
-  assert.equal(reopenApp.globalData.memberSession.isLoggedIn, true)
+  assert.equal(reopenApp.globalData.memberSession.isLoggedIn, false)
   assert.equal(reopenApp.globalData.userInfo.phone, '13800138000')
-  assert.equal(reopenApp.isCustomerLoggedIn(), true)
+  assert.equal(reopenApp.isCustomerLoggedIn(), false)
 
   reopenApp.logoutCustomer()
   assert.equal(reopenApp.globalData.memberSession.isLoggedIn, false)

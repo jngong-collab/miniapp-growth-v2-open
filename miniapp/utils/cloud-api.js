@@ -1,5 +1,14 @@
+function resolveApp() {
+    if (typeof getApp !== 'function') return null
+    try {
+        return getApp()
+    } catch (error) {
+        return null
+    }
+}
+
 function buildRequestData(data = {}, { requireLogin = false } = {}) {
-    const app = getApp()
+    const app = resolveApp()
     const payload = { ...(data || {}) }
     if (app && typeof app.getCustomerSessionToken === 'function') {
         const sessionToken = app.getCustomerSessionToken()
@@ -35,7 +44,7 @@ function callCloud(name, data = {}) {
 }
 
 function getCustomerRequiredCloudClient() {
-    const app = getApp()
+    const app = resolveApp()
     if (!app || typeof app !== 'object') {
         const error = new Error('客户端上下文异常')
         error.code = -500

@@ -112,7 +112,7 @@
     <view class="prod-list">
       <view class="prod-card animate-fade-up" wx:for="{{products}}" wx:key="_id" bindtap="goToProduct" data-id="{{item._id}}" style="animation-delay: {{index * 0.06}}s">
         <view class="prod-image-zone">
-          <image class="prod-img" src="{{item.images[0]}}" mode="aspectFill"></image>
+          <image class="prod-img" src="{{item.images[0]}}" mode="aspectFill" lazy-load="{{true}}"></image>
           <view class="type-badge {{item.type === 'service' ? 'badge-eco' : item.type === 'package' ? 'badge-ai' : 'badge-primary'}}">
             {{item.type === 'service' ? '服务' : item.type === 'package' ? '套餐' : '产品'}}
           </view>
