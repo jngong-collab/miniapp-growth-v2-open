@@ -442,6 +442,29 @@ test('opsApi ensureUser binds a new customer to the inviter store instead of the
   cleanup()
 })
 
+test('opsApi ensureUser backfills missing storeId from the sole active admin account store', async () => {
+  const { opsApi, state, cleanup } = loadOpsApi({
+    stores: [
+      { _id: 'store-a', name: 'A 店', adminOpenids: [], staff: [] },
+      { _id: 'store-b', name: 'B 店', adminOpenids: [], staff: [] }
+    ],
+    admin_accounts: [
+      { _id: 'admin-1', uid: 'owner-1', status: 'active', storeId: 'store-b', role: 'owner' }
+    ],
+    users: [
+      { _id: 'user-legacy', _openid: 'legacy-customer', role: 'customer', permissions: [], memberLevel: 'normal' }
+    ]
+  }, 'legacy-customer')
+
+  const result = await opsApi.main({ action: 'ensureUser' })
+
+  assert.equal(result.code, 0)
+  assert.equal(result.data.storeId, 'store-b')
+  assert.equal(state.users.find(item => item._openid === 'legacy-customer').storeId, 'store-b')
+
+  cleanup()
+})
+
 test('opsApi getStoreInfo returns the current user store instead of the first store in multi-store mode', async () => {
   const { opsApi, cleanup } = loadOpsApi({
     stores: [

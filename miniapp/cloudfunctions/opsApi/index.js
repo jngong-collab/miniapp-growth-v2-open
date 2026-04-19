@@ -136,11 +136,23 @@ async function ensureUser(openid, event) {
         if (!user) {
             user = { ...payload, _id: addRes._id, openid }
         }
-    } else if (normalizeMemberLevel(user.memberLevel) !== user.memberLevel) {
-        await db.collection('users').where({ _openid: openid }).update({
-            data: { memberLevel: normalizeMemberLevel(user.memberLevel), updatedAt: db.serverDate() }
-        })
-        user.memberLevel = normalizeMemberLevel(user.memberLevel)
+    } else {
+        if (!user.storeId && storeId) {
+            await db.collection('users').where({ _openid: openid }).update({
+                data: {
+                    storeId,
+                    updatedAt: db.serverDate()
+                }
+            })
+            user.storeId = storeId
+        }
+
+        if (normalizeMemberLevel(user.memberLevel) !== user.memberLevel) {
+            await db.collection('users').where({ _openid: openid }).update({
+                data: { memberLevel: normalizeMemberLevel(user.memberLevel), updatedAt: db.serverDate() }
+            })
+            user.memberLevel = normalizeMemberLevel(user.memberLevel)
+        }
     }
 
     if (user && !user.phoneBoundAt) {
@@ -1240,6 +1252,12 @@ async function resolveUserStoreId({ openid, invitedBy = '', currentUser = null }
         const inviterStaffStore = await safeGetFirst('stores', { 'staff.openid': invitedBy })
         if (inviterStaffStore && inviterStaffStore._id) return inviterStaffStore._id
     }
+
+    const activeAdminAccounts = await safeList('admin_accounts', { status: 'active' }, { limit: 50 })
+    const activeAdminStoreIds = uniqueValues(
+        activeAdminAccounts.map(item => String((item && item.storeId) || '').trim()).filter(Boolean)
+    )
+    if (activeAdminStoreIds.length === 1) return activeAdminStoreIds[0]
 
     const stores = await safeList('stores', {}, { limit: 2 })
     if (stores.length === 1) return stores[0]._id || ''
