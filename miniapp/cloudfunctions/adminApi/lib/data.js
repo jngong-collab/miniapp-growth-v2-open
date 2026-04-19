@@ -1,4 +1,4 @@
-const { db, _cmd } = require('./context')
+const { cloud, db, _cmd } = require('./context')
 const { buildAdminAuditEntry } = require('./admin-audit')
 const { uniqueValues } = require('./helpers')
 
@@ -73,11 +73,54 @@ async function safeGetByIdAndStore(collectionName, id, storeId, storeField = 'st
   return String(record[storeField] || '') === String(storeId || '') ? record : null
 }
 
+async function resolveCloudFileMap(fileList = []) {
+  const uniqueFileList = uniqueValues((fileList || []).filter(item => item && String(item).startsWith('cloud://')).map(String))
+  if (!uniqueFileList.length) return {}
+  try {
+    const res = await cloud.getTempFileURL({ fileList: uniqueFileList })
+    return (res.fileList || []).reduce((acc, item) => {
+      if (item.fileID && item.tempFileURL) {
+        acc[item.fileID] = item.tempFileURL
+      }
+      return acc
+    }, {})
+  } catch (error) {
+    return {}
+  }
+}
+
+async function hydrateUsersAvatarUrls(users = []) {
+  if (!Array.isArray(users) || !users.length) return []
+  const fileMap = await resolveCloudFileMap(users.map(item => item && item.avatarUrl))
+  return users.map(item => {
+    const avatarFileId = String((item && item.avatarUrl) || '').trim()
+    if (!avatarFileId.startsWith('cloud://')) {
+      return {
+        ...item,
+        avatarFileId: '',
+        avatarUrl: avatarFileId
+      }
+    }
+    return {
+      ...item,
+      avatarFileId,
+      avatarUrl: fileMap[avatarFileId] || ''
+    }
+  })
+}
+
+async function hydrateUserAvatarUrl(user) {
+  if (!user) return null
+  const [nextUser] = await hydrateUsersAvatarUrls([user])
+  return nextUser || null
+}
+
 async function fetchUsersMap(openids) {
   const ids = uniqueValues(openids)
   if (!ids.length) return {}
   const users = await safeList('users', { _openid: _cmd.in(ids) }, { limit: ids.length })
-  return users.reduce((acc, item) => {
+  const hydratedUsers = await hydrateUsersAvatarUrls(users)
+  return hydratedUsers.reduce((acc, item) => {
     acc[item._openid] = item
     return acc
   }, {})
@@ -115,6 +158,8 @@ module.exports = {
   safeGetFirstByStore,
   safeListByStore,
   safeGetByIdAndStore,
+  hydrateUserAvatarUrl,
+  hydrateUsersAvatarUrls,
   fetchUsersMap,
   fetchOrdersMap,
   writeAuditLog

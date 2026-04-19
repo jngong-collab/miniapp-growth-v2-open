@@ -65,8 +65,15 @@ async function getMyFissionRecords(openid, event = {}) {
     const userMap = {}
     if (inviteeIds.length > 0) {
         const users = await safeList('users', { _openid: _.in(inviteeIds) }, { limit: inviteeIds.length })
+        const avatarMap = await resolveCloudFileMap(users.map(item => item.avatarUrl))
         users.forEach(item => {
-            userMap[item._openid] = item
+            const avatarFileId = String(item.avatarUrl || '').trim()
+            userMap[item._openid] = {
+                ...item,
+                avatarUrl: avatarFileId.startsWith('cloud://')
+                    ? (avatarMap[avatarFileId] || '')
+                    : avatarFileId
+            }
         })
     }
 
@@ -803,6 +810,23 @@ async function ensureAuth(openid, event = {}) {
         user,
         session,
         data: { user, session: { token: session.token, expiresAt: session.expiresAt } }
+    }
+}
+
+async function resolveCloudFileMap(fileList = []) {
+    const uniqueFileList = [...new Set((fileList || []).filter(item => item && String(item).startsWith('cloud://')).map(String))]
+    if (!uniqueFileList.length) return {}
+    try {
+        const res = await cloud.getTempFileURL({ fileList: uniqueFileList })
+        return (res.fileList || []).reduce((acc, item) => {
+            if (item.fileID && item.tempFileURL) {
+                acc[item.fileID] = item.tempFileURL
+            }
+            return acc
+        }, {})
+    } catch (error) {
+        console.error('growthApi 转换云存储资源失败:', error)
+        return {}
     }
 }
 

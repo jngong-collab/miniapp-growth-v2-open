@@ -1,4 +1,5 @@
 const { db, _cmd } = require('./context')
+const dataModule = require('./data')
 const {
   getAccessStoreId,
   safeGetFirst,
@@ -6,7 +7,7 @@ const {
   safeListByStore,
   fetchUsersMap,
   writeAuditLog
-} = require('./data')
+} = dataModule
 const {
   leadSourceLabel,
   followupStatusLabel,
@@ -17,6 +18,13 @@ const {
   formatDateTime,
   fenToYuan
 } = require('./helpers')
+
+const hydrateUserAvatarUrl = typeof dataModule.hydrateUserAvatarUrl === 'function'
+  ? dataModule.hydrateUserAvatarUrl
+  : async (user) => user || null
+const hydrateUsersAvatarUrls = typeof dataModule.hydrateUsersAvatarUrls === 'function'
+  ? dataModule.hydrateUsersAvatarUrls
+  : async (users) => Array.isArray(users) ? users : []
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const LOGIN_TREND_DAYS = {
@@ -285,7 +293,8 @@ async function listCustomers(access, event) {
   const storeId = getAccessStoreId(access)
   const keywordText = String(keyword || '').trim().toLowerCase()
 
-  const users = await safeList('users', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const rawUsers = await safeList('users', { storeId }, { orderBy: ['createdAt', 'desc'], limit: 500 })
+  const users = await hydrateUsersAvatarUrls(rawUsers)
   const openids = users.map(item => item._openid).filter(Boolean)
   const staffRes = await safeGetFirst('stores', { _id: storeId })
   const [tongueReports, followups] = await Promise.all([
@@ -346,7 +355,8 @@ async function getCustomerDetail(access, event) {
   if (!openid) return { code: -1, msg: '缺少用户标识' }
   const storeId = getAccessStoreId(access)
 
-  const user = await safeGetFirst('users', { _openid: openid, storeId })
+  const rawUser = await safeGetFirst('users', { _openid: openid, storeId })
+  const user = await hydrateUserAvatarUrl(rawUser)
   if (!user) return { code: -1, msg: '用户不存在' }
   const staffRes = await safeGetFirst('stores', { _id: storeId })
 

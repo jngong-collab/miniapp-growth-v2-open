@@ -87,6 +87,8 @@ exports.main = async (event) => {
             return loginWithPhone(event, OPENID)
         case 'bindPhoneNumber':
             return bindPhoneNumber(event, OPENID)
+        case 'updateUserProfile':
+            return updateUserProfile(event, OPENID)
         case 'ensureAuth':
             return ensureAuth(event, OPENID)
         case 'logout':
@@ -157,7 +159,8 @@ async function ensureUser(openid, event) {
         user.inviterOpenid = invitedBy
     }
 
-    return { code: 0, openid, data: user }
+    const sanitizedUser = await sanitizeUserProfile(user)
+    return { code: 0, openid, data: sanitizedUser }
 }
 
 async function getSession(event, openid) {
@@ -180,6 +183,62 @@ async function bindPhoneNumber(event, openid) {
     }
 }
 
+async function updateUserProfile(event, openid) {
+    if (!openid) return { code: -1, msg: '缺少用户身份' }
+
+    const authRes = await ensureAuth(event, openid)
+    if (authRes.code) return authRes
+
+    const user = await safeGetFirst('users', { _openid: openid })
+    if (!user || !user._id) {
+        return { code: -1, msg: '用户不存在' }
+    }
+
+    const hasNickName = Object.prototype.hasOwnProperty.call(event || {}, 'nickName')
+    const hasAvatarFileId = Object.prototype.hasOwnProperty.call(event || {}, 'avatarFileId')
+    if (!hasNickName && !hasAvatarFileId) {
+        return { code: -1, msg: '缺少可更新资料' }
+    }
+
+    const updateData = {
+        updatedAt: db.serverDate()
+    }
+
+    if (hasNickName) {
+        const nickName = String((event || {}).nickName || '').trim()
+        if (!nickName) {
+            return { code: -1, msg: '昵称不能为空' }
+        }
+        updateData.nickName = nickName
+    }
+
+    if (hasAvatarFileId) {
+        const avatarFileId = String((event || {}).avatarFileId || '').trim()
+        if (!avatarFileId) {
+            return { code: -1, msg: '头像文件不能为空' }
+        }
+        if (!avatarFileId.startsWith('cloud://')) {
+            return { code: -1, msg: '头像文件异常' }
+        }
+        updateData.avatarUrl = avatarFileId
+    }
+
+    await db.collection('users').doc(user._id).update({
+        data: updateData
+    })
+
+    const latestUser = await safeGetFirst('users', { _openid: openid })
+    const sanitizedUser = await sanitizeUserProfile(latestUser)
+
+    return {
+        code: 0,
+        msg: '资料已更新',
+        data: {
+            user: sanitizedUser
+        }
+    }
+}
+
 async function loginWithPhone(event, openid, options = {}) {
     if (!openid) return { code: -1, msg: '缺少用户身份' }
 
@@ -193,8 +252,13 @@ async function loginWithPhone(event, openid, options = {}) {
             ? String(phoneRes.phone_info.phoneNumber)
             : ''
     } catch (err) {
-        console.error('phonenumber.getPhoneNumber 失败:', err)
-        return { code: -1, msg: '获取手机号失败，请稍后重试' }
+        const phoneError = normalizePhoneNumberOpenApiError(err)
+        console.error('phonenumber.getPhoneNumber 失败:', {
+            code: phoneError.code,
+            debugMsg: phoneError.debugMsg,
+            raw: err
+        })
+        return { code: phoneError.code, msg: phoneError.msg }
     }
 
     if (!phoneNumber) {
@@ -248,17 +312,19 @@ async function loginWithPhone(event, openid, options = {}) {
     }
 
     if (options.includeUser) {
+        const sanitizedUser = await sanitizeUserProfile(latestUser)
         payload.user = {
-            _id: latestUser._id || '',
-            _openid: latestUser._openid || openid,
-            nickName: latestUser.nickName || '',
-            avatarUrl: latestUser.avatarUrl || '',
-            storeId: latestUser.storeId || '',
-            phone: latestUser.phone || '',
-            phoneBoundAt: latestUser.phoneBoundAt || '',
-            profileCompleted: latestUser.profileCompleted === true,
-            memberLevel: normalizeMemberLevel(latestUser.memberLevel),
-            loginStatus: latestUser.loginStatus || 'logged_in'
+            _id: sanitizedUser._id || '',
+            _openid: sanitizedUser._openid || openid,
+            nickName: sanitizedUser.nickName || '',
+            avatarUrl: sanitizedUser.avatarUrl || '',
+            avatarFileId: sanitizedUser.avatarFileId || '',
+            storeId: sanitizedUser.storeId || '',
+            phone: sanitizedUser.phone || '',
+            phoneBoundAt: sanitizedUser.phoneBoundAt || '',
+            profileCompleted: sanitizedUser.profileCompleted === true,
+            memberLevel: normalizeMemberLevel(sanitizedUser.memberLevel),
+            loginStatus: sanitizedUser.loginStatus || 'logged_in'
         }
     }
 
@@ -316,10 +382,12 @@ async function ensureAuth(event, openid) {
         }
     })
 
+    const sanitizedUser = await sanitizeUserProfile(user)
+
     return {
         code: 0,
         data: {
-            user,
+            user: sanitizedUser,
             session: {
                 token: session.token,
                 expiresAt: sessionExpiresAt
@@ -1203,6 +1271,23 @@ async function resolveCloudFileMap(fileList = []) {
     }
 }
 
+async function sanitizeUserProfile(user) {
+    if (!user) return null
+
+    const nextUser = { ...user }
+    const avatarFileId = String(nextUser.avatarUrl || '').trim()
+    if (!avatarFileId.startsWith('cloud://')) {
+        nextUser.avatarFileId = ''
+        nextUser.avatarUrl = avatarFileId
+        return nextUser
+    }
+
+    const fileMap = await resolveCloudFileMap([avatarFileId])
+    nextUser.avatarFileId = avatarFileId
+    nextUser.avatarUrl = fileMap[avatarFileId] || ''
+    return nextUser
+}
+
 async function sanitizeStore(store) {
     const { adminOpenids, staff, ...rest } = store
     const fileMap = await resolveCloudFileMap([
@@ -1282,8 +1367,16 @@ async function fetchUsersMap(openids) {
     const ids = uniqueValues(openids)
     if (!ids.length) return {}
     const users = await safeList('users', { _openid: _.in(ids) }, { limit: ids.length })
+    const fileMap = await resolveCloudFileMap(users.map(item => item.avatarUrl))
     return users.reduce((acc, item) => {
-        acc[item._openid] = item
+        const avatarFileId = String(item.avatarUrl || '').trim()
+        acc[item._openid] = {
+            ...item,
+            avatarFileId: avatarFileId.startsWith('cloud://') ? avatarFileId : '',
+            avatarUrl: avatarFileId.startsWith('cloud://')
+                ? (fileMap[avatarFileId] || '')
+                : avatarFileId
+        }
         return acc
     }, {})
 }
@@ -1462,6 +1555,59 @@ async function rollbackRefundingState({ requestId, orderId, outRefundNo, reason 
 
 function normalizeMemberLevel(memberLevel) {
     return MEMBER_LEVELS.includes(memberLevel) ? memberLevel : 'normal'
+}
+
+function normalizePhoneNumberOpenApiError(error) {
+    const rawCode = error && (
+        error.errCode
+        || error.errcode
+        || error.errno
+        || error.errNo
+        || error.errorCode
+        || error.code
+    )
+    const code = Number(rawCode || 0)
+    const debugMsg = String(
+        (error && (error.errMsg || error.message || error.msg || error.toString && error.toString()))
+        || ''
+    ).trim()
+
+    if (code === 112 || /api scope is not declared in the privacy agreement/i.test(debugMsg)) {
+        return {
+            code: 112,
+            msg: '当前版本未完成手机号相关隐私声明配置，请完善《用户隐私保护指引》后再试',
+            debugMsg
+        }
+    }
+
+    if (
+        /invalid code|code been used|code expired|invalid\s+phone\s+code/i.test(debugMsg)
+        || (/code/i.test(debugMsg) && /(used|expired|invalid)/i.test(debugMsg))
+        || /授权码.*(失效|过期|已被使用)/.test(debugMsg)
+    ) {
+        return {
+            code: -1,
+            msg: '手机号授权已失效，请重新点击授权',
+            debugMsg
+        }
+    }
+
+    if (
+        /frequency limit|rate limit|quota limit|too many requests|busy/i.test(debugMsg)
+        || /请求过于频繁/.test(debugMsg)
+    ) {
+        return {
+            code: -1,
+            msg: '当前请求过于频繁，请稍后再试',
+            debugMsg
+        }
+    }
+
+    return {
+        code: Number.isFinite(code) && code !== 0 ? code : -1,
+        msg: '获取手机号失败，请稍后重试',
+        debugMsg
+    }
 }
 
 function newSessionExpiresAt(baseTime = new Date()) {

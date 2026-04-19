@@ -4,12 +4,24 @@ const { countActivePackageItems } = require('../../utils/package-state')
 const { isWorkbenchUser, hasWorkbenchPermission } = require('../../utils/workbench')
 const { callCloud, callCloudWithLogin } = require('../../utils/cloud-api')
 
+function getFileExtension(filePath = '') {
+    const matched = String(filePath || '').match(/\.[a-zA-Z0-9]+(?:$|\?)/)
+    if (!matched) return '.jpg'
+    return matched[0].replace(/\?$/, '')
+}
+
 function getGuestData() {
     return {
         isLoggedIn: false,
         userInfo: {},
+        profileDraftNickName: '',
+        profileDraftAvatarUrl: '',
+        pendingAvatarPath: '',
+        profileDirty: false,
+        profileSaving: false,
         privacyChecked: false,
         needPrivacyAuthorization: false,
+        privacyDeclarationMissing: false,
         privacyContractName: '《用户隐私保护指引》',
         loggingIn: false,
         balanceYuan: '0.0',
@@ -61,6 +73,7 @@ Page({
         this.setData({
             privacyChecked: true,
             needPrivacyAuthorization: !!privacyState.needAuthorization,
+            privacyDeclarationMissing: false,
             privacyContractName: privacyState.privacyContractName || '《用户隐私保护指引》'
         })
     },
@@ -92,6 +105,7 @@ Page({
             permissions: app.globalData.permissions || [],
             canEnterWorkbench: isWorkbenchUser(app.globalData.role)
         })
+        this._syncProfileDraft(isLoggedIn ? userInfo : {})
 
         await Promise.all([
             isLoggedIn ? this._loadUserStats() : this._resetUserStats(),
@@ -102,6 +116,7 @@ Page({
             this.setData({
                 privacyChecked: true,
                 needPrivacyAuthorization: false,
+                privacyDeclarationMissing: false,
                 privacyContractName: '《用户隐私保护指引》',
                 loggingIn: false
             })
@@ -112,7 +127,8 @@ Page({
         await this._refreshPrivacyState().catch(() => {
             this.setData({
                 privacyChecked: true,
-                needPrivacyAuthorization: false
+                needPrivacyAuthorization: false,
+                privacyDeclarationMissing: false
             })
         })
     },
@@ -186,6 +202,122 @@ Page({
         const store = await app.getStoreInfo()
         if (store) {
             this.setData({ storeInfo: store, storePhone: store.phone || '' })
+        }
+    },
+
+    _syncProfileDraft: function (userInfo = {}) {
+        this.setData({
+            profileDraftNickName: userInfo.nickName || '',
+            profileDraftAvatarUrl: userInfo.avatarUrl || '',
+            pendingAvatarPath: '',
+            profileDirty: false,
+            profileSaving: false
+        })
+    },
+
+    _refreshProfileDirtyState: function (overrides = {}) {
+        const userInfo = this.data.userInfo || {}
+        const profileDraftNickName = Object.prototype.hasOwnProperty.call(overrides, 'profileDraftNickName')
+            ? overrides.profileDraftNickName
+            : this.data.profileDraftNickName
+        const profileDraftAvatarUrl = Object.prototype.hasOwnProperty.call(overrides, 'profileDraftAvatarUrl')
+            ? overrides.profileDraftAvatarUrl
+            : this.data.profileDraftAvatarUrl
+        const profileDirty = String(profileDraftNickName || '').trim() !== String(userInfo.nickName || '').trim()
+            || String(profileDraftAvatarUrl || '').trim() !== String(userInfo.avatarUrl || '').trim()
+        this.setData({ profileDirty })
+    },
+
+    onProfileNicknameInput: function (e) {
+        const profileDraftNickName = e.detail.value || ''
+        this.setData({ profileDraftNickName })
+        this._refreshProfileDirtyState({ profileDraftNickName })
+    },
+
+    onProfileNicknameBlur: function (e) {
+        const profileDraftNickName = e.detail.value || ''
+        this.setData({ profileDraftNickName })
+        this._refreshProfileDirtyState({ profileDraftNickName })
+    },
+
+    onChooseAvatar: function (e) {
+        const avatarUrl = e.detail && e.detail.avatarUrl ? String(e.detail.avatarUrl) : ''
+        if (!avatarUrl) {
+            wx.showToast({ title: '未选择头像', icon: 'none' })
+            return
+        }
+        this.setData({
+            profileDraftAvatarUrl: avatarUrl,
+            pendingAvatarPath: avatarUrl
+        })
+        this._refreshProfileDirtyState({ profileDraftAvatarUrl: avatarUrl })
+    },
+
+    _uploadProfileAvatar: async function (filePath) {
+        if (!filePath) return ''
+        const app = getApp()
+        const openid = String((app && app.globalData && app.globalData.openid) || '').trim() || 'anonymous'
+        const extension = getFileExtension(filePath)
+        const cloudPath = `avatars/${openid}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}${extension}`
+        const res = await wx.cloud.uploadFile({
+            cloudPath,
+            filePath
+        })
+        if (!res || !res.fileID) {
+            throw new Error('头像上传失败')
+        }
+        return String(res.fileID)
+    },
+
+    saveProfile: async function (e) {
+        if (!this.data.isLoggedIn) {
+            wx.showToast({ title: '请先登录', icon: 'none' })
+            return
+        }
+        if (this.data.profileSaving || !this.data.profileDirty) {
+            return
+        }
+
+        const submitNickName = e && e.detail && e.detail.value
+            ? String(e.detail.value.nickName || '').trim()
+            : ''
+        const nickName = submitNickName || String(this.data.profileDraftNickName || '').trim()
+        if (!nickName) {
+            wx.showToast({ title: '请输入昵称', icon: 'none' })
+            return
+        }
+
+        try {
+            this.setData({ profileSaving: true })
+
+            let avatarFileId = ''
+            if (this.data.pendingAvatarPath) {
+                avatarFileId = await this._uploadProfileAvatar(this.data.pendingAvatarPath)
+            }
+
+            const res = await callCloudWithLogin('opsApi', {
+                action: 'updateUserProfile',
+                nickName,
+                ...(avatarFileId ? { avatarFileId } : {})
+            })
+            const updatedUser = res && res.user ? res.user : {}
+            const app = getApp()
+            if (app && typeof app.setUserInfo === 'function') {
+                app.setUserInfo({
+                    ...(app.globalData.userInfo || {}),
+                    ...updatedUser
+                })
+            }
+
+            const finalUserInfo = (app && app.globalData && app.globalData.userInfo) || updatedUser
+            this.setData({
+                userInfo: finalUserInfo
+            })
+            this._syncProfileDraft(finalUserInfo)
+            wx.showToast({ title: '资料已保存', icon: 'success' })
+        } catch (error) {
+            this.setData({ profileSaving: false })
+            wx.showToast({ title: error.message || '保存失败', icon: 'none' })
         }
     },
 
@@ -289,9 +421,40 @@ Page({
     onAgreePrivacyAuthorization: function () {
         this.setData({
             privacyChecked: true,
-            needPrivacyAuthorization: false
+            needPrivacyAuthorization: false,
+            privacyDeclarationMissing: false
         })
         wx.showToast({ title: '已同意隐私指引', icon: 'success' })
+    },
+
+    retryPrivacyStateCheck: async function () {
+        await this._refreshPrivacyState().catch(() => {
+            this.setData({
+                privacyChecked: true,
+                needPrivacyAuthorization: false,
+                privacyDeclarationMissing: false
+            })
+        })
+    },
+
+    _handlePrivacyDeclarationMissing: function (detail) {
+        const app = getApp()
+        this.setData({
+            loggingIn: false,
+            privacyChecked: true,
+            needPrivacyAuthorization: false,
+            privacyDeclarationMissing: true
+        })
+        if (app && typeof app.showPrivacyDeclarationMissingModal === 'function') {
+            app.showPrivacyDeclarationMissingModal('手机号登录')
+            return
+        }
+        const message = detail && detail.errMsg ? detail.errMsg : '微信已阻止当前版本的手机号授权'
+        wx.showModal({
+            title: '当前版本暂无法完成授权',
+            content: message,
+            showCancel: false
+        })
     },
 
     onGetPhoneNumber: async function (e) {
@@ -300,6 +463,11 @@ Page({
         }
         if (this.data.needPrivacyAuthorization) {
             wx.showToast({ title: '请先阅读并同意隐私指引', icon: 'none' })
+            return
+        }
+        const app = getApp()
+        if (app && typeof app.isPrivacyScopeUndeclaredError === 'function' && app.isPrivacyScopeUndeclaredError(e.detail)) {
+            this._handlePrivacyDeclarationMissing(e.detail)
             return
         }
         if (e.detail.errMsg && e.detail.errMsg.includes('fail')) {
@@ -321,7 +489,6 @@ Page({
             const sessionToken = res?.sessionToken || ''
             const expiresAt = res?.expiresAt || ''
             const user = res?.user || {}
-            const app = getApp()
             if (!phone || !sessionToken) {
                 this.setData({ loggingIn: false })
                 wx.showToast({ title: '绑定失败', icon: 'none' })
@@ -345,14 +512,20 @@ Page({
                 userInfo: nextUserInfo,
                 loggingIn: false,
                 privacyChecked: true,
-                needPrivacyAuthorization: false
+                needPrivacyAuthorization: false,
+                privacyDeclarationMissing: false
             })
+            this._syncProfileDraft(nextUserInfo)
 
             wx.showToast({ title: '绑定成功', icon: 'success' })
             await this._loadUserStats().catch(() => {})
             this._goAfterLogin()
         } catch (err) {
             this.setData({ loggingIn: false })
+            if (app && typeof app.isPrivacyScopeUndeclaredError === 'function' && app.isPrivacyScopeUndeclaredError(err)) {
+                this._handlePrivacyDeclarationMissing(err)
+                return
+            }
             wx.showToast({ title: err.message || '绑定失败', icon: 'none' })
         }
     },

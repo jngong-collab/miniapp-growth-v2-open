@@ -166,8 +166,103 @@
   margin-bottom: var(--spacing-md);
 }
 
-.section-name { font-size: var(--font-md); font-weight: 700; color: var(--color-text-title); }
+.section-name,
+.section-title { font-size: var(--font-md); font-weight: 700; color: var(--color-text-title); }
 .section-more { font-size: var(--font-sm); color: var(--color-text-sub); font-weight: 500; }
+
+.profile-editor {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: stretch;
+}
+
+.profile-avatar-picker {
+  width: 188rpx;
+  min-height: 220rpx;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #FBF6EF, #F5E8D8);
+  border: 1rpx solid rgba(139,107,74,0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  box-sizing: border-box;
+}
+
+.profile-avatar-picker::after,
+.profile-save-btn::after {
+  border: none;
+}
+
+.profile-avatar-image,
+.profile-avatar-fallback {
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+}
+
+.profile-avatar-image {
+  display: block;
+  overflow: hidden;
+}
+
+.profile-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.75);
+  font-size: 48rpx;
+}
+
+.profile-avatar-tip {
+  font-size: var(--font-xs);
+  color: #8B6B4A;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.profile-editor-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.profile-name-input {
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1rpx solid var(--color-border);
+  font-size: var(--font-base);
+  color: var(--color-text-title);
+  box-sizing: border-box;
+}
+
+.profile-editor-desc {
+  font-size: var(--font-xs);
+  color: var(--color-text-sub);
+  line-height: 1.7;
+}
+
+.profile-save-btn {
+  margin: 0;
+  height: 78rpx;
+  border-radius: var(--radius-capsule);
+  background: linear-gradient(135deg, #D4A574, #B8916B);
+  color: #fff;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  box-shadow: 0 10rpx 24rpx rgba(184,145,107,0.14);
+}
+
+.profile-save-btn[disabled] {
+  background: #E7D7C5;
+  color: rgba(80,54,34,0.66);
+  box-shadow: none;
+}
 
 /* 订单快捷入口 */
 .order-grid { display: flex; justify-content: space-around; }

@@ -9,6 +9,7 @@ Page({
         loggingIn: false,
         privacyChecked: false,
         needPrivacyAuthorization: false,
+        privacyDeclarationMissing: false,
         privacyContractName: '《用户隐私保护指引》',
         state: 'idle',    // 'idle' | 'preview' | 'analyzing'
         selectedImage: '',
@@ -106,6 +107,7 @@ Page({
         this.setData({
             privacyChecked: true,
             needPrivacyAuthorization: !!privacyState.needAuthorization,
+            privacyDeclarationMissing: false,
             privacyContractName: privacyState.privacyContractName || '《用户隐私保护指引》'
         })
     },
@@ -193,9 +195,41 @@ Page({
     onAgreePrivacyAuthorization: function () {
         this.setData({
             privacyChecked: true,
-            needPrivacyAuthorization: false
+            needPrivacyAuthorization: false,
+            privacyDeclarationMissing: false
         })
         wx.showToast({ title: '已同意隐私指引', icon: 'success' })
+    },
+
+    retryPrivacyStateCheck: async function () {
+        await this._refreshPrivacyState().catch(() => {
+            this.setData({
+                privacyChecked: true,
+                needPrivacyAuthorization: false,
+                privacyDeclarationMissing: false
+            })
+        })
+    },
+
+    _handlePrivacyDeclarationMissing: function (detail) {
+        const app = getApp()
+        this.setData({
+            showLoginModal: true,
+            loggingIn: false,
+            privacyChecked: true,
+            needPrivacyAuthorization: false,
+            privacyDeclarationMissing: true
+        })
+        if (app && typeof app.showPrivacyDeclarationMissingModal === 'function') {
+            app.showPrivacyDeclarationMissingModal('手机号登录')
+            return
+        }
+        const message = detail && detail.errMsg ? detail.errMsg : '微信已阻止当前版本的手机号授权'
+        wx.showModal({
+            title: '当前版本暂无法完成授权',
+            content: message,
+            showCancel: false
+        })
     },
 
     onGetPhoneNumber: async function (e) {
@@ -204,6 +238,11 @@ Page({
         }
         if (this.data.needPrivacyAuthorization) {
             wx.showToast({ title: '请先阅读并同意隐私指引', icon: 'none' })
+            return
+        }
+        const app = getApp()
+        if (app && typeof app.isPrivacyScopeUndeclaredError === 'function' && app.isPrivacyScopeUndeclaredError(e.detail)) {
+            this._handlePrivacyDeclarationMissing(e.detail)
             return
         }
         if (e.detail.errMsg && e.detail.errMsg.includes('fail')) {
@@ -225,8 +264,8 @@ Page({
             const sessionToken = res?.sessionToken || ''
             const expiresAt = res?.expiresAt || ''
             const user = res?.user || {}
-            const app = getApp()
             if (!phone || !sessionToken) {
+                this.setData({ loggingIn: false })
                 wx.showToast({ title: '绑定失败', icon: 'none' })
                 return
             }
@@ -243,7 +282,8 @@ Page({
                 showLoginModal: false,
                 loggingIn: false,
                 privacyChecked: true,
-                needPrivacyAuthorization: false
+                needPrivacyAuthorization: false,
+                privacyDeclarationMissing: false
             })
             await this._loadHistory()
             wx.showToast({ title: '登录成功', icon: 'success' })
@@ -253,6 +293,10 @@ Page({
             }
         } catch (error) {
             this.setData({ loggingIn: false })
+            if (app && typeof app.isPrivacyScopeUndeclaredError === 'function' && app.isPrivacyScopeUndeclaredError(error)) {
+                this._handlePrivacyDeclarationMissing(error)
+                return
+            }
             wx.showToast({ title: error.message || '绑定失败', icon: 'none' })
         }
     },

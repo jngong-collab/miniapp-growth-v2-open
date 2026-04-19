@@ -1,4 +1,5 @@
 const { db, _cmd } = require('./context')
+const dataModule = require('./data')
 const {
   getAccessStoreId,
   safeGetById,
@@ -8,7 +9,7 @@ const {
   fetchOrdersMap,
   fetchUsersMap,
   writeAuditLog
-} = require('./data')
+} = dataModule
 const {
   fenToYuan,
   formatDateTime,
@@ -23,6 +24,10 @@ const {
   toTimestamp
 } = require('./helpers')
 const { approveRefundRequest } = require('./refund')
+
+const hydrateUserAvatarUrl = typeof dataModule.hydrateUserAvatarUrl === 'function'
+  ? dataModule.hydrateUserAvatarUrl
+  : async (user) => user || null
 
 const VERIFICATION_STATUS_LABELS = {
   pending: '待核销',
@@ -591,11 +596,12 @@ async function getOrderDetail(access, event) {
   const order = await safeGetByIdAndStore('orders', orderId, storeId)
   if (!order) return { code: -1, msg: '无权限查看该订单' }
 
-  const [items, refundRequest, user] = await Promise.all([
+  const [items, refundRequest, rawUser] = await Promise.all([
     safeList('order_items', { orderId }, { orderBy: ['createdAt', 'asc'], limit: 100 }),
     safeGetFirst('refund_requests', { orderId }),
     order._openid ? safeGetFirst('users', { _openid: order._openid }) : null
   ])
+  const user = await hydrateUserAvatarUrl(rawUser)
 
   const detail = normalizeOrderSummary(order, items, user, refundRequest)
   detail.items = items.map(item => ({

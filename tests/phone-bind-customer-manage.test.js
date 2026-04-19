@@ -55,7 +55,7 @@ function unloadModule(modulePath) {
   delete require.cache[modulePath]
 }
 
-function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000' } = {}) {
+function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000', phoneError = null } = {}) {
   const users = user ? [{ ...user }] : []
   const authSessions = []
   return {
@@ -74,6 +74,9 @@ function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000' } = {}) {
     openapi: {
       phonenumber: {
         getPhoneNumber: async ({ code }) => {
+          if (phoneError) {
+            throw phoneError
+          }
           if (code === 'valid-code') {
             return { phone_info: { phoneNumber } }
           }
@@ -272,6 +275,36 @@ test('opsApi bindPhoneNumber binds phone and handles rebind', async () => {
   assert.ok(res.data.sessionToken)
   assert.ok(res.data.user)
   assert.equal(res.data.user.phone, '13800138000')
+})
+
+test('opsApi bindPhoneNumber exposes privacy declaration and invalid-code failures with specific messages', async () => {
+  const privacyOpsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
+    'wx-server-sdk': createOpsApiWxSdk({
+      user: { _id: 'user-1', _openid: 'test-openid', phone: '', storeId: 'store-a' },
+      phoneError: {
+        errno: 112,
+        message: 'getPhoneNumber:fail api scope is not declared in the privacy agreement'
+      }
+    })
+  })
+
+  const privacyRes = await privacyOpsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
+  assert.equal(privacyRes.code, 112)
+  assert.match(privacyRes.msg, /隐私保护指引|隐私声明/)
+
+  const invalidCodeOpsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
+    'wx-server-sdk': createOpsApiWxSdk({
+      user: { _id: 'user-1', _openid: 'test-openid', phone: '', storeId: 'store-a' },
+      phoneError: {
+        errCode: 40029,
+        message: 'invalid code'
+      }
+    })
+  })
+
+  const invalidCodeRes = await invalidCodeOpsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
+  assert.equal(invalidCodeRes.code, -1)
+  assert.match(invalidCodeRes.msg, /重新点击授权|授权已失效/)
 })
 
 test('opsApi ensureAuth, getSession and logout follow the persisted session lifecycle', async () => {
@@ -644,6 +677,130 @@ test('profile onGetPhoneNumber refreshes local state with full bind payload', as
   }
 })
 
+test('profile onGetPhoneNumber surfaces privacy declaration guidance when phone scope is undeclared', async () => {
+  const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
+  const wxCalls = { showToast: [], showModal: [] }
+  let cloudCalls = 0
+
+  try {
+    global.wx = {
+      cloud: {
+        callFunction() {
+          cloudCalls += 1
+          throw new Error('should not request bindPhoneNumber when privacy scope is undeclared')
+        }
+      },
+      showToast(payload) {
+        wxCalls.showToast.push(payload)
+      },
+      showModal(payload) {
+        wxCalls.showModal.push(payload)
+      }
+    }
+
+    const appMock = {
+      isPrivacyScopeUndeclaredError(detail) {
+        return detail && detail.errno === 112
+      },
+      showPrivacyDeclarationMissingModal(feature) {
+        wx.showModal({
+          title: '当前版本暂无法完成授权',
+          content: `微信检测到当前版本未完成${feature}所需的隐私声明配置，请先完善《用户隐私保护指引》后再试。`,
+          showCancel: false
+        })
+      }
+    }
+    global.getApp = () => appMock
+
+    const page = {
+      ...pageDef,
+      data: { ...JSON.parse(JSON.stringify(pageDef.data)), privacyChecked: true },
+      setData(update) {
+        this.data = { ...this.data, ...update }
+      }
+    }
+
+    await page.onGetPhoneNumber({
+      detail: {
+        errMsg: 'getPhoneNumber:fail api scope is not declared in the privacy agreement',
+        errno: 112
+      }
+    })
+
+    assert.equal(cloudCalls, 0)
+    assert.equal(page.data.privacyDeclarationMissing, true)
+    assert.equal(page.data.needPrivacyAuthorization, false)
+    assert.equal(page.data.loggingIn, false)
+    assert.equal(wxCalls.showToast.length, 0)
+    assert.equal(wxCalls.showModal.length, 1)
+    assert.match(wxCalls.showModal[0].content, /手机号登录/)
+  } finally {
+    delete global.Page
+    delete global.wx
+    delete global.getApp
+  }
+})
+
+test('profile onGetPhoneNumber maps server-side privacy declaration errors into the privacy guidance state', async () => {
+  const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
+  const wxCalls = { showToast: [], showModal: [] }
+
+  try {
+    global.wx = {
+      cloud: {
+        callFunction() {
+          return Promise.resolve({
+            result: {
+              code: 112,
+              msg: '当前版本未完成手机号相关隐私声明配置，请完善《用户隐私保护指引》后再试'
+            }
+          })
+        }
+      },
+      showToast(payload) {
+        wxCalls.showToast.push(payload)
+      },
+      showModal(payload) {
+        wxCalls.showModal.push(payload)
+      }
+    }
+
+    const appMock = {
+      isPrivacyScopeUndeclaredError(detail) {
+        return detail && (detail.code === 112 || detail.errno === 112)
+      },
+      showPrivacyDeclarationMissingModal(feature) {
+        wx.showModal({
+          title: '当前版本暂无法完成授权',
+          content: `微信检测到当前版本未完成${feature}所需的隐私声明配置，请先完善《用户隐私保护指引》后再试。`,
+          showCancel: false
+        })
+      }
+    }
+    global.getApp = () => appMock
+
+    const page = {
+      ...pageDef,
+      data: { ...JSON.parse(JSON.stringify(pageDef.data)), privacyChecked: true },
+      setData(update) {
+        this.data = { ...this.data, ...update }
+      }
+    }
+
+    await page.onGetPhoneNumber({ detail: { code: 'mock-phone-code', errMsg: 'getPhoneNumber:ok' } })
+
+    assert.equal(page.data.privacyDeclarationMissing, true)
+    assert.equal(page.data.loggingIn, false)
+    assert.equal(wxCalls.showToast.length, 0)
+    assert.equal(wxCalls.showModal.length, 1)
+    assert.match(wxCalls.showModal[0].content, /手机号登录/)
+  } finally {
+    delete global.Page
+    delete global.wx
+    delete global.getApp
+  }
+})
+
 test('profile page exposes guest login guidance while cart checkout and payment stay login-gated', () => {
   const profileJsSource = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'profile', 'profile.js'), 'utf8')
   const profileWxmlSource = fs.readFileSync(path.join(repoRoot, 'miniapp', 'pages', 'profile', 'profile.wxml'), 'utf8')
@@ -655,14 +812,18 @@ test('profile page exposes guest login guidance while cart checkout and payment 
   assert.match(profileJsSource, /consumePendingProtectedTarget/)
   assert.match(profileJsSource, /openPrivacyContract/)
   assert.match(profileJsSource, /onAgreePrivacyAuthorization/)
+  assert.match(profileJsSource, /privacyDeclarationMissing/)
   assert.match(profileWxmlSource, /guest-showcase-card/)
   assert.match(profileWxmlSource, /<text class="guest-showcase-title">未登录<\/text>/)
   assert.match(profileWxmlSource, /agreePrivacyAuthorization/)
   assert.match(profileWxmlSource, /同意隐私指引/)
+  assert.match(profileWxmlSource, /当前版本暂无法使用手机号登录/)
+  assert.match(profileWxmlSource, /重新检查/)
   assert.match(profileWxmlSource, /微信授权手机号登录/)
   assert.match(profileWxmlSource, /退出登录/)
   assert.match(appSource, /getPrivacySetting/)
   assert.match(appSource, /openPrivacyContract/)
+  assert.match(appSource, /isPrivacyScopeUndeclaredError/)
 
   assert.match(cartSource, /requireCustomerLogin\('\/pages\/cart\/cart\?from=checkout'/)
   assert.match(cartSource, /callCloudWithLogin\('commerceApi',\s*\{\s*action:\s*'createCartOrder'/s)
@@ -799,6 +960,135 @@ test('tongue page keeps interface visible and prompts login before protected act
     assert.equal(tongueInstance.data.state, 'idle')
     assert.equal(tongueInstance.data.showLoginModal, true)
     assert.equal(wxCalls.showToast[0].title, '已同意隐私指引')
+  } finally {
+    delete global.Page
+    delete global.getApp
+    delete global.wx
+  }
+})
+
+test('tongue onGetPhoneNumber surfaces privacy declaration guidance when phone scope is undeclared', async () => {
+  const tonguePage = loadMiniappPage('miniapp/pages/tongue/tongue.js')
+  const wxCalls = { showToast: [], showModal: [] }
+  let cloudCalls = 0
+
+  try {
+    global.wx = {
+      cloud: {
+        callFunction() {
+          cloudCalls += 1
+          throw new Error('should not request bindPhoneNumber when privacy scope is undeclared')
+        }
+      },
+      showToast(payload) {
+        wxCalls.showToast.push(payload)
+      },
+      showModal(payload) {
+        wxCalls.showModal.push(payload)
+      },
+      getStorageSync: () => '',
+      setStorageSync: () => {}
+    }
+
+    const appMock = {
+      isPrivacyScopeUndeclaredError(detail) {
+        return detail && detail.errno === 112
+      },
+      showPrivacyDeclarationMissingModal(feature) {
+        wx.showModal({
+          title: '当前版本暂无法完成授权',
+          content: `微信检测到当前版本未完成${feature}所需的隐私声明配置，请先完善《用户隐私保护指引》后再试。`,
+          showCancel: false
+        })
+      }
+    }
+    global.getApp = () => appMock
+
+    const tongueInstance = {
+      ...tonguePage,
+      data: { ...JSON.parse(JSON.stringify(tonguePage.data)), privacyChecked: true },
+      setData(update) {
+        this.data = { ...this.data, ...update }
+      }
+    }
+
+    await tongueInstance.onGetPhoneNumber({
+      detail: {
+        errMsg: 'getPhoneNumber:fail api scope is not declared in the privacy agreement',
+        errno: 112
+      }
+    })
+
+    assert.equal(cloudCalls, 0)
+    assert.equal(tongueInstance.data.privacyDeclarationMissing, true)
+    assert.equal(tongueInstance.data.needPrivacyAuthorization, false)
+    assert.equal(tongueInstance.data.showLoginModal, true)
+    assert.equal(wxCalls.showToast.length, 0)
+    assert.equal(wxCalls.showModal.length, 1)
+    assert.match(wxCalls.showModal[0].content, /手机号登录/)
+  } finally {
+    delete global.Page
+    delete global.getApp
+    delete global.wx
+  }
+})
+
+test('tongue onGetPhoneNumber maps server-side privacy declaration errors into the privacy guidance state', async () => {
+  const tonguePage = loadMiniappPage('miniapp/pages/tongue/tongue.js')
+  const wxCalls = { showToast: [], showModal: [] }
+
+  try {
+    global.wx = {
+      cloud: {
+        callFunction() {
+          return Promise.resolve({
+            result: {
+              code: 112,
+              msg: '当前版本未完成手机号相关隐私声明配置，请完善《用户隐私保护指引》后再试'
+            }
+          })
+        }
+      },
+      showToast(payload) {
+        wxCalls.showToast.push(payload)
+      },
+      showModal(payload) {
+        wxCalls.showModal.push(payload)
+      },
+      getStorageSync: () => '',
+      setStorageSync: () => {}
+    }
+
+    const appMock = {
+      isPrivacyScopeUndeclaredError(detail) {
+        return detail && (detail.code === 112 || detail.errno === 112)
+      },
+      showPrivacyDeclarationMissingModal(feature) {
+        wx.showModal({
+          title: '当前版本暂无法完成授权',
+          content: `微信检测到当前版本未完成${feature}所需的隐私声明配置，请先完善《用户隐私保护指引》后再试。`,
+          showCancel: false
+        })
+      }
+    }
+    global.getApp = () => appMock
+
+    const tongueInstance = {
+      ...tonguePage,
+      data: { ...JSON.parse(JSON.stringify(tonguePage.data)), privacyChecked: true, showLoginModal: true },
+      setData(update) {
+        this.data = { ...this.data, ...update }
+      }
+    }
+
+    await tongueInstance.onGetPhoneNumber({ detail: { code: 'mock-phone-code', errMsg: 'getPhoneNumber:ok' } })
+
+    assert.equal(tongueInstance.data.privacyDeclarationMissing, true)
+    assert.equal(tongueInstance.data.showLoginModal, true)
+    assert.equal(tongueInstance.data.loggingIn, false)
+    assert.equal(wxCalls.showToast.length, 0)
+    assert.equal(wxCalls.showModal.length, 1)
+    assert.match(wxCalls.showModal[0].content, /手机号登录/)
   } finally {
     delete global.Page
     delete global.getApp

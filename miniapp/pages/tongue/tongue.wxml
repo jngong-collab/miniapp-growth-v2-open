@@ -164,6 +164,17 @@
             </button>
           </view>
         </block>
+        <block wx:elif="{{privacyDeclarationMissing}}">
+          <view class="auth-privacy-box">
+            <text class="auth-privacy-title">当前版本暂无法使用手机号登录</text>
+            <text class="auth-privacy-desc">微信检测到当前版本未完成手机号相关隐私声明，已阻止授权。请更新到完成隐私指引配置的版本后再试。</text>
+
+            <button class="tongue-privacy-link" bindtap="openPrivacyContract">查看{{privacyContractName}}</button>
+            <button class="tongue-privacy-agree" bindtap="retryPrivacyStateCheck">
+              重新检查
+            </button>
+          </view>
+        </block>
         <button
           wx:else
           class="tongue-login-action"

@@ -461,6 +461,33 @@ App({
     })
   },
 
+  isPrivacyScopeUndeclaredError(detail = {}) {
+    const errMsg = typeof detail === 'string'
+      ? detail
+      : String(detail.errMsg || detail.message || detail.result?.msg || '')
+    const errno = Number(
+      detail.errno
+      || detail.errNo
+      || detail.errorCode
+      || detail.code
+      || detail.result?.code
+      || 0
+    )
+    return errno === 112
+      || /api scope is not declared in the privacy agreement/i.test(errMsg)
+      || /手机号相关隐私声明配置/i.test(errMsg)
+  },
+
+  showPrivacyDeclarationMissingModal(feature = '手机号登录') {
+    if (!wx || typeof wx.showModal !== 'function') return
+    wx.showModal({
+      title: '当前版本暂无法完成授权',
+      content: `微信检测到当前版本未完成${feature}所需的隐私声明配置，请先完善《用户隐私保护指引》后再试。`,
+      showCancel: false,
+      confirmText: '我知道了'
+    })
+  },
+
   _navigateToPageOrTab(url) {
     const target = buildRedirectTarget(url)
     if (!target) return

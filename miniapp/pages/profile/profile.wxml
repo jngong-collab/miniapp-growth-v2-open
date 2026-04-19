@@ -97,6 +97,16 @@
             </view>
           </view>
         </block>
+        <block wx:elif="{{privacyDeclarationMissing}}">
+          <view class="guest-privacy-card">
+            <text class="guest-privacy-title">当前版本暂无法使用手机号登录</text>
+            <text class="guest-privacy-desc">微信检测到当前版本未完成手机号相关隐私声明，已阻止授权。请更新到完成隐私指引配置的版本后再试。</text>
+            <view class="guest-privacy-actions">
+              <button class="guest-privacy-link-btn" bindtap="openPrivacyContract">查看{{privacyContractName}}</button>
+              <button class="guest-privacy-agree-btn" bindtap="retryPrivacyStateCheck">重新检查</button>
+            </view>
+          </view>
+        </block>
         <button
           wx:else
           class="guest-login-btn"
@@ -128,6 +138,47 @@
 
   <!-- 主体内容 -->
   <view class="profile-body">
+    <view class="section-block animate-fade-up" style="animation-delay: 0.1s" wx:if="{{isLoggedIn}}">
+      <view class="section-head">
+        <text class="section-title">头像与昵称</text>
+        <text class="section-more">用于个人中心、邀请记录和后台客户展示</text>
+      </view>
+      <view class="profile-editor">
+        <button
+          class="profile-avatar-picker"
+          open-type="chooseAvatar"
+          bind:chooseavatar="onChooseAvatar"
+        >
+          <image
+            class="profile-avatar-image"
+            wx:if="{{profileDraftAvatarUrl}}"
+            src="{{profileDraftAvatarUrl}}"
+            mode="aspectFill"
+          ></image>
+          <view class="profile-avatar-fallback" wx:else>👤</view>
+          <view class="profile-avatar-tip">点击更换头像</view>
+        </button>
+        <form class="profile-editor-form" bindsubmit="saveProfile">
+          <input
+            class="profile-name-input"
+            name="nickName"
+            type="nickname"
+            placeholder="请输入昵称"
+            maxlength="20"
+            value="{{profileDraftNickName}}"
+            bindinput="onProfileNicknameInput"
+            bindblur="onProfileNicknameBlur"
+          />
+          <text class="profile-editor-desc">头像昵称将展示在个人中心、邀请记录和门店后台客户列表中。</text>
+          <button
+            class="profile-save-btn"
+            form-type="submit"
+            loading="{{profileSaving}}"
+            disabled="{{profileSaving || !profileDirty}}"
+          >{{profileSaving ? '保存中...' : (profileDirty ? '保存资料' : '资料已同步')}}</button>
+        </form>
+      </view>
+    </view>
 
     <!-- 订单快捷入口 -->
     <view class="section-block animate-fade-up" style="animation-delay: 0.14s" wx:if="{{isLoggedIn}}">
