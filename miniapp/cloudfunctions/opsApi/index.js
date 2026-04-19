@@ -248,9 +248,10 @@ async function loginWithPhone(event, openid, options = {}) {
     let phoneNumber = ''
     try {
         const phoneRes = await cloud.openapi.phonenumber.getPhoneNumber({ code })
-        phoneNumber = phoneRes && phoneRes.phone_info && phoneRes.phone_info.phoneNumber
-            ? String(phoneRes.phone_info.phoneNumber)
-            : ''
+        phoneNumber = extractPhoneNumberFromOpenApiResult(phoneRes)
+        if (!phoneNumber) {
+            console.error('phonenumber.getPhoneNumber 未识别手机号字段:', summarizePhoneOpenApiResult(phoneRes))
+        }
     } catch (err) {
         const phoneError = normalizePhoneNumberOpenApiError(err)
         console.error('phonenumber.getPhoneNumber 失败:', {
@@ -1555,6 +1556,46 @@ async function rollbackRefundingState({ requestId, orderId, outRefundNo, reason 
 
 function normalizeMemberLevel(memberLevel) {
     return MEMBER_LEVELS.includes(memberLevel) ? memberLevel : 'normal'
+}
+
+function extractPhoneNumberFromOpenApiResult(result) {
+    const candidates = [
+        result && result.phone_info && result.phone_info.phoneNumber,
+        result && result.phone_info && result.phone_info.purePhoneNumber,
+        result && result.phoneInfo && result.phoneInfo.phoneNumber,
+        result && result.phoneInfo && result.phoneInfo.purePhoneNumber,
+        result && result.data && result.data.phone_info && result.data.phone_info.phoneNumber,
+        result && result.data && result.data.phone_info && result.data.phone_info.purePhoneNumber,
+        result && result.data && result.data.phoneInfo && result.data.phoneInfo.phoneNumber,
+        result && result.data && result.data.phoneInfo && result.data.phoneInfo.purePhoneNumber,
+        result && result.phoneNumber,
+        result && result.purePhoneNumber
+    ]
+
+    for (const item of candidates) {
+        const value = String(item || '').trim()
+        if (value) return value
+    }
+    return ''
+}
+
+function summarizePhoneOpenApiResult(result) {
+    const topLevelKeys = result && typeof result === 'object' ? Object.keys(result) : []
+    const phoneInfoKeys = result && result.phone_info && typeof result.phone_info === 'object'
+        ? Object.keys(result.phone_info)
+        : []
+    const camelPhoneInfoKeys = result && result.phoneInfo && typeof result.phoneInfo === 'object'
+        ? Object.keys(result.phoneInfo)
+        : []
+    const dataKeys = result && result.data && typeof result.data === 'object'
+        ? Object.keys(result.data)
+        : []
+    return {
+        topLevelKeys,
+        dataKeys,
+        phoneInfoKeys,
+        camelPhoneInfoKeys
+    }
 }
 
 function normalizePhoneNumberOpenApiError(error) {

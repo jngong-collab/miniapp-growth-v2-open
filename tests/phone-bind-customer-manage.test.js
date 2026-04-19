@@ -55,7 +55,7 @@ function unloadModule(modulePath) {
   delete require.cache[modulePath]
 }
 
-function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000', phoneError = null } = {}) {
+function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000', phoneError = null, phoneResponse = null } = {}) {
   const users = user ? [{ ...user }] : []
   const authSessions = []
   return {
@@ -78,6 +78,9 @@ function createOpsApiWxSdk({ user = null, phoneNumber = '13800138000', phoneErro
             throw phoneError
           }
           if (code === 'valid-code') {
+            if (phoneResponse) {
+              return phoneResponse
+            }
             return { phone_info: { phoneNumber } }
           }
           throw new Error('invalid code')
@@ -275,6 +278,26 @@ test('opsApi bindPhoneNumber binds phone and handles rebind', async () => {
   assert.ok(res.data.sessionToken)
   assert.ok(res.data.user)
   assert.equal(res.data.user.phone, '13800138000')
+})
+
+test('opsApi bindPhoneNumber accepts alternate phone response shapes from openapi', async () => {
+  const opsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
+    'wx-server-sdk': createOpsApiWxSdk({
+      user: { _id: 'user-1', _openid: 'test-openid', phone: '', storeId: 'store-a' },
+      phoneResponse: {
+        data: {
+          phoneInfo: {
+            purePhoneNumber: '13800138001'
+          }
+        }
+      }
+    })
+  })
+
+  const res = await opsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
+  assert.equal(res.code, 0)
+  assert.equal(res.data.phone, '13800138001')
+  assert.equal(res.data.user.phone, '13800138001')
 })
 
 test('opsApi bindPhoneNumber exposes privacy declaration, permission, and invalid-code failures with specific messages', async () => {
