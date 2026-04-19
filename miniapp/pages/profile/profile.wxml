@@ -146,8 +146,7 @@
       <view class="profile-editor">
         <button
           class="profile-avatar-picker"
-          open-type="chooseAvatar"
-          bind:chooseavatar="onChooseAvatar"
+          bindtap="chooseProfileAvatar"
         >
           <image
             class="profile-avatar-image"

@@ -723,6 +723,42 @@ test('profile onGetPhoneNumber refreshes local state with full bind payload', as
   }
 })
 
+test('profile chooseProfileAvatar ignores cancel without showing an error toast', async () => {
+  const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
+  const wxCalls = { showToast: [] }
+
+  try {
+    global.wx = {
+      chooseMedia() {
+        return Promise.reject({ errMsg: 'chooseMedia:fail cancel' })
+      },
+      showToast(payload) {
+        wxCalls.showToast.push(payload)
+      }
+    }
+    global.getApp = () => ({})
+
+    const page = {
+      ...pageDef,
+      data: JSON.parse(JSON.stringify(pageDef.data)),
+      setData(update) {
+        this.data = { ...this.data, ...update }
+      },
+      _refreshProfileDirtyState() {}
+    }
+
+    await page.chooseProfileAvatar()
+
+    assert.equal(wxCalls.showToast.length, 0)
+    assert.equal(page.data.pendingAvatarPath, '')
+    assert.equal(page.data.profileDraftAvatarUrl, '')
+  } finally {
+    delete global.Page
+    delete global.wx
+    delete global.getApp
+  }
+})
+
 test('profile onGetPhoneNumber surfaces privacy declaration guidance when phone scope is undeclared', async () => {
   const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
   const wxCalls = { showToast: [], showModal: [] }

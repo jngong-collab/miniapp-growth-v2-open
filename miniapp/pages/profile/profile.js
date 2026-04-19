@@ -10,6 +10,31 @@ function getFileExtension(filePath = '') {
     return matched[0].replace(/\?$/, '')
 }
 
+function isAvatarSelectionCanceled(error) {
+    const message = String(
+        (error && (error.errMsg || error.message || error.toString && error.toString()))
+        || ''
+    ).toLowerCase()
+    return /cancel|canceled|cancelled/.test(message)
+}
+
+function getAvatarPathFromPickerResult(result) {
+    if (!result || typeof result !== 'object') return ''
+
+    const mediaFile = Array.isArray(result.tempFiles) && result.tempFiles.length
+        ? result.tempFiles[0]
+        : null
+    const mediaPath = mediaFile && typeof mediaFile.tempFilePath === 'string'
+        ? mediaFile.tempFilePath
+        : ''
+    if (mediaPath) return mediaPath
+
+    const imagePath = Array.isArray(result.tempFilePaths) && result.tempFilePaths.length
+        ? String(result.tempFilePaths[0] || '')
+        : ''
+    return imagePath
+}
+
 function getGuestData() {
     return {
         isLoggedIn: false,
@@ -240,10 +265,8 @@ Page({
         this._refreshProfileDirtyState({ profileDraftNickName })
     },
 
-    onChooseAvatar: function (e) {
-        const avatarUrl = e.detail && e.detail.avatarUrl ? String(e.detail.avatarUrl) : ''
+    _applyChosenAvatar: function (avatarUrl) {
         if (!avatarUrl) {
-            wx.showToast({ title: '未选择头像', icon: 'none' })
             return
         }
         this.setData({
@@ -251,6 +274,46 @@ Page({
             pendingAvatarPath: avatarUrl
         })
         this._refreshProfileDirtyState({ profileDraftAvatarUrl: avatarUrl })
+    },
+
+    chooseProfileAvatar: async function () {
+        const chooseMedia = wx && typeof wx.chooseMedia === 'function'
+            ? () => wx.chooseMedia({
+                count: 1,
+                mediaType: ['image'],
+                sourceType: ['album', 'camera']
+            })
+            : null
+
+        const chooseImage = wx && typeof wx.chooseImage === 'function'
+            ? () => wx.chooseImage({
+                count: 1,
+                sizeType: ['compressed'],
+                sourceType: ['album', 'camera']
+            })
+            : null
+
+        if (!chooseMedia && !chooseImage) {
+            wx.showToast({ title: '当前设备暂不支持选择头像', icon: 'none' })
+            return
+        }
+
+        try {
+            const result = chooseMedia
+                ? await chooseMedia()
+                : await chooseImage()
+            const avatarUrl = getAvatarPathFromPickerResult(result)
+            if (!avatarUrl) {
+                wx.showToast({ title: '未选择头像', icon: 'none' })
+                return
+            }
+            this._applyChosenAvatar(avatarUrl)
+        } catch (error) {
+            if (isAvatarSelectionCanceled(error)) {
+                return
+            }
+            wx.showToast({ title: '选择头像失败', icon: 'none' })
+        }
     },
 
     _uploadProfileAvatar: async function (filePath) {
