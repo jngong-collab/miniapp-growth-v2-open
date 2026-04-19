@@ -1581,6 +1581,18 @@ function normalizePhoneNumberOpenApiError(error) {
     }
 
     if (
+        code === -604101
+        || /function has no permission to call this api/i.test(debugMsg)
+        || /system error:\s*error code:\s*-604101/i.test(debugMsg)
+    ) {
+        return {
+            code: -604101,
+            msg: '登录服务缺少手机号权限，请联系管理员',
+            debugMsg
+        }
+    }
+
+    if (
         /invalid code|code been used|code expired|invalid\s+phone\s+code/i.test(debugMsg)
         || (/code/i.test(debugMsg) && /(used|expired|invalid)/i.test(debugMsg))
         || /授权码.*(失效|过期|已被使用)/.test(debugMsg)

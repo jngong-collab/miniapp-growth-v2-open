@@ -277,7 +277,7 @@ test('opsApi bindPhoneNumber binds phone and handles rebind', async () => {
   assert.equal(res.data.user.phone, '13800138000')
 })
 
-test('opsApi bindPhoneNumber exposes privacy declaration and invalid-code failures with specific messages', async () => {
+test('opsApi bindPhoneNumber exposes privacy declaration, permission, and invalid-code failures with specific messages', async () => {
   const privacyOpsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
     'wx-server-sdk': createOpsApiWxSdk({
       user: { _id: 'user-1', _openid: 'test-openid', phone: '', storeId: 'store-a' },
@@ -292,6 +292,20 @@ test('opsApi bindPhoneNumber exposes privacy declaration and invalid-code failur
   assert.equal(privacyRes.code, 112)
   assert.match(privacyRes.msg, /隐私保护指引|隐私声明/)
 
+  const permissionOpsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
+    'wx-server-sdk': createOpsApiWxSdk({
+      user: { _id: 'user-1', _openid: 'test-openid', phone: '', storeId: 'store-a' },
+      phoneError: {
+        errCode: -604101,
+        errMsg: 'system error: error code: -604101 function has no permission to call this API'
+      }
+    })
+  })
+
+  const permissionRes = await permissionOpsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
+  assert.equal(permissionRes.code, -604101)
+  assert.match(permissionRes.msg, /缺少手机号权限|联系管理员/)
+
   const invalidCodeOpsModule = loadFreshModule('../miniapp/cloudfunctions/opsApi/index.js', {
     'wx-server-sdk': createOpsApiWxSdk({
       user: { _id: 'user-1', _openid: 'test-openid', phone: '', storeId: 'store-a' },
@@ -305,6 +319,15 @@ test('opsApi bindPhoneNumber exposes privacy declaration and invalid-code failur
   const invalidCodeRes = await invalidCodeOpsModule.main({ action: 'bindPhoneNumber', code: 'valid-code' })
   assert.equal(invalidCodeRes.code, -1)
   assert.match(invalidCodeRes.msg, /重新点击授权|授权已失效/)
+})
+
+test('opsApi declares phone number openapi permission in cloud function config', () => {
+  const configPath = path.join(repoRoot, 'miniapp', 'cloudfunctions', 'opsApi', 'config.json')
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+
+  assert.ok(config.permissions)
+  assert.ok(Array.isArray(config.permissions.openapi))
+  assert.ok(config.permissions.openapi.includes('phonenumber.getPhoneNumber'))
 })
 
 test('opsApi ensureAuth, getSession and logout follow the persisted session lifecycle', async () => {
