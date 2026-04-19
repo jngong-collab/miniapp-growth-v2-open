@@ -759,6 +759,82 @@ test('profile chooseProfileAvatar ignores cancel without showing an error toast'
   }
 })
 
+test('profile logout refreshes guest privacy state so the login entry becomes available immediately', async () => {
+  const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
+  const wxCalls = { showToast: [] }
+  let modalPromise = Promise.resolve()
+  let refreshPrivacyCalls = 0
+  let logoutCalls = 0
+  let clearCustomerAuthCalls = 0
+
+  try {
+    global.wx = {
+      cloud: {
+        callFunction({ name, data }) {
+          assert.equal(name, 'opsApi')
+          assert.equal(data.action, 'logout')
+          logoutCalls += 1
+          return Promise.resolve({ result: { code: 0, data: {} } })
+        }
+      },
+      showModal(payload) {
+        modalPromise = Promise.resolve(payload.success({ confirm: true }))
+      },
+      showToast(payload) {
+        wxCalls.showToast.push(payload)
+      }
+    }
+
+    const appMock = {
+      globalData: {
+        role: 'customer',
+        permissions: []
+      },
+      clearCustomerAuth() {
+        clearCustomerAuthCalls += 1
+      }
+    }
+    global.getApp = () => appMock
+
+    const page = {
+      ...pageDef,
+      data: JSON.parse(JSON.stringify(pageDef.data)),
+      setData(update) {
+        this.data = { ...this.data, ...update }
+      },
+      async _refreshPrivacyState() {
+        refreshPrivacyCalls += 1
+        this.setData({
+          privacyChecked: true,
+          needPrivacyAuthorization: false,
+          privacyDeclarationMissing: false,
+          privacyContractName: '《用户隐私保护指引》'
+        })
+      }
+    }
+
+    page.data.isLoggedIn = true
+    page.data.userInfo = { nickName: 'TestUser', phone: '13800138000' }
+
+    page.doLogout()
+    await modalPromise
+
+    assert.equal(logoutCalls, 1)
+    assert.equal(clearCustomerAuthCalls, 1)
+    assert.equal(refreshPrivacyCalls, 1)
+    assert.equal(page.data.isLoggedIn, false)
+    assert.equal(page.data.privacyChecked, true)
+    assert.equal(page.data.needPrivacyAuthorization, false)
+    assert.equal(page.data.privacyDeclarationMissing, false)
+    assert.equal(wxCalls.showToast.length, 1)
+    assert.equal(wxCalls.showToast[0].title, '已退出登录')
+  } finally {
+    delete global.Page
+    delete global.wx
+    delete global.getApp
+  }
+})
+
 test('profile onGetPhoneNumber surfaces privacy declaration guidance when phone scope is undeclared', async () => {
   const pageDef = loadMiniappPage('miniapp/pages/profile/profile.js')
   const wxCalls = { showToast: [], showModal: [] }

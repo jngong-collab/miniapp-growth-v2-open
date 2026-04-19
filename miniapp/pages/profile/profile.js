@@ -616,6 +616,14 @@ Page({
                     permissions: app.globalData.permissions || [],
                     canEnterWorkbench: isWorkbenchUser(app.globalData.role)
                 })
+                await this._refreshPrivacyState().catch(() => {
+                    this.setData({
+                        privacyChecked: true,
+                        needPrivacyAuthorization: false,
+                        privacyDeclarationMissing: false,
+                        privacyContractName: '《用户隐私保护指引》'
+                    })
+                })
                 wx.showToast({ title: '已退出登录', icon: 'success', duration: 1500 })
             }
         })
